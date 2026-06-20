@@ -1852,7 +1852,6 @@ const App = (() => {
   }
 
   // ---- Exportar liquidación como imagen a la galería ----
-  function roundRect(ctx,x,y,w,h,r){ ctx.beginPath(); ctx.moveTo(x+r,y); ctx.arcTo(x+w,y,x+w,y+h,r); ctx.arcTo(x+w,y+h,x,y+h,r); ctx.arcTo(x,y+h,x,y,r); ctx.arcTo(x,y,x+w,y,r); ctx.closePath(); }
   function exportImage(){
     const d=curDay(); if(!d){ toast('No hay día activo'); return; }
     const res=computeDay(d); if(!res){ toast('Sin resultados'); return; }
@@ -1866,40 +1865,38 @@ const App = (() => {
     const S=2;
     const cv=document.createElement('canvas'); cv.width=W*S; cv.height=H*S;
     const g=cv.getContext('2d'); g.scale(S,S);
-    const grd=g.createLinearGradient(0,0,0,H); grd.addColorStop(0,'#10402f'); grd.addColorStop(1,'#0a2a1f');
-    g.fillStyle=grd; g.fillRect(0,0,W,H);
-    g.strokeStyle='rgba(244,241,232,.18)'; g.lineWidth=2; roundRect(g,18,18,W-36,H-36,24); g.stroke();
-    const chalk='#f4f1e8', gold='#e8c87a', green='#74e7a0', red='#ff8f76', muted='#9bb3a8';
+    g.fillStyle='#ffffff'; g.fillRect(0,0,W,H);
+    const ink='#1b211d', muted='#6e776f', goldc='#b98a2e', green='#0a6a3a', red='#c1272d', lineC='#e4e6e1';
+    g.fillStyle='#0a6a3a'; g.fillRect(0,0,W,196);   // banda verde (estilo leaderboard de la app)
     g.textAlign='center';
-    g.fillStyle=gold; g.font='600 24px system-ui,sans-serif';
-    g.fillText('GOLF VIERNES · SALIDAS 2:10 Y 2:20', W/2, 72);
-    g.fillStyle=chalk; g.font='700 52px Anton, system-ui, sans-serif';
-    g.fillText(d.label||'Resultados', W/2, 132);
-    g.fillStyle=muted; g.font='400 24px system-ui,sans-serif';
-    g.fillText(`${courseOf(d).name} · ${rows.length} jug. · raya $${state.rayaValue} · ${holesLabel(d)}`, W/2, 172);
-    g.strokeStyle='rgba(244,241,232,.15)'; g.beginPath(); g.moveTo(60,200); g.lineTo(W-60,200); g.stroke();
-    g.textAlign='left'; g.fillStyle=muted; g.font='600 22px system-ui,sans-serif'; g.fillText('JUGADOR',110,top-18);
+    g.fillStyle='#e3c878'; g.font='600 24px "Hanken Grotesk",system-ui,sans-serif';
+    g.fillText('GOLF VIERNES · CAMPESTRE LEÓN', W/2, 64);
+    g.fillStyle='#ffffff'; g.font='700 52px Anton, system-ui, sans-serif';
+    g.fillText(d.label||'Resultados', W/2, 124);
+    g.fillStyle='rgba(255,255,255,.85)'; g.font='400 24px "Hanken Grotesk",system-ui,sans-serif';
+    g.fillText(`${courseOf(d).name} · ${rows.length} jug. · raya $${state.rayaValue} · ${holesLabel(d)}`, W/2, 166);
+    g.textAlign='left'; g.fillStyle=muted; g.font='600 22px "Hanken Grotesk",system-ui,sans-serif'; g.fillText('JUGADOR',110,top-18);
     g.textAlign='right'; g.fillText('PESOS',W-70,top-18);
     let y=top+20;
     rows.forEach((r,i)=>{
-      const p=player(r.id); const pos=r.pesos>0, zero=r.pesos===0;
-      g.textAlign='center'; g.fillStyle=muted; g.font='700 26px system-ui,sans-serif'; g.fillText(String(i+1),70,y+22);
-      g.textAlign='left'; g.fillStyle=chalk; g.font='700 34px system-ui,sans-serif'; g.fillText(pname(r.id),110,y+16);
-      g.fillStyle=muted; g.font='400 20px system-ui,sans-serif'; g.fillText(`${r.total>0?'+':''}${r.total} raya${Math.abs(r.total)===1?'':'s'}`,112,y+44);
-      g.textAlign='right'; g.fillStyle=zero?muted:(pos?green:red); g.font='700 40px system-ui,sans-serif';
+      const pos=r.pesos>0, zero=r.pesos===0;
+      g.textAlign='center'; g.fillStyle=muted; g.font='700 26px "Hanken Grotesk",system-ui,sans-serif'; g.fillText(String(i+1),70,y+22);
+      g.textAlign='left'; g.fillStyle=ink; g.font='700 34px "Hanken Grotesk",system-ui,sans-serif'; g.fillText(pname(r.id),110,y+16);
+      g.fillStyle=muted; g.font='400 20px "Hanken Grotesk",system-ui,sans-serif'; g.fillText(`${r.total>0?'+':''}${r.total} raya${Math.abs(r.total)===1?'':'s'}`,112,y+44);
+      g.textAlign='right'; g.fillStyle=zero?muted:(pos?green:red); g.font='700 40px "Hanken Grotesk",system-ui,sans-serif';
       g.fillText(`${pos?'+':''}$${r.pesos.toLocaleString('es-MX')}`,W-70,y+30);
-      g.strokeStyle='rgba(244,241,232,.07)'; g.beginPath(); g.moveTo(60,y+rowH-12); g.lineTo(W-60,y+rowH-12); g.stroke();
+      g.strokeStyle=lineC; g.lineWidth=1; g.beginPath(); g.moveTo(60,y+rowH-12); g.lineTo(W-60,y+rowH-12); g.stroke();
       y+=rowH;
     });
     y+=ruleGap;
     if(dl.length){
-      g.textAlign='left'; g.fillStyle=gold; g.font='700 24px system-ui,sans-serif'; g.fillText('CUENTA DEL 19',70,y); y+=40;
-      g.fillStyle=chalk; g.font='400 24px system-ui,sans-serif'; dl.forEach(line=>{ g.fillText(line,70,y); y+=36; }); y+=16;
+      g.textAlign='left'; g.fillStyle=goldc; g.font='700 24px "Hanken Grotesk",system-ui,sans-serif'; g.fillText('CUENTA DEL 19',70,y); y+=40;
+      g.fillStyle=ink; g.font='400 24px "Hanken Grotesk",system-ui,sans-serif'; dl.forEach(line=>{ g.fillText(line,70,y); y+=36; }); y+=16;
     }
     g.textAlign='center';
-    g.fillStyle=res.sum===0?green:red; g.font='600 24px system-ui,sans-serif';
+    g.fillStyle=res.sum===0?green:red; g.font='600 24px "Hanken Grotesk",system-ui,sans-serif';
     g.fillText(res.sum===0?'✓ Cuadra en cero':('⚠ Descuadre $'+res.sum), W/2, y+8);
-    g.fillStyle=muted; g.font='400 20px system-ui,sans-serif';
+    g.fillStyle=muted; g.font='400 20px "Hanken Grotesk",system-ui,sans-serif';
     g.fillText('Club Campestre de León · '+new Date().toLocaleString('es-MX',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}), W/2, y+42);
 
     const fname=((d.label||'resultados').replace(/[^\w\- ]+/g,'').replace(/\s+/g,'-')||'resultados')+'.png';
@@ -1930,29 +1927,28 @@ const App = (() => {
   function exportBoard(title, subtitle, sections){
     sections=(sections||[]).filter(s=>s && ((s.rows&&s.rows.length)||(s.lines&&s.lines.length)));
     if(!sections.length){ toast('Nada que exportar'); return; }
-    const W=1080, S=2, chalk='#f4f1e8', gold='#e8c87a', green='#74e7a0', red='#ff8f76', muted='#9bb3a8';
+    const W=1080, S=2, ink='#1b211d', goldc='#b98a2e', green='#0a6a3a', red='#c1272d', muted='#6e776f', lineC='#e4e6e1';
     let bodyH=0; sections.forEach(s=>{ bodyH+=(s.head?52:0)+((s.rows||[]).length*64)+((s.lines||[]).length*40)+18; });
     const top=206, H=top+bodyH+86;
     const cv=document.createElement('canvas'); cv.width=W*S; cv.height=H*S; const g=cv.getContext('2d'); g.scale(S,S);
-    const grd=g.createLinearGradient(0,0,0,H); grd.addColorStop(0,'#10402f'); grd.addColorStop(1,'#0a2a1f'); g.fillStyle=grd; g.fillRect(0,0,W,H);
-    g.strokeStyle='rgba(244,241,232,.18)'; g.lineWidth=2; roundRect(g,18,18,W-36,H-36,24); g.stroke();
-    g.textAlign='center'; g.fillStyle=gold; g.font='600 24px system-ui,sans-serif'; g.fillText('GOLF VIERNES · CAMPESTRE LEÓN', W/2, 66);
-    g.fillStyle=chalk; g.font='700 50px Anton, system-ui, sans-serif'; g.fillText(title, W/2, 124);
-    if(subtitle){ g.fillStyle=muted; g.font='400 23px system-ui,sans-serif'; g.fillText(subtitle, W/2, 162); }
-    g.strokeStyle='rgba(244,241,232,.15)'; g.beginPath(); g.moveTo(60,186); g.lineTo(W-60,186); g.stroke();
-    const colOf=c=> c==='good'?green : c==='bad'?red : c==='gold'||c==='ace'||c==='fire'?gold : chalk;
+    g.fillStyle='#ffffff'; g.fillRect(0,0,W,H);
+    g.fillStyle='#0a6a3a'; g.fillRect(0,0,W,180);   // banda verde de encabezado
+    g.textAlign='center'; g.fillStyle='#e3c878'; g.font='600 24px "Hanken Grotesk",system-ui,sans-serif'; g.fillText('GOLF VIERNES · CAMPESTRE LEÓN', W/2, 62);
+    g.fillStyle='#ffffff'; g.font='700 50px Anton, system-ui, sans-serif'; g.fillText(title, W/2, 120);
+    if(subtitle){ g.fillStyle='rgba(255,255,255,.85)'; g.font='400 23px "Hanken Grotesk",system-ui,sans-serif'; g.fillText(subtitle, W/2, 158); }
+    const colOf=c=> c==='good'?green : c==='bad'?red : c==='gold'||c==='ace'||c==='fire'?goldc : ink;
     let y=top;
     sections.forEach(sec=>{
-      if(sec.head){ g.textAlign='left'; g.fillStyle=gold; g.font='700 24px system-ui,sans-serif'; g.fillText(sec.head,70,y+6); y+=52; }
+      if(sec.head){ g.textAlign='left'; g.fillStyle=goldc; g.font='700 24px "Hanken Grotesk",system-ui,sans-serif'; g.fillText(sec.head,70,y+6); y+=52; }
       (sec.rows||[]).forEach(r=>{
-        g.textAlign='left'; g.fillStyle=chalk; g.font='700 30px system-ui,sans-serif'; g.fillText((r.e?r.e+'  ':'')+r.l,70,y+14);
-        if(r.r!=null){ g.textAlign='right'; g.fillStyle=colOf(r.c); g.font='700 32px system-ui,sans-serif'; g.fillText(String(r.r),W-70,y+14); }
-        g.strokeStyle='rgba(244,241,232,.07)'; g.beginPath(); g.moveTo(60,y+40); g.lineTo(W-60,y+40); g.stroke(); y+=64;
+        g.textAlign='left'; g.fillStyle=ink; g.font='700 30px "Hanken Grotesk",system-ui,sans-serif'; g.fillText((r.e?r.e+'  ':'')+r.l,70,y+14);
+        if(r.r!=null){ g.textAlign='right'; g.fillStyle=colOf(r.c); g.font='700 32px "Hanken Grotesk",system-ui,sans-serif'; g.fillText(String(r.r),W-70,y+14); }
+        g.strokeStyle=lineC; g.lineWidth=1; g.beginPath(); g.moveTo(60,y+40); g.lineTo(W-60,y+40); g.stroke(); y+=64;
       });
-      (sec.lines||[]).forEach(line=>{ g.textAlign='left'; g.fillStyle=chalk; g.font='400 24px system-ui,sans-serif'; g.fillText(line,70,y+8); y+=40; });
+      (sec.lines||[]).forEach(line=>{ g.textAlign='left'; g.fillStyle=ink; g.font='400 24px "Hanken Grotesk",system-ui,sans-serif'; g.fillText(line,70,y+8); y+=40; });
       y+=18;
     });
-    g.textAlign='center'; g.fillStyle=muted; g.font='400 20px system-ui,sans-serif';
+    g.textAlign='center'; g.fillStyle=muted; g.font='400 20px "Hanken Grotesk",system-ui,sans-serif';
     g.fillText('Club Campestre de León · '+new Date().toLocaleString('es-MX',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}), W/2, H-38);
     saveCanvas(cv, (title.replace(/[^\w\- ]+/g,'').replace(/\s+/g,'-')||'tablero')+'.png', title);
   }
@@ -2005,30 +2001,31 @@ const App = (() => {
     let bodyH=130; groups.forEach(gr=>{ bodyH += 34 + headH*2 + gr.ids.length*rowH + 24; });
     const H=bodyH+70;
     const cv=document.createElement('canvas'); cv.width=W*S; cv.height=H*S; const g=cv.getContext('2d'); g.scale(S,S);
-    const grd=g.createLinearGradient(0,0,0,H); grd.addColorStop(0,'#10402f'); grd.addColorStop(1,'#0a2a1f'); g.fillStyle=grd; g.fillRect(0,0,W,H);
-    g.strokeStyle='rgba(244,241,232,.18)'; g.lineWidth=2; roundRect(g,18,18,W-36,H-36,24); g.stroke();
-    g.textAlign='center'; g.fillStyle='#e8c87a'; g.font='600 22px system-ui,sans-serif'; g.fillText('GOLF VIERNES · CAMPESTRE LEÓN', W/2, 52);
-    g.fillStyle='#f4f1e8'; g.font='700 40px Anton, system-ui, sans-serif'; g.fillText('Tarjeta · '+(d.label||''), W/2, 92);
-    g.fillStyle='#9bb3a8'; g.font='400 20px system-ui,sans-serif'; g.fillText(courseOf(d).name+' · '+holesLabel(d), W/2, 118);
+    const ink='#1b211d', muted='#6e776f', goldc='#b98a2e', green='#0a6a3a', red='#c1272d', miss='#b8bfb9';
+    g.fillStyle='#ffffff'; g.fillRect(0,0,W,H);
+    g.fillStyle='#0a6a3a'; g.fillRect(0,0,W,124);   // banda verde
+    g.textAlign='center'; g.fillStyle='#e3c878'; g.font='600 22px "Hanken Grotesk",system-ui,sans-serif'; g.fillText('GOLF VIERNES · CAMPESTRE LEÓN', W/2, 48);
+    g.fillStyle='#ffffff'; g.font='700 40px Anton, system-ui, sans-serif'; g.fillText('Tarjeta · '+(d.label||''), W/2, 90);
+    g.fillStyle='rgba(255,255,255,.85)'; g.font='400 20px "Hanken Grotesk",system-ui,sans-serif'; g.fillText(courseOf(d).name+' · '+holesLabel(d), W/2, 116);
     const colX=k=>padX+nameW+k*cW+cW/2, totX=padX+nameW+nC*cW+totW/2, rayX=padX+nameW+nC*cW+totW+rayW/2;
-    let y=140;
+    let y=148;
     groups.forEach(gr=>{
-      g.textAlign='left'; g.fillStyle=gr.gi===0?'#74e7a0':'#c9a8ff'; g.font='700 22px system-ui,sans-serif'; g.fillText('Grupo '+(gr.gi+1), padX, y); y+=30;
-      g.fillStyle='#cfe3d6'; g.font='700 17px system-ui,sans-serif'; g.textAlign='left'; g.fillText('Hoyo', padX, y+22);
-      g.textAlign='center'; cols.forEach((c,k)=>{ g.fillStyle=c.sub?'#e8c87a':'#cfe3d6'; g.fillText(c.sub||holes[c.h].n, colX(k), y+22); }); g.fillStyle='#cfe3d6'; g.fillText('Tot', totX, y+22); g.fillText('Ray', rayX, y+22); y+=headH;
-      g.textAlign='left'; g.fillStyle='#9bb3a8'; g.fillText('Par', padX, y+20);
-      g.textAlign='center'; cols.forEach((c,k)=>{ g.fillStyle=c.sub?'#cdbb8a':'#9bb3a8'; g.fillText(c.sub?c.seg.reduce((a,i)=>a+holes[i].par,0):holes[c.h].par, colX(k), y+20); }); g.fillStyle='#9bb3a8'; g.fillText(parTot, totX, y+20); y+=headH-4;
+      g.textAlign='left'; g.fillStyle=gr.gi===0?green:'#7a5bb0'; g.font='700 22px "Hanken Grotesk",system-ui,sans-serif'; g.fillText('Grupo '+(gr.gi+1), padX, y); y+=30;
+      g.fillStyle=muted; g.font='700 17px "Hanken Grotesk",system-ui,sans-serif'; g.textAlign='left'; g.fillText('Hoyo', padX, y+22);
+      g.textAlign='center'; cols.forEach((c,k)=>{ g.fillStyle=c.sub?goldc:muted; g.fillText(c.sub||holes[c.h].n, colX(k), y+22); }); g.fillStyle=muted; g.fillText('Tot', totX, y+22); g.fillText('Ray', rayX, y+22); y+=headH;
+      g.textAlign='left'; g.fillStyle=muted; g.fillText('Par', padX, y+20);
+      g.textAlign='center'; cols.forEach((c,k)=>{ g.fillStyle=c.sub?goldc:muted; g.fillText(c.sub?c.seg.reduce((a,i)=>a+holes[i].par,0):holes[c.h].par, colX(k), y+20); }); g.fillStyle=muted; g.fillText(parTot, totX, y+20); y+=headH-4;
       gr.ids.forEach(id=>{ const sc=ensureScore(d,id), tot=ord.reduce((a,i)=>a+(sc.gross[i]||0),0); const r=res?res.rows.find(x=>x.id===id):null, rr=r?r.total:0;
-        g.textAlign='left'; g.fillStyle='#f4f1e8'; g.font='700 18px system-ui,sans-serif'; g.fillText(pname(id), padX, y+22);
-        g.textAlign='center'; g.font='600 18px system-ui,sans-serif';
-        cols.forEach((c,k)=>{ if(c.sub){ const s=c.seg.reduce((a,i)=>a+(sc.gross[i]||0),0); g.fillStyle='#e8c87a'; g.font='700 18px system-ui,sans-serif'; g.fillText(s||'·', colX(k), y+22); g.font='600 18px system-ui,sans-serif'; }
-          else { const gv=sc.gross[c.h]; if(gv>0){ const df=gv-holes[c.h].par; g.fillStyle=df<=-1?'#74e7a0':df===0?'#f4f1e8':df===1?'#e8c87a':'#ff8f76'; } else g.fillStyle='#5b7068'; g.fillText(gv||'·', colX(k), y+22); } });
-        g.fillStyle='#f4f1e8'; g.font='700 18px system-ui,sans-serif'; g.fillText(tot||'—', totX, y+22);
-        g.fillStyle=rr>0?'#74e7a0':rr<0?'#ff8f76':'#9bb3a8'; g.fillText((rr>0?'+':'')+(rr||0), rayX, y+22); y+=rowH;
+        g.textAlign='left'; g.fillStyle=ink; g.font='700 18px "Hanken Grotesk",system-ui,sans-serif'; g.fillText(pname(id), padX, y+22);
+        g.textAlign='center'; g.font='600 18px "Hanken Grotesk",system-ui,sans-serif';
+        cols.forEach((c,k)=>{ if(c.sub){ const s=c.seg.reduce((a,i)=>a+(sc.gross[i]||0),0); g.fillStyle=goldc; g.font='700 18px "Hanken Grotesk",system-ui,sans-serif'; g.fillText(s||'·', colX(k), y+22); g.font='600 18px "Hanken Grotesk",system-ui,sans-serif'; }
+          else { const gv=sc.gross[c.h]; if(gv>0){ const df=gv-holes[c.h].par; g.fillStyle=df<=-1?green:df===0?ink:df===1?goldc:red; } else g.fillStyle=miss; g.fillText(gv||'·', colX(k), y+22); } });
+        g.fillStyle=ink; g.font='700 18px "Hanken Grotesk",system-ui,sans-serif'; g.fillText(tot||'—', totX, y+22);
+        g.fillStyle=rr>0?green:rr<0?red:muted; g.fillText((rr>0?'+':'')+(rr||0), rayX, y+22); y+=rowH;
       });
       y+=24;
     });
-    g.textAlign='center'; g.fillStyle='#9bb3a8'; g.font='400 18px system-ui,sans-serif';
+    g.textAlign='center'; g.fillStyle=muted; g.font='400 18px "Hanken Grotesk",system-ui,sans-serif';
     g.fillText('Club Campestre de León · '+new Date().toLocaleString('es-MX',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}), W/2, H-34);
     saveCanvas(cv, 'tarjeta-'+((d.label||'dia').replace(/[^\w]+/g,'-')||'dia')+'.png', 'Tarjeta '+(d.label||''));
   }
