@@ -1,0 +1,639 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;0,6..72,700;1,6..72,500;1,6..72,600&family=Hanken+Grotesk:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  *{box-sizing:border-box}
+  .gv-screen::-webkit-scrollbar{display:none}
+</style>
+</helmet>
+
+<div style="width:max-content;min-width:100%;min-height:100vh;box-sizing:border-box;padding:48px;background:#e7e5df;font-family:'Hanken Grotesk',system-ui,sans-serif">
+
+  <!-- intro -->
+  <div style="max-width:780px;margin:0 0 40px">
+    <div style="font-weight:800;font-size:12px;letter-spacing:.18em;text-transform:uppercase;color:#0a6a3a">Golf Viernes · Rediseño v2</div>
+    <h1 style="font-family:'Newsreader';font-weight:600;font-size:44px;line-height:1.02;letter-spacing:-.01em;color:#0a6a3a;margin:8px 0 10px">Estilo Masters, para tu viernes</h1>
+    <p style="font-size:16px;line-height:1.55;color:#54635a;margin:0;max-width:640px">Blanco limpio, verde profundo, títulos y nombres en serif (Newsreader), cifras en rojo/verde y acento dorado. El <b>podio</b> que te gustó arriba de El 19, con su leaderboard tipo torneo abajo. Mismo lenguaje en Captura, Salidas y Destacados.</p>
+  </div>
+
+  <div style="display:flex;gap:48px;align-items:flex-start">
+
+    <!-- ===================== EL 19 ===================== -->
+    <div style="flex:none;width:392px">
+      <div style="font-family:'Newsreader';font-weight:600;font-size:15px;color:#0a6a3a;margin-bottom:3px">El 19 · Resultados</div>
+      <div style="font-size:12.5px;color:#7c7567;margin-bottom:14px">Podio + leaderboard del viernes.</div>
+      <div style="width:392px;border-radius:42px;border:11px solid #0e1410;overflow:hidden;box-shadow:0 24px 60px rgba(15,40,28,.22)">
+        <div class="gv-screen" style="background:#fff;height:824px;overflow:auto;-ms-overflow-style:none;scrollbar-width:none">
+
+          <!-- status bar -->
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 22px 4px">
+            <div style="font-weight:700;font-size:15px;color:#1b211d">7:59</div>
+            <div style="display:flex;align-items:center;gap:7px;color:#1b211d">
+              <span style="font-size:12px;letter-spacing:1px">▂▄▆</span><span style="font-size:13px">📶</span>
+              <span style="display:inline-flex;align-items:center;border:1.5px solid #1b211d;border-radius:4px;padding:1px 4px;font-size:9px;font-weight:800">24</span>
+            </div>
+          </div>
+          <!-- app bar -->
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:6px 20px 12px;border-bottom:1px solid #e4e6e1">
+            <div style="color:#0a6a3a;display:flex"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="3.6"/><path d="M5.5 20a6.5 6.5 0 0 1 13 0"/></svg></div>
+            <div style="font-family:'Newsreader';font-style:italic;font-weight:600;font-size:19px;color:#0a6a3a;white-space:nowrap;display:flex;align-items:center"><span style="display:inline-flex;margin-right:8px"><svg width="24" height="24" viewBox="0 0 24 24"><path d="M3 16 C5 13 9 12 12 12 C16 12 19 13.5 21 16 C19.5 17.6 16 18.6 12 18.6 C8 18.6 4.5 17.6 3 16 Z" fill="#e6c34a" stroke="#0a6a3a" stroke-width="1.3" stroke-linejoin="round"/><ellipse cx="13.6" cy="15.1" rx="1.3" ry="0.72" fill="#0a6a3a"/><path d="M13.6 15 L13.6 4.2" stroke="#0a6a3a" stroke-width="1.3" stroke-linecap="round"/><path d="M13.6 4.4 L19.2 6.1 L13.6 7.9 Z" fill="#c1272d"/></svg></span>Golf Viernes</div>
+            <div style="color:#0a6a3a;display:flex"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M6.5 9.5a5.5 5.5 0 0 1 11 0c0 4.5 1.8 6 1.8 6H4.7s1.8-1.5 1.8-6Z"/><path d="M10 19a2 2 0 0 0 4 0"/></svg></div>
+          </div>
+
+          <div style="padding:14px 18px 92px">
+            <h2 style="font-family:'Newsreader';font-weight:600;font-size:34px;line-height:1;color:#0a6a3a;margin:0 0 14px">Resultados</h2>
+
+            <!-- filter pills -->
+            <div style="display:flex;align-items:center;gap:9px;margin-bottom:18px">
+              <div style="display:flex;align-items:center;gap:7px;border:1.5px solid #0a6a3a;border-radius:999px;padding:9px 15px;color:#0a6a3a;font-weight:600;font-size:14px">Viernes 13 jun <span style="font-size:11px">▾</span></div>
+              <div style="width:40px;height:40px;border:1.5px solid #0a6a3a;border-radius:50%;display:grid;place-items:center;color:#0a6a3a;font-size:15px"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="6"/><path d="M20 20l-4.2-4.2"/></svg></div>
+              <div style="display:flex;align-items:center;gap:7px;border:1.5px solid #0a6a3a;border-radius:999px;padding:9px 15px;color:#0a6a3a;font-weight:600;font-size:14px">Todos <span style="font-size:11px">▾</span></div>
+            </div>
+
+            <!-- podium -->
+            <div style="border:1px solid #e4e6e1;border-radius:18px;padding:16px 14px 4px;margin-bottom:18px;background:#fcfcfb">
+              <div style="text-align:center;font-weight:700;font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:#b98a2e;margin-bottom:14px">El podio del viernes</div>
+              <div style="display:flex;align-items:flex-end;justify-content:center;gap:10px">
+                <!-- 2nd -->
+                <div style="text-align:center;flex:1">
+                  <div style="width:54px;height:54px;margin:0 auto;border-radius:50%;background:#0a6a3a;color:#fff;display:grid;place-items:center;font-family:'Newsreader';font-weight:600;font-size:22px">CH</div>
+                  <div style="font-family:'Newsreader';font-weight:600;font-size:15px;color:#0a6a3a;margin-top:7px">Chuy</div>
+                  <div style="font-weight:800;font-size:18px;color:#0a6a3a;line-height:1">+180</div>
+                  <div style="background:#eef1ee;color:#5a655c;border-radius:10px 10px 0 0;padding:9px 0 7px;margin-top:7px;font-weight:800;font-size:16px">2</div>
+                </div>
+                <!-- 1st -->
+                <div style="text-align:center;flex:1.15">
+                  <div style="line-height:1;margin-bottom:2px;display:flex;justify-content:center"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#b98a2e" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 8.5l4 3.2L12 5l4.5 6.7 4-3.2-1.6 9.3H5.1Z"/><path d="M5.5 20.5h13"/></svg></div>
+                  <div style="width:66px;height:66px;margin:0 auto;border-radius:50%;background:#fff;color:#b98a2e;display:grid;place-items:center;font-family:'Newsreader';font-weight:600;font-size:27px;border:3px solid #d8b24e;box-shadow:0 0 0 4px rgba(216,178,78,.18)">BE</div>
+                  <div style="font-family:'Newsreader';font-weight:600;font-size:17px;color:#0a6a3a;margin-top:7px">Beto</div>
+                  <div style="font-weight:800;font-size:22px;color:#0a6a3a;line-height:1">+340</div>
+                  <div style="background:#d8b24e;color:#3a2c00;border-radius:10px 10px 0 0;padding:12px 0 9px;margin-top:7px;font-weight:800;font-size:18px">1</div>
+                </div>
+                <!-- 3rd -->
+                <div style="text-align:center;flex:1">
+                  <div style="width:54px;height:54px;margin:0 auto;border-radius:50%;background:#0a6a3a;color:#fff;display:grid;place-items:center;font-family:'Newsreader';font-weight:600;font-size:22px">TA</div>
+                  <div style="font-family:'Newsreader';font-weight:600;font-size:15px;color:#0a6a3a;margin-top:7px">Tavo</div>
+                  <div style="font-weight:800;font-size:18px;color:#0a6a3a;line-height:1">+60</div>
+                  <div style="background:#eef1ee;color:#5a655c;border-radius:10px 10px 0 0;padding:6px 0 7px;margin-top:7px;font-weight:800;font-size:16px">3</div>
+                </div>
+              </div>
+            </div>
+
+            <!-- leaderboard table -->
+            <div style="border:1px solid #e4e6e1;border-radius:14px;overflow:hidden">
+              <div style="display:grid;grid-template-columns:38px 1fr 64px 56px;background:#0a6a3a;color:#fff;font-size:11px;font-weight:700;letter-spacing:.03em">
+                <div style="padding:9px 0 9px 12px">POS</div><div style="padding:9px 0">JUGADOR</div><div style="padding:9px 0;text-align:right">PESOS</div><div style="padding:9px 12px 9px 0;text-align:right">RAYAS</div>
+              </div>
+              <div style="background:#f4f5f2;color:#8a928b;font-size:10.5px;font-weight:800;letter-spacing:.1em;padding:6px 12px">HOY · CAMPESTRE LEÓN · RAYA $20</div>
+
+              <div style="display:grid;grid-template-columns:38px 1fr 64px 56px;align-items:center;border-bottom:1px solid #eef0ed">
+                <div style="padding:11px 0 11px 12px;font-weight:700;color:#1b211d">1</div>
+                <div style="font-family:'Newsreader';font-weight:600;font-size:17px;color:#0a6a3a">Beto <span style="color:#d8b24e;font-size:12px">★</span></div>
+                <div style="text-align:right;font-weight:800;font-size:16px;color:#0a6a3a">+340</div>
+                <div style="padding-right:12px;text-align:right;font-weight:600;color:#5a655c">+17</div>
+              </div>
+              <div style="display:grid;grid-template-columns:38px 1fr 64px 56px;align-items:center;border-bottom:1px solid #eef0ed">
+                <div style="padding:11px 0 11px 12px;font-weight:700;color:#1b211d">2</div>
+                <div style="font-family:'Newsreader';font-weight:600;font-size:17px;color:#0a6a3a">Chuy</div>
+                <div style="text-align:right;font-weight:800;font-size:16px;color:#0a6a3a">+180</div>
+                <div style="padding-right:12px;text-align:right;font-weight:600;color:#5a655c">+9</div>
+              </div>
+              <div style="display:grid;grid-template-columns:38px 1fr 64px 56px;align-items:center;border-bottom:1px solid #eef0ed">
+                <div style="padding:11px 0 11px 12px;font-weight:700;color:#1b211d">3</div>
+                <div style="font-family:'Newsreader';font-weight:600;font-size:17px;color:#0a6a3a">Tavo</div>
+                <div style="text-align:right;font-weight:800;font-size:16px;color:#0a6a3a">+60</div>
+                <div style="padding-right:12px;text-align:right;font-weight:600;color:#5a655c">+3</div>
+              </div>
+              <div style="display:grid;grid-template-columns:38px 1fr 64px 56px;align-items:center;border-bottom:1px solid #eef0ed">
+                <div style="padding:11px 0 11px 12px;font-weight:700;color:#1b211d">4</div>
+                <div style="font-family:'Newsreader';font-weight:600;font-size:17px;color:#0a6a3a">Memo</div>
+                <div style="text-align:right;font-weight:800;font-size:16px;color:#9aa39a">0</div>
+                <div style="padding-right:12px;text-align:right;font-weight:600;color:#9aa39a">0</div>
+              </div>
+              <div style="display:grid;grid-template-columns:38px 1fr 64px 56px;align-items:center;border-bottom:1px solid #eef0ed">
+                <div style="padding:11px 0 11px 12px;font-weight:700;color:#1b211d">5</div>
+                <div style="font-family:'Newsreader';font-weight:600;font-size:17px;color:#0a6a3a">Lalo</div>
+                <div style="text-align:right;font-weight:800;font-size:16px;color:#c1272d">−120</div>
+                <div style="padding-right:12px;text-align:right;font-weight:600;color:#5a655c">−6</div>
+              </div>
+              <div style="display:grid;grid-template-columns:38px 1fr 64px 56px;align-items:center;border-bottom:1px solid #eef0ed">
+                <div style="padding:11px 0 11px 12px;font-weight:700;color:#1b211d">6</div>
+                <div style="font-family:'Newsreader';font-weight:600;font-size:17px;color:#0a6a3a">Pancho</div>
+                <div style="text-align:right;font-weight:800;font-size:16px;color:#c1272d">−140</div>
+                <div style="padding-right:12px;text-align:right;font-weight:600;color:#5a655c">−7</div>
+              </div>
+              <div style="display:grid;grid-template-columns:38px 1fr 64px 56px;align-items:center">
+                <div style="padding:11px 0 11px 12px;font-weight:700;color:#1b211d">7</div>
+                <div style="font-family:'Newsreader';font-weight:600;font-size:17px;color:#0a6a3a">Güero <span style="display:inline-flex;vertical-align:-2px;color:#c1272d"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="7.5"/><path d="M12 8v8M14.2 9.5c-.6-.7-1.6-1-2.6-1-1.3 0-2.3.7-2.3 1.8 0 2.6 5 1.3 5 3.9 0 1.2-1.1 1.9-2.7 1.9-1.1 0-2.1-.4-2.7-1.1"/></svg></span></div>
+                <div style="text-align:right;font-weight:800;font-size:16px;color:#c1272d">−320</div>
+                <div style="padding-right:12px;text-align:right;font-weight:600;color:#5a655c">−16</div>
+              </div>
+            </div>
+
+            <div style="display:flex;align-items:center;justify-content:center;gap:7px;color:#0a6a3a;font-weight:600;font-size:12.5px;margin:14px 0 14px"><span style="display:inline-flex;align-items:center"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 6.5"/></svg></span>Cuadra en cero · listo para cerrar</div>
+            <button style="width:100%;background:#0a6a3a;color:#fff;border:none;border-radius:12px;padding:15px;font-weight:700;font-size:15px">Cerrar viernes y ajustar ventajas</button>
+            <div style="text-align:center;margin-top:11px;font-size:13px;color:#b98a2e;font-weight:700">Ver desglose por concepto →</div>
+          </div>
+
+          <!-- bottom nav -->
+          <div style="position:sticky;bottom:0;background:#fff;display:grid;grid-template-columns:repeat(6,1fr);padding:7px 2px 11px;border-top:1px solid #e4e6e1">
+            <div style="display:flex;flex-direction:column;align-items:center;gap:3px;color:#0a6a3a"><span style="display:grid;place-items:center;width:22px;height:22px"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M7 4h10v4.5a5 5 0 0 1-10 0Z"/><path d="M7 5.5H4.5a2 2 0 0 0 2.3 3.2"/><path d="M17 5.5h2.5a2 2 0 0 1-2.3 3.2"/><path d="M10 14h4l-.4 2.5h-3.2Z"/><path d="M8.5 20h7"/><path d="M12 16.5V20"/></svg></span><span style="font-size:9px;font-weight:700">El 19</span></div>
+            <div style="display:flex;flex-direction:column;align-items:center;gap:3px;color:#9aa39a"><span style="display:grid;place-items:center;width:22px;height:22px"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3.5c.5 2.8 3.5 3.8 3.5 7.3a3.5 3.5 0 0 1-7 0c0-1.3.4-2.2 1.2-3 .2 1 .8 1.5 1.4 1.7-.3-2.4 0-4.7.9-6Z"/></svg></span><span style="font-size:9px;font-weight:600">Destac.</span></div>
+            <div style="display:flex;flex-direction:column;align-items:center;gap:3px;color:#9aa39a"><span style="display:grid;place-items:center;width:22px;height:22px"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M6.5 21V3.5"/><path d="M6.5 4.5h10l-2.3 3 2.3 3h-10"/></svg></span><span style="font-size:9px;font-weight:600">Salidas</span></div>
+            <div style="display:flex;flex-direction:column;align-items:center;gap:3px;color:#9aa39a"><span style="display:grid;place-items:center;width:22px;height:22px"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M15.2 4.4l4.4 4.4-9.4 9.4-4.7.9.9-4.7Z"/><path d="M13.4 6.2l4.4 4.4"/><path d="M6.4 14.4l3.2 3.2"/></svg></span><span style="font-size:9px;font-weight:600">Captura</span></div>
+            <div style="display:flex;flex-direction:column;align-items:center;gap:3px;color:#9aa39a"><span style="display:grid;place-items:center;width:22px;height:22px"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4.5v15"/><path d="M5.5 19.5h13"/><path d="M6 7.5l6-1.3 6 1.3"/><path d="M6 7.5l-2.5 5a2.5 2.5 0 0 0 5 0Z"/><path d="M18 7.5l-2.5 5a2.5 2.5 0 0 0 5 0Z"/></svg></span><span style="font-size:9px;font-weight:600">Ventajas</span></div>
+            <div style="display:flex;flex-direction:column;align-items:center;gap:3px;color:#9aa39a"><span style="display:grid;place-items:center;width:22px;height:22px"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 2.5v2.2M12 19.3v2.2M21.5 12h-2.2M4.7 12H2.5M18.7 5.3l-1.6 1.6M6.9 17.1l-1.6 1.6M18.7 18.7l-1.6-1.6M6.9 6.9 5.3 5.3"/></svg></span><span style="font-size:9px;font-weight:600">Ajustes</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===================== CAPTURA ===================== -->
+    <div style="flex:none;width:392px">
+      <div style="font-family:'Newsreader';font-weight:600;font-size:15px;color:#0a6a3a;margin-bottom:3px">Captura</div>
+      <div style="font-size:12.5px;color:#7c7567;margin-bottom:14px">Hoyo por hoyo, limpio y con cifras grandes.</div>
+      <div style="width:392px;border-radius:42px;border:11px solid #0e1410;overflow:hidden;box-shadow:0 24px 60px rgba(15,40,28,.22)">
+        <div class="gv-screen" style="background:#fff;height:824px;overflow:auto;-ms-overflow-style:none;scrollbar-width:none">
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 22px 4px">
+            <div style="font-weight:700;font-size:15px;color:#1b211d">8:01</div>
+            <div style="display:flex;align-items:center;gap:7px;color:#1b211d"><span style="font-size:12px;letter-spacing:1px">▂▄▆</span><span style="font-size:13px">📶</span><span style="display:inline-flex;align-items:center;border:1.5px solid #1b211d;border-radius:4px;padding:1px 4px;font-size:9px;font-weight:800">24</span></div>
+          </div>
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:6px 20px 12px;border-bottom:1px solid #e4e6e1">
+            <div style="color:#0a6a3a;display:flex"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="3.6"/><path d="M5.5 20a6.5 6.5 0 0 1 13 0"/></svg></div>
+            <div style="font-family:'Newsreader';font-style:italic;font-weight:600;font-size:19px;color:#0a6a3a;white-space:nowrap;display:flex;align-items:center"><span style="display:inline-flex;margin-right:8px"><svg width="24" height="24" viewBox="0 0 24 24"><path d="M3 16 C5 13 9 12 12 12 C16 12 19 13.5 21 16 C19.5 17.6 16 18.6 12 18.6 C8 18.6 4.5 17.6 3 16 Z" fill="#e6c34a" stroke="#0a6a3a" stroke-width="1.3" stroke-linejoin="round"/><ellipse cx="13.6" cy="15.1" rx="1.3" ry="0.72" fill="#0a6a3a"/><path d="M13.6 15 L13.6 4.2" stroke="#0a6a3a" stroke-width="1.3" stroke-linecap="round"/><path d="M13.6 4.4 L19.2 6.1 L13.6 7.9 Z" fill="#c1272d"/></svg></span>Golf Viernes</div>
+            <div style="color:#0a6a3a;display:flex"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M6.5 9.5a5.5 5.5 0 0 1 11 0c0 4.5 1.8 6 1.8 6H4.7s1.8-1.5 1.8-6Z"/><path d="M10 19a2 2 0 0 0 4 0"/></svg></div>
+          </div>
+
+          <div style="padding:14px 18px 92px">
+            <h2 style="font-family:'Newsreader';font-weight:600;font-size:34px;line-height:1;color:#0a6a3a;margin:0 0 14px">Captura</h2>
+            <div style="display:flex;border:1px solid #e4e6e1;border-radius:999px;padding:4px;margin-bottom:16px">
+              <div style="flex:1;text-align:center;padding:8px;border-radius:999px;background:#0a6a3a;color:#fff;font-weight:700;font-size:13.5px">Capturar</div>
+              <div style="flex:1;text-align:center;padding:8px;font-weight:600;font-size:13.5px;color:#6e776f">Tarjeta</div>
+            </div>
+
+            <!-- hole nav -->
+            <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px">
+              <div style="width:46px;height:46px;border:1.5px solid #0a6a3a;border-radius:50%;display:grid;place-items:center;color:#0a6a3a;font-size:18px">‹</div>
+              <div style="flex:1;text-align:center">
+                <div style="font-family:'Newsreader';font-weight:600;font-size:26px;color:#0a6a3a;line-height:1">Hoyo 7</div>
+                <div style="font-size:12px;color:#6e776f;margin-top:3px;font-weight:600">Par 4 · HCP 11 · 7 de 18</div>
+              </div>
+              <div style="width:46px;height:46px;background:#0a6a3a;border-radius:50%;display:grid;place-items:center;color:#fff;font-size:18px">›</div>
+            </div>
+
+            <!-- player rows -->
+            <div style="border:1px solid #e4e6e1;border-radius:16px;padding:4px 14px">
+              <div style="padding:14px 0;border-bottom:1px solid #eef0ed">
+                <div style="display:flex;align-items:center;gap:10px">
+                  <div style="flex:1;font-family:'Newsreader';font-weight:600;font-size:18px;color:#0a6a3a">Beto <span style="display:inline-flex;vertical-align:-2px;color:#0a6a3a"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 6.5"/></svg></span></div>
+                  <div style="display:flex;align-items:center;border:1px solid #e4e6e1;border-radius:11px;overflow:hidden">
+                    <div style="width:40px;height:40px;display:grid;place-items:center;font-size:22px;font-weight:600;color:#0a6a3a">−</div>
+                    <div style="min-width:42px;text-align:center;font-weight:800;font-size:24px;color:#0a6a3a">3</div>
+                    <div style="width:40px;height:40px;display:grid;place-items:center;font-size:22px;font-weight:600;color:#0a6a3a">+</div>
+                  </div>
+                  <div style="display:flex;align-items:center;gap:5px;color:#6e776f;font-weight:700;font-size:14px"><span style="display:inline-flex;vertical-align:-2px"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M7 21V4"/><path d="M7 4.5h8l-1.8 2.4L15 9.3H7"/></svg></span>1</div>
+                </div>
+                <div style="display:flex;gap:6px;margin-top:10px">
+                  <div style="flex:1;text-align:center;padding:8px 0;border-radius:9px;background:#0a6a3a;color:#fff;font-weight:700;font-size:12.5px"><span style="display:inline-flex;align-items:center;gap:5px;justify-content:center"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M2 13c2.2-3.2 4.8-3.2 7 0 2.2-3.2 4.8-3.2 7 0"/></svg>Birdie</span></div>
+                  <div style="flex:1;text-align:center;padding:8px 0;border-radius:9px;background:#f4f5f2;color:#6e776f;font-weight:700;font-size:12.5px">Par</div>
+                  <div style="flex:1;text-align:center;padding:8px 0;border-radius:9px;background:#f4f5f2;color:#6e776f;font-weight:700;font-size:12.5px">Bogey</div>
+                  <div style="flex:1;text-align:center;padding:8px 0;border-radius:9px;background:#f4f5f2;color:#6e776f;font-weight:700;font-size:12.5px">Zopi</div>
+                </div>
+                <div style="display:flex;gap:6px;margin-top:8px">
+                  <div style="font-size:11px;font-weight:700;padding:4px 9px;border-radius:7px;background:#fff;border:1px dashed #b98a2e;color:#b98a2e"><span style="display:inline-flex;align-items:center;gap:4px"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 13c2.2-3.2 4.8-3.2 7 0 2.2-3.2 4.8-3.2 7 0"/></svg>auto</span></div>
+                  <div style="font-size:11px;font-weight:700;padding:4px 9px;border-radius:7px;background:#f4f5f2;color:#6e776f"><span style="display:inline-flex;align-items:center;gap:4px"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3.5v8"/><path d="M12 4h4l-1.2 1.6L16 7.2h-4"/><path d="M3 18c2-1.8 4 .2 6-.8s4 .8 6-.2 3 .8 6-1"/><path d="M3 21h18"/></svg>Sandy</span></div>
+                  <div style="font-size:11px;font-weight:700;padding:4px 9px;border-radius:7px;background:#f4f5f2;color:#6e776f"><span style="display:inline-flex;align-items:center;gap:4px"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M7.5 8h7v10.5a1 1 0 0 1-1 1h-5a1 1 0 0 1-1-1Z"/><path d="M14.5 10h2.5a1.4 1.4 0 0 1 1.4 1.4v2.6a1.4 1.4 0 0 1-1.4 1.4h-2.5"/><path d="M9 8c0-1.6 1.2-2.6 3-2.6s3 1 3 2.6"/></svg>Chevez</span></div>
+                </div>
+              </div>
+              <div style="padding:14px 0;border-bottom:1px solid #eef0ed">
+                <div style="display:flex;align-items:center;gap:10px">
+                  <div style="flex:1;font-family:'Newsreader';font-weight:600;font-size:18px;color:#0a6a3a">Chuy <span style="background:#fbe9e7;color:#c1272d;font-size:10px;font-weight:800;border-radius:999px;padding:1px 7px"><span style="display:inline-flex;vertical-align:-1px;margin-right:3px"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></svg></span>3</span></div>
+                  <div style="display:flex;align-items:center;border:1px solid #e4e6e1;border-radius:11px;overflow:hidden">
+                    <div style="width:40px;height:40px;display:grid;place-items:center;font-size:22px;font-weight:600;color:#0a6a3a">−</div>
+                    <div style="min-width:42px;text-align:center;font-weight:800;font-size:24px;color:#1b211d">4</div>
+                    <div style="width:40px;height:40px;display:grid;place-items:center;font-size:22px;font-weight:600;color:#0a6a3a">+</div>
+                  </div>
+                  <div style="display:flex;align-items:center;gap:5px;color:#6e776f;font-weight:700;font-size:14px"><span style="display:inline-flex;vertical-align:-2px"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M7 21V4"/><path d="M7 4.5h8l-1.8 2.4L15 9.3H7"/></svg></span>2</div>
+                </div>
+              </div>
+              <div style="padding:14px 0">
+                <div style="display:flex;align-items:center;gap:10px">
+                  <div style="flex:1;font-family:'Newsreader';font-weight:600;font-size:18px;color:#0a6a3a">Tavo <span style="display:inline-flex;vertical-align:-2px;color:#0a6a3a"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 6.5"/></svg></span></div>
+                  <div style="display:flex;align-items:center;border:1px solid #e4e6e1;border-radius:11px;overflow:hidden">
+                    <div style="width:40px;height:40px;display:grid;place-items:center;font-size:22px;font-weight:600;color:#0a6a3a">−</div>
+                    <div style="min-width:42px;text-align:center;font-weight:800;font-size:24px;color:#c1272d">5</div>
+                    <div style="width:40px;height:40px;display:grid;place-items:center;font-size:22px;font-weight:600;color:#0a6a3a">+</div>
+                  </div>
+                  <div style="display:flex;align-items:center;gap:5px;color:#6e776f;font-weight:700;font-size:14px"><span style="display:inline-flex;vertical-align:-2px"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M7 21V4"/><path d="M7 4.5h8l-1.8 2.4L15 9.3H7"/></svg></span>2</div>
+                </div>
+              </div>
+            </div>
+
+            <div style="display:flex;align-items:center;justify-content:center;gap:7px;background:#fbf4e6;color:#9a6b00;border-radius:10px;padding:10px;font-weight:600;font-size:12.5px;margin:14px 0 11px"><span style="display:inline-flex;align-items:center"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></svg></span>Faltan 3 hoyos: 11, 12, 15</div>
+            <button style="width:100%;background:#0a6a3a;color:#fff;border:none;border-radius:12px;padding:14px;font-weight:700;font-size:14px;margin-bottom:9px"><span style="display:inline-flex;align-items:center;gap:7px;justify-content:center"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M5 5l8 7-8 7Z"/><path d="M18 5v14"/></svg>Ir al siguiente pendiente</span></button>
+            <button style="width:100%;background:#fff;color:#0a6a3a;border:1.5px solid #0a6a3a;border-radius:12px;padding:13px;font-weight:700;font-size:14px"><span style="display:inline-flex;align-items:center;gap:7px;justify-content:center"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M6 21V4"/><path d="M6 5h12v7.5H6"/><path d="M6 8.7h12M10 5v7.5M14 5v7.5"/></svg>Ir a cerrar la jugada</span></button>
+          </div>
+
+          <div style="position:sticky;bottom:0;background:#fff;display:grid;grid-template-columns:repeat(6,1fr);padding:7px 2px 11px;border-top:1px solid #e4e6e1">
+            <div style="display:flex;flex-direction:column;align-items:center;gap:3px;color:#9aa39a"><span style="display:grid;place-items:center;width:22px;height:22px"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M7 4h10v4.5a5 5 0 0 1-10 0Z"/><path d="M7 5.5H4.5a2 2 0 0 0 2.3 3.2"/><path d="M17 5.5h2.5a2 2 0 0 1-2.3 3.2"/><path d="M10 14h4l-.4 2.5h-3.2Z"/><path d="M8.5 20h7"/><path d="M12 16.5V20"/></svg></span><span style="font-size:9px;font-weight:600">El 19</span></div>
+            <div style="display:flex;flex-direction:column;align-items:center;gap:3px;color:#9aa39a"><span style="display:grid;place-items:center;width:22px;height:22px"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3.5c.5 2.8 3.5 3.8 3.5 7.3a3.5 3.5 0 0 1-7 0c0-1.3.4-2.2 1.2-3 .2 1 .8 1.5 1.4 1.7-.3-2.4 0-4.7.9-6Z"/></svg></span><span style="font-size:9px;font-weight:600">Destac.</span></div>
+            <div style="display:flex;flex-direction:column;align-items:center;gap:3px;color:#9aa39a"><span style="display:grid;place-items:center;width:22px;height:22px"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M6.5 21V3.5"/><path d="M6.5 4.5h10l-2.3 3 2.3 3h-10"/></svg></span><span style="font-size:9px;font-weight:600">Salidas</span></div>
+            <div style="display:flex;flex-direction:column;align-items:center;gap:3px;color:#0a6a3a"><span style="display:grid;place-items:center;width:22px;height:22px"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M15.2 4.4l4.4 4.4-9.4 9.4-4.7.9.9-4.7Z"/><path d="M13.4 6.2l4.4 4.4"/><path d="M6.4 14.4l3.2 3.2"/></svg></span><span style="font-size:9px;font-weight:700">Captura</span></div>
+            <div style="display:flex;flex-direction:column;align-items:center;gap:3px;color:#9aa39a"><span style="display:grid;place-items:center;width:22px;height:22px"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4.5v15"/><path d="M5.5 19.5h13"/><path d="M6 7.5l6-1.3 6 1.3"/><path d="M6 7.5l-2.5 5a2.5 2.5 0 0 0 5 0Z"/><path d="M18 7.5l-2.5 5a2.5 2.5 0 0 0 5 0Z"/></svg></span><span style="font-size:9px;font-weight:600">Ventajas</span></div>
+            <div style="display:flex;flex-direction:column;align-items:center;gap:3px;color:#9aa39a"><span style="display:grid;place-items:center;width:22px;height:22px"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 2.5v2.2M12 19.3v2.2M21.5 12h-2.2M4.7 12H2.5M18.7 5.3l-1.6 1.6M6.9 17.1l-1.6 1.6M18.7 18.7l-1.6-1.6M6.9 6.9 5.3 5.3"/></svg></span><span style="font-size:9px;font-weight:600">Ajustes</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===================== SALIDAS ===================== -->
+    <div style="flex:none;width:392px">
+      <div style="font-family:'Newsreader';font-weight:600;font-size:15px;color:#0a6a3a;margin-bottom:3px">Salidas</div>
+      <div style="font-size:12.5px;color:#7c7567;margin-bottom:14px">Convoca, sortea, arma los grupos.</div>
+      <div style="width:392px;border-radius:42px;border:11px solid #0e1410;overflow:hidden;box-shadow:0 24px 60px rgba(15,40,28,.22)">
+        <div class="gv-screen" style="background:#fff;height:824px;overflow:auto;-ms-overflow-style:none;scrollbar-width:none">
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 22px 4px">
+            <div style="font-weight:700;font-size:15px;color:#1b211d">8:02</div>
+            <div style="display:flex;align-items:center;gap:7px;color:#1b211d"><span style="font-size:12px;letter-spacing:1px">▂▄▆</span><span style="font-size:13px">📶</span><span style="display:inline-flex;align-items:center;border:1.5px solid #1b211d;border-radius:4px;padding:1px 4px;font-size:9px;font-weight:800">24</span></div>
+          </div>
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:6px 20px 12px;border-bottom:1px solid #e4e6e1">
+            <div style="color:#0a6a3a;display:flex"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="3.6"/><path d="M5.5 20a6.5 6.5 0 0 1 13 0"/></svg></div>
+            <div style="font-family:'Newsreader';font-style:italic;font-weight:600;font-size:19px;color:#0a6a3a;white-space:nowrap;display:flex;align-items:center"><span style="display:inline-flex;margin-right:8px"><svg width="24" height="24" viewBox="0 0 24 24"><path d="M3 16 C5 13 9 12 12 12 C16 12 19 13.5 21 16 C19.5 17.6 16 18.6 12 18.6 C8 18.6 4.5 17.6 3 16 Z" fill="#e6c34a" stroke="#0a6a3a" stroke-width="1.3" stroke-linejoin="round"/><ellipse cx="13.6" cy="15.1" rx="1.3" ry="0.72" fill="#0a6a3a"/><path d="M13.6 15 L13.6 4.2" stroke="#0a6a3a" stroke-width="1.3" stroke-linecap="round"/><path d="M13.6 4.4 L19.2 6.1 L13.6 7.9 Z" fill="#c1272d"/></svg></span>Golf Viernes</div>
+            <div style="color:#0a6a3a;display:flex"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M6.5 9.5a5.5 5.5 0 0 1 11 0c0 4.5 1.8 6 1.8 6H4.7s1.8-1.5 1.8-6Z"/><path d="M10 19a2 2 0 0 0 4 0"/></svg></div>
+          </div>
+
+          <div style="padding:14px 18px 92px">
+            <h2 style="font-family:'Newsreader';font-weight:600;font-size:34px;line-height:1;color:#0a6a3a;margin:0 0 16px">Salidas</h2>
+
+            <!-- convocados -->
+            <div style="margin-bottom:20px">
+              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:11px">
+                <div style="font-family:'Newsreader';font-weight:600;font-size:19px;color:#1b211d">¿Quién juega hoy?</div>
+                <div style="font-size:12px;color:#6e776f;font-weight:700">7 convocados</div>
+              </div>
+              <div style="display:flex;flex-wrap:wrap;gap:8px">
+                <div style="padding:8px 14px;border-radius:999px;background:#0a6a3a;color:#fff;font-size:13.5px;font-weight:600">★ Beto</div>
+                <div style="padding:8px 14px;border-radius:999px;background:#0a6a3a;color:#fff;font-size:13.5px;font-weight:600">Chuy</div>
+                <div style="padding:8px 14px;border-radius:999px;background:#0a6a3a;color:#fff;font-size:13.5px;font-weight:600">Tavo</div>
+                <div style="padding:8px 14px;border-radius:999px;background:#0a6a3a;color:#fff;font-size:13.5px;font-weight:600">Memo</div>
+                <div style="padding:8px 14px;border-radius:999px;background:#0a6a3a;color:#fff;font-size:13.5px;font-weight:600">Lalo</div>
+                <div style="padding:8px 14px;border-radius:999px;background:#0a6a3a;color:#fff;font-size:13.5px;font-weight:600">Pancho</div>
+                <div style="padding:8px 14px;border-radius:999px;background:#0a6a3a;color:#fff;font-size:13.5px;font-weight:600">Güero</div>
+                <div style="padding:8px 14px;border-radius:999px;border:1.5px solid #d6dad4;color:#6e776f;font-size:13.5px;font-weight:600">Nacho</div>
+                <div style="padding:8px 14px;border-radius:999px;border:1.5px solid #d6dad4;color:#6e776f;font-size:13.5px;font-weight:600">Beto G.</div>
+              </div>
+            </div>
+
+            <!-- grupos -->
+            <div style="border:1px solid #e4e6e1;border-radius:16px;padding:15px;margin-bottom:18px">
+              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+                <div style="font-family:'Newsreader';font-weight:600;font-size:19px;color:#1b211d">Grupos</div>
+                <div style="background:#d8b24e;color:#3a2c00;border-radius:999px;padding:9px 16px;font-size:13.5px;font-weight:800"><span style="display:inline-flex;align-items:center;gap:6px"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="3.5"/><circle cx="9" cy="9" r="1.05" fill="currentColor" stroke="none"/><circle cx="15" cy="15" r="1.05" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="1.05" fill="currentColor" stroke="none"/></svg>Sortear</span></div>
+              </div>
+              <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-top:1px solid #eef0ed">
+                <div style="font-size:13px;color:#6e776f;font-weight:600"><span style="display:inline-flex;align-items:center;gap:6px"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M7 21V4"/><path d="M7 4.5h8l-1.8 2.4L15 9.3H7"/></svg>Campo</span></div>
+                <div style="font-size:13.5px;font-weight:700;color:#0a6a3a;border:1.5px solid #d6dad4;border-radius:999px;padding:6px 13px">Campestre León ▾</div>
+              </div>
+              <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-top:1px solid #eef0ed">
+                <div style="font-size:13px;color:#6e776f;font-weight:600">Hoyos</div>
+                <div style="display:flex;gap:6px">
+                  <div style="padding:6px 14px;border-radius:999px;background:#0a6a3a;color:#fff;font-size:13px;font-weight:700">18</div>
+                  <div style="padding:6px 14px;border-radius:999px;border:1.5px solid #d6dad4;color:#6e776f;font-size:13px;font-weight:700">9</div>
+                </div>
+              </div>
+
+              <div style="margin-top:14px">
+                <div style="font-family:'Newsreader';font-weight:600;font-size:15px;color:#0a6a3a;margin-bottom:9px">Grupo 1 · <span style="color:#6e776f;font-weight:500">4/6</span></div>
+                <div style="display:flex;flex-wrap:wrap;gap:8px">
+                  <div style="padding:8px 13px;border-radius:999px;background:#eef3ef;border:1px solid #cfe0d6;color:#0a6a3a;font-size:13px;font-weight:600">Beto ↔</div>
+                  <div style="padding:8px 13px;border-radius:999px;background:#eef3ef;border:1px solid #cfe0d6;color:#0a6a3a;font-size:13px;font-weight:600">Tavo ↔</div>
+                  <div style="padding:8px 13px;border-radius:999px;background:#eef3ef;border:1px solid #cfe0d6;color:#0a6a3a;font-size:13px;font-weight:600">Lalo ↔</div>
+                  <div style="padding:8px 13px;border-radius:999px;background:#eef3ef;border:1px solid #cfe0d6;color:#0a6a3a;font-size:13px;font-weight:600">Güero ↔</div>
+                </div>
+              </div>
+              <div style="margin-top:14px">
+                <div style="font-family:'Newsreader';font-weight:600;font-size:15px;color:#7a5bb0;margin-bottom:9px">Grupo 2 · <span style="color:#6e776f;font-weight:500">3/6</span></div>
+                <div style="display:flex;flex-wrap:wrap;gap:8px">
+                  <div style="padding:8px 13px;border-radius:999px;background:#f1edf7;border:1px solid #ddd0ec;color:#7a5bb0;font-size:13px;font-weight:600">Chuy ↔</div>
+                  <div style="padding:8px 13px;border-radius:999px;background:#f1edf7;border:1px solid #ddd0ec;color:#7a5bb0;font-size:13px;font-weight:600">Memo ↔</div>
+                  <div style="padding:8px 13px;border-radius:999px;background:#f1edf7;border:1px solid #ddd0ec;color:#7a5bb0;font-size:13px;font-weight:600">Pancho ↔</div>
+                </div>
+              </div>
+            </div>
+
+            <div style="border-top:1px solid #e4e6e1;padding-top:16px">
+              <div style="font-family:'Newsreader';font-weight:600;font-size:19px;color:#1b211d;margin-bottom:4px">Invitados</div>
+              <div style="font-size:12.5px;color:#6e776f;line-height:1.45;margin-bottom:12px">Agrega un invitado y captura sus ventajas contra todos los del día.</div>
+              <div style="display:inline-flex;border:1.5px solid #0a6a3a;color:#0a6a3a;border-radius:999px;padding:9px 16px;font-size:13.5px;font-weight:700">+ Agregar invitado</div>
+            </div>
+          </div>
+
+          <div style="position:sticky;bottom:0;background:#fff;display:grid;grid-template-columns:repeat(6,1fr);padding:7px 2px 11px;border-top:1px solid #e4e6e1">
+            <div style="display:flex;flex-direction:column;align-items:center;gap:3px;color:#9aa39a"><span style="display:grid;place-items:center;width:22px;height:22px"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M7 4h10v4.5a5 5 0 0 1-10 0Z"/><path d="M7 5.5H4.5a2 2 0 0 0 2.3 3.2"/><path d="M17 5.5h2.5a2 2 0 0 1-2.3 3.2"/><path d="M10 14h4l-.4 2.5h-3.2Z"/><path d="M8.5 20h7"/><path d="M12 16.5V20"/></svg></span><span style="font-size:9px;font-weight:600">El 19</span></div>
+            <div style="display:flex;flex-direction:column;align-items:center;gap:3px;color:#9aa39a"><span style="display:grid;place-items:center;width:22px;height:22px"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3.5c.5 2.8 3.5 3.8 3.5 7.3a3.5 3.5 0 0 1-7 0c0-1.3.4-2.2 1.2-3 .2 1 .8 1.5 1.4 1.7-.3-2.4 0-4.7.9-6Z"/></svg></span><span style="font-size:9px;font-weight:600">Destac.</span></div>
+            <div style="display:flex;flex-direction:column;align-items:center;gap:3px;color:#0a6a3a"><span style="display:grid;place-items:center;width:22px;height:22px"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M6.5 21V3.5"/><path d="M6.5 4.5h10l-2.3 3 2.3 3h-10"/></svg></span><span style="font-size:9px;font-weight:700">Salidas</span></div>
+            <div style="display:flex;flex-direction:column;align-items:center;gap:3px;color:#9aa39a"><span style="display:grid;place-items:center;width:22px;height:22px"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M15.2 4.4l4.4 4.4-9.4 9.4-4.7.9.9-4.7Z"/><path d="M13.4 6.2l4.4 4.4"/><path d="M6.4 14.4l3.2 3.2"/></svg></span><span style="font-size:9px;font-weight:600">Captura</span></div>
+            <div style="display:flex;flex-direction:column;align-items:center;gap:3px;color:#9aa39a"><span style="display:grid;place-items:center;width:22px;height:22px"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4.5v15"/><path d="M5.5 19.5h13"/><path d="M6 7.5l6-1.3 6 1.3"/><path d="M6 7.5l-2.5 5a2.5 2.5 0 0 0 5 0Z"/><path d="M18 7.5l-2.5 5a2.5 2.5 0 0 0 5 0Z"/></svg></span><span style="font-size:9px;font-weight:600">Ventajas</span></div>
+            <div style="display:flex;flex-direction:column;align-items:center;gap:3px;color:#9aa39a"><span style="display:grid;place-items:center;width:22px;height:22px"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 2.5v2.2M12 19.3v2.2M21.5 12h-2.2M4.7 12H2.5M18.7 5.3l-1.6 1.6M6.9 17.1l-1.6 1.6M18.7 18.7l-1.6-1.6M6.9 6.9 5.3 5.3"/></svg></span><span style="font-size:9px;font-weight:600">Ajustes</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===================== DESTACADOS ===================== -->
+    <div style="flex:none;width:392px">
+      <div style="font-family:'Newsreader';font-weight:600;font-size:15px;color:#0a6a3a;margin-bottom:3px">Destacados</div>
+      <div style="font-size:12.5px;color:#7c7567;margin-bottom:14px">Salón de la fama + la carrilla del 19.</div>
+      <div style="width:392px;border-radius:42px;border:11px solid #0e1410;overflow:hidden;box-shadow:0 24px 60px rgba(15,40,28,.22)">
+        <div class="gv-screen" style="background:#fff;height:824px;overflow:auto;-ms-overflow-style:none;scrollbar-width:none">
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 22px 4px">
+            <div style="font-weight:700;font-size:15px;color:#1b211d">8:03</div>
+            <div style="display:flex;align-items:center;gap:7px;color:#1b211d"><span style="font-size:12px;letter-spacing:1px">▂▄▆</span><span style="font-size:13px">📶</span><span style="display:inline-flex;align-items:center;border:1.5px solid #1b211d;border-radius:4px;padding:1px 4px;font-size:9px;font-weight:800">24</span></div>
+          </div>
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:6px 20px 12px;border-bottom:1px solid #e4e6e1">
+            <div style="color:#0a6a3a;display:flex"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="3.6"/><path d="M5.5 20a6.5 6.5 0 0 1 13 0"/></svg></div>
+            <div style="font-family:'Newsreader';font-style:italic;font-weight:600;font-size:19px;color:#0a6a3a;white-space:nowrap;display:flex;align-items:center"><span style="display:inline-flex;margin-right:8px"><svg width="24" height="24" viewBox="0 0 24 24"><path d="M3 16 C5 13 9 12 12 12 C16 12 19 13.5 21 16 C19.5 17.6 16 18.6 12 18.6 C8 18.6 4.5 17.6 3 16 Z" fill="#e6c34a" stroke="#0a6a3a" stroke-width="1.3" stroke-linejoin="round"/><ellipse cx="13.6" cy="15.1" rx="1.3" ry="0.72" fill="#0a6a3a"/><path d="M13.6 15 L13.6 4.2" stroke="#0a6a3a" stroke-width="1.3" stroke-linecap="round"/><path d="M13.6 4.4 L19.2 6.1 L13.6 7.9 Z" fill="#c1272d"/></svg></span>Golf Viernes</div>
+            <div style="color:#0a6a3a;display:flex"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M6.5 9.5a5.5 5.5 0 0 1 11 0c0 4.5 1.8 6 1.8 6H4.7s1.8-1.5 1.8-6Z"/><path d="M10 19a2 2 0 0 0 4 0"/></svg></div>
+          </div>
+
+          <div style="padding:14px 18px 92px">
+            <h2 style="font-family:'Newsreader';font-weight:600;font-size:34px;line-height:1;color:#0a6a3a;margin:0 0 14px">Destacados</h2>
+            <div style="display:flex;border:1px solid #e4e6e1;border-radius:999px;padding:4px;margin-bottom:16px">
+              <div style="flex:1;text-align:center;padding:8px;border-radius:999px;background:#0a6a3a;color:#fff;font-weight:700;font-size:13px">Día</div>
+              <div style="flex:1;text-align:center;padding:8px;font-weight:600;font-size:13px;color:#6e776f">Jugadores</div>
+              <div style="flex:1;text-align:center;padding:8px;font-weight:600;font-size:13px;color:#6e776f">Temporada</div>
+            </div>
+
+            <!-- hero (Masters home style) -->
+            <div style="background:#0a6a3a;border-radius:16px;padding:18px;margin-bottom:18px;position:relative;overflow:hidden">
+              <div style="position:absolute;top:-18px;right:-6px;font-size:96px;opacity:.13">👑</div>
+              <div style="font-size:11px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:#e3c878;position:relative">Líder del viernes</div>
+              <div style="font-family:'Newsreader';font-weight:600;font-size:27px;color:#fff;line-height:1.08;margin-top:5px;position:relative">Beto se lleva la noche</div>
+              <div style="font-weight:800;font-size:18px;color:#e3c878;position:relative;margin-top:6px">+$340 · +17 rayas</div>
+              <div style="font-weight:700;font-size:13.5px;color:#e3c878;position:relative;margin-top:10px">Ver resultados →</div>
+            </div>
+
+            <!-- badge grid -->
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:11px;margin-bottom:20px">
+              <div style="border:1px solid #e4e6e1;border-top:3px solid #0a6a3a;border-radius:13px;padding:13px;position:relative;min-height:96px">
+                <div style="font-size:28px;line-height:1">🐦</div>
+                <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.05em;color:#6e776f;margin-top:7px">Rey del birdie</div>
+                <div style="font-family:'Newsreader';font-weight:600;font-size:18px;color:#0a6a3a;line-height:1.05">Chuy</div>
+                <div style="position:absolute;top:12px;right:14px;font-weight:800;font-size:18px;color:#0a6a3a">×4</div>
+              </div>
+              <div style="border:1px solid #e4e6e1;border-top:3px solid #d8862e;border-radius:13px;padding:13px;position:relative;min-height:96px">
+                <div style="font-size:28px;line-height:1">🔥</div>
+                <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.05em;color:#6e776f;margin-top:7px">Racha caliente</div>
+                <div style="font-family:'Newsreader';font-weight:600;font-size:18px;color:#0a6a3a;line-height:1.05">Beto</div>
+                <div style="position:absolute;top:12px;right:14px;font-weight:800;font-size:15px;color:#c2410c">5 hoyos</div>
+              </div>
+              <div style="border:1px solid #e4e6e1;border-top:3px solid #d8b24e;border-radius:13px;padding:13px;position:relative;min-height:96px">
+                <div style="font-size:28px;line-height:1">🎯</div>
+                <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.05em;color:#6e776f;margin-top:7px">Rey del oyes</div>
+                <div style="font-family:'Newsreader';font-weight:600;font-size:18px;color:#0a6a3a;line-height:1.05">Tavo</div>
+                <div style="position:absolute;top:12px;right:14px;font-weight:800;font-size:18px;color:#b98a2e">×3</div>
+              </div>
+              <div style="border:1px solid #e4e6e1;border-top:3px solid #c1272d;border-radius:13px;padding:13px;position:relative;min-height:96px">
+                <div style="font-size:28px;line-height:1">💸</div>
+                <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.05em;color:#6e776f;margin-top:7px">Cajero del día</div>
+                <div style="font-family:'Newsreader';font-weight:600;font-size:18px;color:#c1272d;line-height:1.05">Güero</div>
+                <div style="position:absolute;top:12px;right:14px;font-weight:800;font-size:16px;color:#c1272d">−$320</div>
+              </div>
+            </div>
+
+            <div style="font-family:'Newsreader';font-weight:600;font-size:19px;color:#1b211d;margin-bottom:11px">🎙️ La mesa del 19</div>
+            <div style="background:#f4f5f2;border-left:3px solid #0a6a3a;border-radius:4px 12px 12px 4px;padding:11px 14px;margin-bottom:9px;font-size:13.5px;line-height:1.45;color:#2a312c">Beto se llevó la noche con <b>+$340</b>. El que invita el otro viernes. 👑</div>
+            <div style="background:#f4f5f2;border-left:3px solid #c1272d;border-radius:4px 12px 12px 4px;padding:11px 14px;margin-bottom:9px;font-size:13.5px;line-height:1.45;color:#2a312c">Güero otra vez de cajero (<b>−$320</b>). Ya hasta trae cambio. 💸</div>
+            <div style="background:#f4f5f2;border-left:3px solid #d8862e;border-radius:4px 12px 12px 4px;padding:11px 14px;font-size:13.5px;line-height:1.45;color:#2a312c">5 hoyos al hilo de Beto sin soltar. Pura lumbre. 🔥</div>
+          </div>
+
+          <div style="position:sticky;bottom:0;background:#fff;display:grid;grid-template-columns:repeat(6,1fr);padding:7px 2px 11px;border-top:1px solid #e4e6e1">
+            <div style="display:flex;flex-direction:column;align-items:center;gap:3px;color:#9aa39a"><span style="display:grid;place-items:center;width:22px;height:22px"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M7 4h10v4.5a5 5 0 0 1-10 0Z"/><path d="M7 5.5H4.5a2 2 0 0 0 2.3 3.2"/><path d="M17 5.5h2.5a2 2 0 0 1-2.3 3.2"/><path d="M10 14h4l-.4 2.5h-3.2Z"/><path d="M8.5 20h7"/><path d="M12 16.5V20"/></svg></span><span style="font-size:9px;font-weight:600">El 19</span></div>
+            <div style="display:flex;flex-direction:column;align-items:center;gap:3px;color:#0a6a3a"><span style="display:grid;place-items:center;width:22px;height:22px"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3.5c.5 2.8 3.5 3.8 3.5 7.3a3.5 3.5 0 0 1-7 0c0-1.3.4-2.2 1.2-3 .2 1 .8 1.5 1.4 1.7-.3-2.4 0-4.7.9-6Z"/></svg></span><span style="font-size:9px;font-weight:700">Destac.</span></div>
+            <div style="display:flex;flex-direction:column;align-items:center;gap:3px;color:#9aa39a"><span style="display:grid;place-items:center;width:22px;height:22px"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M6.5 21V3.5"/><path d="M6.5 4.5h10l-2.3 3 2.3 3h-10"/></svg></span><span style="font-size:9px;font-weight:600">Salidas</span></div>
+            <div style="display:flex;flex-direction:column;align-items:center;gap:3px;color:#9aa39a"><span style="display:grid;place-items:center;width:22px;height:22px"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M15.2 4.4l4.4 4.4-9.4 9.4-4.7.9.9-4.7Z"/><path d="M13.4 6.2l4.4 4.4"/><path d="M6.4 14.4l3.2 3.2"/></svg></span><span style="font-size:9px;font-weight:600">Captura</span></div>
+            <div style="display:flex;flex-direction:column;align-items:center;gap:3px;color:#9aa39a"><span style="display:grid;place-items:center;width:22px;height:22px"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4.5v15"/><path d="M5.5 19.5h13"/><path d="M6 7.5l6-1.3 6 1.3"/><path d="M6 7.5l-2.5 5a2.5 2.5 0 0 0 5 0Z"/><path d="M18 7.5l-2.5 5a2.5 2.5 0 0 0 5 0Z"/></svg></span><span style="font-size:9px;font-weight:600">Ventajas</span></div>
+            <div style="display:flex;flex-direction:column;align-items:center;gap:3px;color:#9aa39a"><span style="display:grid;place-items:center;width:22px;height:22px"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 2.5v2.2M12 19.3v2.2M21.5 12h-2.2M4.7 12H2.5M18.7 5.3l-1.6 1.6M6.9 17.1l-1.6 1.6M18.7 18.7l-1.6-1.6M6.9 6.9 5.3 5.3"/></svg></span><span style="font-size:9px;font-weight:600">Ajustes</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===================== VENTAJAS ===================== -->
+    <div style="flex:none;width:392px">
+      <div style="font-family:'Newsreader';font-weight:600;font-size:15px;color:#0a6a3a;margin-bottom:3px">Ventajas</div>
+      <div style="font-size:12.5px;color:#7c7567;margin-bottom:14px">Rayas de hándicap entre jugadores.</div>
+      <div style="width:392px;border-radius:42px;border:11px solid #0e1410;overflow:hidden;box-shadow:0 24px 60px rgba(15,40,28,.22)">
+        <div class="gv-screen" style="background:#fff;height:824px;overflow:auto;-ms-overflow-style:none;scrollbar-width:none">
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 22px 4px">
+            <div style="font-weight:700;font-size:15px;color:#1b211d">8:04</div>
+            <div style="display:flex;align-items:center;gap:7px;color:#1b211d"><span style="font-size:12px;letter-spacing:1px">▂▄▆</span><span style="font-size:13px">📶</span><span style="display:inline-flex;align-items:center;border:1.5px solid #1b211d;border-radius:4px;padding:1px 4px;font-size:9px;font-weight:800">24</span></div>
+          </div>
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:6px 20px 12px;border-bottom:1px solid #e4e6e1">
+            <div style="color:#0a6a3a;display:flex"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="3.6"/><path d="M5.5 20a6.5 6.5 0 0 1 13 0"/></svg></div>
+            <div style="font-family:'Newsreader';font-style:italic;font-weight:600;font-size:19px;color:#0a6a3a;white-space:nowrap;display:flex;align-items:center"><span style="display:inline-flex;margin-right:8px"><svg width="24" height="24" viewBox="0 0 24 24"><path d="M3 16 C5 13 9 12 12 12 C16 12 19 13.5 21 16 C19.5 17.6 16 18.6 12 18.6 C8 18.6 4.5 17.6 3 16 Z" fill="#e6c34a" stroke="#0a6a3a" stroke-width="1.3" stroke-linejoin="round"/><ellipse cx="13.6" cy="15.1" rx="1.3" ry="0.72" fill="#0a6a3a"/><path d="M13.6 15 L13.6 4.2" stroke="#0a6a3a" stroke-width="1.3" stroke-linecap="round"/><path d="M13.6 4.4 L19.2 6.1 L13.6 7.9 Z" fill="#c1272d"/></svg></span>Golf Viernes</div>
+            <div style="color:#0a6a3a;display:flex"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M6.5 9.5a5.5 5.5 0 0 1 11 0c0 4.5 1.8 6 1.8 6H4.7s1.8-1.5 1.8-6Z"/><path d="M10 19a2 2 0 0 0 4 0"/></svg></div>
+          </div>
+
+          <div style="padding:14px 18px 92px">
+            <h2 style="font-family:'Newsreader';font-weight:600;font-size:34px;line-height:1;color:#0a6a3a;margin:0 0 8px">Ventajas</h2>
+            <p style="font-size:13px;color:#6e776f;line-height:1.5;margin:0 0 16px">El de menor hándicap le da rayas al resto para emparejar la apuesta. Ajusta el índice de cada quien.</p>
+
+            <div style="display:flex;border:1px solid #e4e6e1;border-radius:999px;padding:4px;margin-bottom:16px">
+              <div style="flex:1;text-align:center;padding:8px;border-radius:999px;background:#0a6a3a;color:#fff;font-weight:700;font-size:13.5px">Hándicaps</div>
+              <div style="flex:1;text-align:center;padding:8px;font-weight:600;font-size:13.5px;color:#6e776f">Cara a cara</div>
+            </div>
+
+            <div style="border:1px solid #e4e6e1;border-radius:16px;padding:2px 15px;margin-bottom:18px">
+              <div style="display:flex;align-items:center;justify-content:space-between;padding:13px 0 11px;border-bottom:1px solid #eef0ed">
+                <div style="font-family:'Newsreader';font-weight:600;font-size:19px;color:#1b211d">Hándicap del grupo</div>
+                <div style="font-size:10.5px;font-weight:800;letter-spacing:.08em;color:#9aa39a">RAYAS</div>
+              </div>
+              <div style="display:flex;align-items:center;gap:11px;padding:11px 0;border-bottom:1px solid #eef0ed">
+                <div style="width:40px;height:40px;border-radius:50%;background:#0a6a3a;color:#fff;display:grid;place-items:center;font-family:'Newsreader';font-weight:600;font-size:16px;flex:none">BE</div>
+                <div style="flex:1"><div style="font-family:'Newsreader';font-weight:600;font-size:17px;color:#0a6a3a;line-height:1.1">Beto <span style="color:#d8b24e;font-size:11px">★ scratch</span></div><div style="font-size:11.5px;color:#6e776f;font-weight:600">Índice 8.2</div></div>
+                <div style="display:flex;align-items:center;border:1px solid #e4e6e1;border-radius:10px;overflow:hidden;flex:none"><div style="width:34px;height:34px;display:grid;place-items:center;font-size:20px;font-weight:600;color:#0a6a3a">−</div><div style="min-width:28px;text-align:center;font-weight:800;font-size:18px;color:#0a6a3a">0</div><div style="width:34px;height:34px;display:grid;place-items:center;font-size:20px;font-weight:600;color:#0a6a3a">+</div></div>
+              </div>
+              <div style="display:flex;align-items:center;gap:11px;padding:11px 0;border-bottom:1px solid #eef0ed">
+                <div style="width:40px;height:40px;border-radius:50%;background:#0a6a3a;color:#fff;display:grid;place-items:center;font-family:'Newsreader';font-weight:600;font-size:16px;flex:none">CH</div>
+                <div style="flex:1"><div style="font-family:'Newsreader';font-weight:600;font-size:17px;color:#0a6a3a;line-height:1.1">Chuy</div><div style="font-size:11.5px;color:#6e776f;font-weight:600">Índice 12.4</div></div>
+                <div style="display:flex;align-items:center;border:1px solid #e4e6e1;border-radius:10px;overflow:hidden;flex:none"><div style="width:34px;height:34px;display:grid;place-items:center;font-size:20px;font-weight:600;color:#0a6a3a">−</div><div style="min-width:28px;text-align:center;font-weight:800;font-size:18px;color:#0a6a3a">4</div><div style="width:34px;height:34px;display:grid;place-items:center;font-size:20px;font-weight:600;color:#0a6a3a">+</div></div>
+              </div>
+              <div style="display:flex;align-items:center;gap:11px;padding:11px 0;border-bottom:1px solid #eef0ed">
+                <div style="width:40px;height:40px;border-radius:50%;background:#0a6a3a;color:#fff;display:grid;place-items:center;font-family:'Newsreader';font-weight:600;font-size:16px;flex:none">TA</div>
+                <div style="flex:1"><div style="font-family:'Newsreader';font-weight:600;font-size:17px;color:#0a6a3a;line-height:1.1">Tavo</div><div style="font-size:11.5px;color:#6e776f;font-weight:600">Índice 15.1</div></div>
+                <div style="display:flex;align-items:center;border:1px solid #e4e6e1;border-radius:10px;overflow:hidden;flex:none"><div style="width:34px;height:34px;display:grid;place-items:center;font-size:20px;font-weight:600;color:#0a6a3a">−</div><div style="min-width:28px;text-align:center;font-weight:800;font-size:18px;color:#0a6a3a">7</div><div style="width:34px;height:34px;display:grid;place-items:center;font-size:20px;font-weight:600;color:#0a6a3a">+</div></div>
+              </div>
+              <div style="display:flex;align-items:center;gap:11px;padding:11px 0;border-bottom:1px solid #eef0ed">
+                <div style="width:40px;height:40px;border-radius:50%;background:#0a6a3a;color:#fff;display:grid;place-items:center;font-family:'Newsreader';font-weight:600;font-size:16px;flex:none">ME</div>
+                <div style="flex:1"><div style="font-family:'Newsreader';font-weight:600;font-size:17px;color:#0a6a3a;line-height:1.1">Memo</div><div style="font-size:11.5px;color:#6e776f;font-weight:600">Índice 18.6</div></div>
+                <div style="display:flex;align-items:center;border:1px solid #e4e6e1;border-radius:10px;overflow:hidden;flex:none"><div style="width:34px;height:34px;display:grid;place-items:center;font-size:20px;font-weight:600;color:#0a6a3a">−</div><div style="min-width:28px;text-align:center;font-weight:800;font-size:18px;color:#0a6a3a">10</div><div style="width:34px;height:34px;display:grid;place-items:center;font-size:20px;font-weight:600;color:#0a6a3a">+</div></div>
+              </div>
+              <div style="display:flex;align-items:center;gap:11px;padding:11px 0;border-bottom:1px solid #eef0ed">
+                <div style="width:40px;height:40px;border-radius:50%;background:#0a6a3a;color:#fff;display:grid;place-items:center;font-family:'Newsreader';font-weight:600;font-size:16px;flex:none">LA</div>
+                <div style="flex:1"><div style="font-family:'Newsreader';font-weight:600;font-size:17px;color:#0a6a3a;line-height:1.1">Lalo</div><div style="font-size:11.5px;color:#6e776f;font-weight:600">Índice 21.3</div></div>
+                <div style="display:flex;align-items:center;border:1px solid #e4e6e1;border-radius:10px;overflow:hidden;flex:none"><div style="width:34px;height:34px;display:grid;place-items:center;font-size:20px;font-weight:600;color:#0a6a3a">−</div><div style="min-width:28px;text-align:center;font-weight:800;font-size:18px;color:#0a6a3a">13</div><div style="width:34px;height:34px;display:grid;place-items:center;font-size:20px;font-weight:600;color:#0a6a3a">+</div></div>
+              </div>
+              <div style="display:flex;align-items:center;gap:11px;padding:11px 0">
+                <div style="width:40px;height:40px;border-radius:50%;background:#0a6a3a;color:#fff;display:grid;place-items:center;font-family:'Newsreader';font-weight:600;font-size:16px;flex:none">GÜ</div>
+                <div style="flex:1"><div style="font-family:'Newsreader';font-weight:600;font-size:17px;color:#0a6a3a;line-height:1.1">Güero</div><div style="font-size:11.5px;color:#6e776f;font-weight:600">Índice 24.0</div></div>
+                <div style="display:flex;align-items:center;border:1px solid #e4e6e1;border-radius:10px;overflow:hidden;flex:none"><div style="width:34px;height:34px;display:grid;place-items:center;font-size:20px;font-weight:600;color:#0a6a3a">−</div><div style="min-width:28px;text-align:center;font-weight:800;font-size:18px;color:#0a6a3a">16</div><div style="width:34px;height:34px;display:grid;place-items:center;font-size:20px;font-weight:600;color:#0a6a3a">+</div></div>
+              </div>
+            </div>
+
+            <div style="border:1px solid #e4e6e1;border-radius:16px;padding:15px">
+              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
+                <div style="font-family:'Newsreader';font-weight:600;font-size:19px;color:#1b211d">Cara a cara · hoy</div>
+                <div style="font-size:12px;color:#6e776f;font-weight:700">Grupo 1</div>
+              </div>
+              <div style="font-size:12px;color:#6e776f;line-height:1.45;margin-bottom:6px">Beto es el scratch del grupo. Las rayas que reparte en este match:</div>
+              <div style="display:flex;align-items:center;justify-content:space-between;padding:9px 0;border-top:1px solid #eef0ed">
+                <div style="display:flex;align-items:center;gap:8px;font-size:14px;font-weight:600"><span style="font-family:'Newsreader';color:#0a6a3a">Beto</span><span style="color:#9aa39a">→</span><span style="font-family:'Newsreader';color:#0a6a3a">Tavo</span></div>
+                <div style="background:#eef3ef;border:1px solid #cfe0d6;color:#0a6a3a;border-radius:999px;padding:4px 11px;font-size:12.5px;font-weight:800">da 7</div>
+              </div>
+              <div style="display:flex;align-items:center;justify-content:space-between;padding:9px 0;border-top:1px solid #eef0ed">
+                <div style="display:flex;align-items:center;gap:8px;font-size:14px;font-weight:600"><span style="font-family:'Newsreader';color:#0a6a3a">Beto</span><span style="color:#9aa39a">→</span><span style="font-family:'Newsreader';color:#0a6a3a">Lalo</span></div>
+                <div style="background:#eef3ef;border:1px solid #cfe0d6;color:#0a6a3a;border-radius:999px;padding:4px 11px;font-size:12.5px;font-weight:800">da 13</div>
+              </div>
+              <div style="display:flex;align-items:center;justify-content:space-between;padding:9px 0;border-top:1px solid #eef0ed">
+                <div style="display:flex;align-items:center;gap:8px;font-size:14px;font-weight:600"><span style="font-family:'Newsreader';color:#0a6a3a">Beto</span><span style="color:#9aa39a">→</span><span style="font-family:'Newsreader';color:#0a6a3a">Güero</span></div>
+                <div style="background:#eef3ef;border:1px solid #cfe0d6;color:#0a6a3a;border-radius:999px;padding:4px 11px;font-size:12.5px;font-weight:800">da 16</div>
+              </div>
+            </div>
+          </div>
+
+          <div style="position:sticky;bottom:0;background:#fff;display:grid;grid-template-columns:repeat(6,1fr);padding:7px 2px 11px;border-top:1px solid #e4e6e1">
+            <div style="display:flex;flex-direction:column;align-items:center;gap:3px;color:#9aa39a"><span style="display:grid;place-items:center;width:22px;height:22px"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M7 4h10v4.5a5 5 0 0 1-10 0Z"/><path d="M7 5.5H4.5a2 2 0 0 0 2.3 3.2"/><path d="M17 5.5h2.5a2 2 0 0 1-2.3 3.2"/><path d="M10 14h4l-.4 2.5h-3.2Z"/><path d="M8.5 20h7"/><path d="M12 16.5V20"/></svg></span><span style="font-size:9px;font-weight:600">El 19</span></div>
+            <div style="display:flex;flex-direction:column;align-items:center;gap:3px;color:#9aa39a"><span style="display:grid;place-items:center;width:22px;height:22px"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3.5c.5 2.8 3.5 3.8 3.5 7.3a3.5 3.5 0 0 1-7 0c0-1.3.4-2.2 1.2-3 .2 1 .8 1.5 1.4 1.7-.3-2.4 0-4.7.9-6Z"/></svg></span><span style="font-size:9px;font-weight:600">Destac.</span></div>
+            <div style="display:flex;flex-direction:column;align-items:center;gap:3px;color:#9aa39a"><span style="display:grid;place-items:center;width:22px;height:22px"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M6.5 21V3.5"/><path d="M6.5 4.5h10l-2.3 3 2.3 3h-10"/></svg></span><span style="font-size:9px;font-weight:600">Salidas</span></div>
+            <div style="display:flex;flex-direction:column;align-items:center;gap:3px;color:#9aa39a"><span style="display:grid;place-items:center;width:22px;height:22px"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M15.2 4.4l4.4 4.4-9.4 9.4-4.7.9.9-4.7Z"/><path d="M13.4 6.2l4.4 4.4"/><path d="M6.4 14.4l3.2 3.2"/></svg></span><span style="font-size:9px;font-weight:600">Captura</span></div>
+            <div style="display:flex;flex-direction:column;align-items:center;gap:3px;color:#0a6a3a"><span style="display:grid;place-items:center;width:22px;height:22px"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4.5v15"/><path d="M5.5 19.5h13"/><path d="M6 7.5l6-1.3 6 1.3"/><path d="M6 7.5l-2.5 5a2.5 2.5 0 0 0 5 0Z"/><path d="M18 7.5l-2.5 5a2.5 2.5 0 0 0 5 0Z"/></svg></span><span style="font-size:9px;font-weight:700">Ventajas</span></div>
+            <div style="display:flex;flex-direction:column;align-items:center;gap:3px;color:#9aa39a"><span style="display:grid;place-items:center;width:22px;height:22px"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 2.5v2.2M12 19.3v2.2M21.5 12h-2.2M4.7 12H2.5M18.7 5.3l-1.6 1.6M6.9 17.1l-1.6 1.6M18.7 18.7l-1.6-1.6M6.9 6.9 5.3 5.3"/></svg></span><span style="font-size:9px;font-weight:600">Ajustes</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===================== AJUSTES ===================== -->
+    <div style="flex:none;width:392px">
+      <div style="font-family:'Newsreader';font-weight:600;font-size:15px;color:#0a6a3a;margin-bottom:3px">Ajustes</div>
+      <div style="font-size:12.5px;color:#7c7567;margin-bottom:14px">Grupo, reglas de la casa y cuenta.</div>
+      <div style="width:392px;border-radius:42px;border:11px solid #0e1410;overflow:hidden;box-shadow:0 24px 60px rgba(15,40,28,.22)">
+        <div class="gv-screen" style="background:#fff;height:824px;overflow:auto;-ms-overflow-style:none;scrollbar-width:none">
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 22px 4px">
+            <div style="font-weight:700;font-size:15px;color:#1b211d">8:05</div>
+            <div style="display:flex;align-items:center;gap:7px;color:#1b211d"><span style="font-size:12px;letter-spacing:1px">▂▄▆</span><span style="font-size:13px">📶</span><span style="display:inline-flex;align-items:center;border:1.5px solid #1b211d;border-radius:4px;padding:1px 4px;font-size:9px;font-weight:800">24</span></div>
+          </div>
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:6px 20px 12px;border-bottom:1px solid #e4e6e1">
+            <div style="color:#0a6a3a;display:flex"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="3.6"/><path d="M5.5 20a6.5 6.5 0 0 1 13 0"/></svg></div>
+            <div style="font-family:'Newsreader';font-style:italic;font-weight:600;font-size:19px;color:#0a6a3a;white-space:nowrap;display:flex;align-items:center"><span style="display:inline-flex;margin-right:8px"><svg width="24" height="24" viewBox="0 0 24 24"><path d="M3 16 C5 13 9 12 12 12 C16 12 19 13.5 21 16 C19.5 17.6 16 18.6 12 18.6 C8 18.6 4.5 17.6 3 16 Z" fill="#e6c34a" stroke="#0a6a3a" stroke-width="1.3" stroke-linejoin="round"/><ellipse cx="13.6" cy="15.1" rx="1.3" ry="0.72" fill="#0a6a3a"/><path d="M13.6 15 L13.6 4.2" stroke="#0a6a3a" stroke-width="1.3" stroke-linecap="round"/><path d="M13.6 4.4 L19.2 6.1 L13.6 7.9 Z" fill="#c1272d"/></svg></span>Golf Viernes</div>
+            <div style="color:#0a6a3a;display:flex"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M6.5 9.5a5.5 5.5 0 0 1 11 0c0 4.5 1.8 6 1.8 6H4.7s1.8-1.5 1.8-6Z"/><path d="M10 19a2 2 0 0 0 4 0"/></svg></div>
+          </div>
+
+          <div style="padding:14px 18px 92px">
+            <h2 style="font-family:'Newsreader';font-weight:600;font-size:34px;line-height:1;color:#0a6a3a;margin:0 0 14px">Ajustes</h2>
+
+            <div style="border:1px solid #e4e6e1;border-radius:16px;padding:15px;display:flex;align-items:center;gap:13px">
+              <div style="width:52px;height:52px;border-radius:50%;background:#0a6a3a;color:#fff;display:grid;place-items:center;font-family:'Newsreader';font-weight:600;font-size:20px;flex:none">BE</div>
+              <div style="flex:1"><div style="font-family:'Newsreader';font-weight:600;font-size:20px;color:#0a6a3a;line-height:1.1">Beto</div><div style="font-size:12.5px;color:#6e776f;font-weight:600">Organizador · Golf Viernes</div></div>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#c2c8c2" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg>
+            </div>
+
+            <div style="font-size:11px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:#9aa39a;margin:18px 4px 8px">Grupo</div>
+            <div style="border:1px solid #e4e6e1;border-radius:16px;padding:0 15px">
+              <div style="display:flex;align-items:center;gap:12px;padding:13px 0;border-bottom:1px solid #eef0ed">
+                <span style="color:#6e776f;display:flex;flex:none"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.2"/><path d="M3.5 19a5.5 5.5 0 0 1 11 0"/><path d="M16 5.2a3.2 3.2 0 0 1 0 5.6"/><path d="M20.5 19a5.5 5.5 0 0 0-3-4.9"/></svg></span>
+                <div style="flex:1;font-size:14.5px;font-weight:600;color:#1b211d">Miembros</div>
+                <div style="display:flex;align-items:center;gap:6px"><span style="font-size:13.5px;color:#6e776f;font-weight:600">9</span><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#c2c8c2" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg></div>
+              </div>
+              <div style="display:flex;align-items:center;gap:12px;padding:13px 0;border-bottom:1px solid #eef0ed">
+                <span style="color:#6e776f;display:flex;flex:none"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="9.5" cy="8" r="3.2"/><path d="M4 19a5.5 5.5 0 0 1 11 0"/><path d="M18 7.5v5M15.5 10h5"/></svg></span>
+                <div style="flex:1;font-size:14.5px;font-weight:600;color:#1b211d">Invitar al grupo</div>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#c2c8c2" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg>
+              </div>
+              <div style="display:flex;align-items:center;gap:12px;padding:13px 0">
+                <span style="color:#6e776f;display:flex;flex:none"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M7 21V4"/><path d="M7 4.5h8l-1.8 2.4L15 9.3H7"/></svg></span>
+                <div style="flex:1;font-size:14.5px;font-weight:600;color:#1b211d">Campo por defecto</div>
+                <div style="display:flex;align-items:center;gap:6px"><span style="font-size:13.5px;color:#6e776f;font-weight:600">Campestre León</span><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#c2c8c2" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg></div>
+              </div>
+            </div>
+
+            <div style="font-size:11px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:#9aa39a;margin:18px 4px 8px">Reglas de la casa</div>
+            <div style="border:1px solid #e4e6e1;border-radius:16px;padding:0 15px">
+              <div style="display:flex;align-items:center;gap:12px;padding:13px 0;border-bottom:1px solid #eef0ed">
+                <span style="color:#6e776f;display:flex;flex:none"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.5"/><path d="M12 7v10M14.5 9c-.7-.8-1.7-1.1-2.7-1.1-1.4 0-2.5.8-2.5 2 0 2.8 5.4 1.4 5.4 4.2 0 1.3-1.2 2-2.9 2-1.1 0-2.2-.4-2.9-1.2"/></svg></span>
+                <div style="flex:1;font-size:14.5px;font-weight:600;color:#1b211d">Valor de la raya</div>
+                <div style="display:flex;align-items:center;gap:6px"><span style="font-size:13.5px;color:#6e776f;font-weight:600">$20</span><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#c2c8c2" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg></div>
+              </div>
+              <div style="display:flex;align-items:center;gap:12px;padding:13px 0;border-bottom:1px solid #eef0ed">
+                <span style="color:#6e776f;display:flex;flex:none"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="15" rx="6.5" ry="2.6"/><path d="M12 15V5"/><path d="M12 5.4h4l-1.4 1.6L16 8.6h-4"/></svg></span>
+                <div style="flex:1;font-size:14.5px;font-weight:600;color:#1b211d">Hoyos por defecto</div>
+                <div style="display:flex;align-items:center;gap:6px"><span style="font-size:13.5px;color:#6e776f;font-weight:600">18</span><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#c2c8c2" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg></div>
+              </div>
+              <div style="display:flex;align-items:center;gap:12px;padding:13px 0;border-bottom:1px solid #eef0ed">
+                <span style="color:#6e776f;display:flex;flex:none"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 13c2.6-3.6 5.8-3.6 8.4 0 2.6-3.6 5.8-3.6 8.4 0"/></svg></span>
+                <div style="flex:1;font-size:14.5px;font-weight:600;color:#1b211d">Birdie automático</div>
+                <div style="width:42px;height:24px;border-radius:999px;background:#0a6a3a;position:relative;flex:none"><div style="position:absolute;top:2px;left:20px;width:20px;height:20px;border-radius:50%;background:#fff"></div></div>
+              </div>
+              <div style="display:flex;align-items:center;gap:12px;padding:13px 0;border-bottom:1px solid #eef0ed">
+                <span style="color:#6e776f;display:flex;flex:none"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3.5v8"/><path d="M12 4h4l-1.2 1.6L16 7.2h-4"/><path d="M3 18c2-1.8 4 .2 6-.8s4 .8 6-.2 3 .8 6-1"/><path d="M3 21h18"/></svg></span>
+                <div style="flex:1;font-size:14.5px;font-weight:600;color:#1b211d">Sandy</div>
+                <div style="width:42px;height:24px;border-radius:999px;background:#0a6a3a;position:relative;flex:none"><div style="position:absolute;top:2px;left:20px;width:20px;height:20px;border-radius:50%;background:#fff"></div></div>
+              </div>
+              <div style="display:flex;align-items:center;gap:12px;padding:13px 0">
+                <span style="color:#6e776f;display:flex;flex:none"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M7.5 8h7v10.5a1 1 0 0 1-1 1h-5a1 1 0 0 1-1-1Z"/><path d="M14.5 10h2.5a1.4 1.4 0 0 1 1.4 1.4v2.6a1.4 1.4 0 0 1-1.4 1.4h-2.5"/><path d="M9 8c0-1.6 1.2-2.6 3-2.6s3 1 3 2.6"/></svg></span>
+                <div style="flex:1;font-size:14.5px;font-weight:600;color:#1b211d">Chevez</div>
+                <div style="width:42px;height:24px;border-radius:999px;background:#d6dad4;position:relative;flex:none"><div style="position:absolute;top:2px;left:2px;width:20px;height:20px;border-radius:50%;background:#fff"></div></div>
+              </div>
+            </div>
+
+            <div style="font-size:11px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:#9aa39a;margin:18px 4px 8px">App</div>
+            <div style="border:1px solid #e4e6e1;border-radius:16px;padding:0 15px">
+              <div style="display:flex;align-items:center;gap:12px;padding:13px 0;border-bottom:1px solid #eef0ed">
+                <span style="color:#6e776f;display:flex;flex:none"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M6.5 9.5a5.5 5.5 0 0 1 11 0c0 4.5 1.8 6 1.8 6H4.7s1.8-1.5 1.8-6Z"/><path d="M10 19a2 2 0 0 0 4 0"/></svg></span>
+                <div style="flex:1;font-size:14.5px;font-weight:600;color:#1b211d">Notificaciones</div>
+                <div style="width:42px;height:24px;border-radius:999px;background:#0a6a3a;position:relative;flex:none"><div style="position:absolute;top:2px;left:20px;width:20px;height:20px;border-radius:50%;background:#fff"></div></div>
+              </div>
+              <div style="display:flex;align-items:center;gap:12px;padding:13px 0;border-bottom:1px solid #eef0ed">
+                <span style="color:#6e776f;display:flex;flex:none"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2.5v2M12 19.5v2M2.5 12h2M19.5 12h2M5 5l1.4 1.4M17.6 17.6 19 19M19 5l-1.4 1.4M6.4 17.6 5 19"/></svg></span>
+                <div style="flex:1;font-size:14.5px;font-weight:600;color:#1b211d">Apariencia</div>
+                <div style="display:flex;align-items:center;gap:6px"><span style="font-size:13.5px;color:#6e776f;font-weight:600">Claro</span><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#c2c8c2" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg></div>
+              </div>
+              <div style="display:flex;align-items:center;gap:12px;padding:13px 0">
+                <span style="color:#6e776f;display:flex;flex:none"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.5"/><path d="M9.7 9.3a2.3 2.3 0 0 1 4.4.8c0 1.6-2.1 1.9-2.1 3.4"/><circle cx="12" cy="17" r="0.5" fill="currentColor" stroke="none"/></svg></span>
+                <div style="flex:1;font-size:14.5px;font-weight:600;color:#1b211d">Ayuda y reglas</div>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#c2c8c2" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg>
+              </div>
+            </div>
+
+            <button style="width:100%;background:#fff;color:#c1272d;border:1.5px solid #f0d4d4;border-radius:12px;padding:13px;font-weight:700;font-size:14px;margin-top:18px">Cerrar sesión</button>
+            <div style="text-align:center;margin-top:12px;font-size:11.5px;color:#9aa39a;font-weight:600">Golf Viernes · v2.0</div>
+          </div>
+
+          <div style="position:sticky;bottom:0;background:#fff;display:grid;grid-template-columns:repeat(6,1fr);padding:7px 2px 11px;border-top:1px solid #e4e6e1">
+            <div style="display:flex;flex-direction:column;align-items:center;gap:3px;color:#9aa39a"><span style="display:grid;place-items:center;width:22px;height:22px"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M7 4h10v4.5a5 5 0 0 1-10 0Z"/><path d="M7 5.5H4.5a2 2 0 0 0 2.3 3.2"/><path d="M17 5.5h2.5a2 2 0 0 1-2.3 3.2"/><path d="M10 14h4l-.4 2.5h-3.2Z"/><path d="M8.5 20h7"/><path d="M12 16.5V20"/></svg></span><span style="font-size:9px;font-weight:600">El 19</span></div>
+            <div style="display:flex;flex-direction:column;align-items:center;gap:3px;color:#9aa39a"><span style="display:grid;place-items:center;width:22px;height:22px"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3.5c.5 2.8 3.5 3.8 3.5 7.3a3.5 3.5 0 0 1-7 0c0-1.3.4-2.2 1.2-3 .2 1 .8 1.5 1.4 1.7-.3-2.4 0-4.7.9-6Z"/></svg></span><span style="font-size:9px;font-weight:600">Destac.</span></div>
+            <div style="display:flex;flex-direction:column;align-items:center;gap:3px;color:#9aa39a"><span style="display:grid;place-items:center;width:22px;height:22px"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M6.5 21V3.5"/><path d="M6.5 4.5h10l-2.3 3 2.3 3h-10"/></svg></span><span style="font-size:9px;font-weight:600">Salidas</span></div>
+            <div style="display:flex;flex-direction:column;align-items:center;gap:3px;color:#9aa39a"><span style="display:grid;place-items:center;width:22px;height:22px"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M15.2 4.4l4.4 4.4-9.4 9.4-4.7.9.9-4.7Z"/><path d="M13.4 6.2l4.4 4.4"/><path d="M6.4 14.4l3.2 3.2"/></svg></span><span style="font-size:9px;font-weight:600">Captura</span></div>
+            <div style="display:flex;flex-direction:column;align-items:center;gap:3px;color:#9aa39a"><span style="display:grid;place-items:center;width:22px;height:22px"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4.5v15"/><path d="M5.5 19.5h13"/><path d="M6 7.5l6-1.3 6 1.3"/><path d="M6 7.5l-2.5 5a2.5 2.5 0 0 0 5 0Z"/><path d="M18 7.5l-2.5 5a2.5 2.5 0 0 0 5 0Z"/></svg></span><span style="font-size:9px;font-weight:600">Ventajas</span></div>
+            <div style="display:flex;flex-direction:column;align-items:center;gap:3px;color:#0a6a3a"><span style="display:grid;place-items:center;width:22px;height:22px"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 2.5v2.2M12 19.3v2.2M21.5 12h-2.2M4.7 12H2.5M18.7 5.3l-1.6 1.6M6.9 17.1l-1.6 1.6M18.7 18.7l-1.6-1.6M6.9 6.9 5.3 5.3"/></svg></span><span style="font-size:9px;font-weight:700">Ajustes</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+</x-dc>
+</body>
+</html>

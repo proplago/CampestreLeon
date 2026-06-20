@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(awk '/<script>/{f=1;next}/<\\\\/script>/{f=0}f' rayas-campestre.html)",
+      "Bash(node --check /tmp/app.js)",
+      "PowerShell($n = \\(Get-Command node -ErrorAction SilentlyContinue\\); if \\($n\\) { $n.Source } else { \"NO NODE\" })",
+      "PowerShell(try { $v = & python --version 2>&1; \"OUT: $v\" } catch { \"ERR: $_\" })",
+      "mcp__Claude_Preview__preview_start",
+      "PowerShell($p='G:\\\\Unidades compartidas\\\\CLAUDE\\\\GolfViernes'; Copy-Item \"$p\\\\index.html\" \"$p\\\\__test.html\" -Force; $c=[System.IO.File]::ReadAllText\\(\"$p\\\\__test.html\"\\); $c=$c -replace 'databaseURL: \"https://golf-viernes-c790d-default-rtdb\\\\.firebaseio\\\\.com\"','databaseURL: \"\"'; [System.IO.File]::WriteAllText\\(\"$p\\\\__test.html\",$c,\\(New-Object System.Text.UTF8Encoding $false\\)\\); if\\($c -match 'databaseURL: \"\"'\\){'OK: copia con Firebase en blanco \\(usa localStorage\\)'}else{'ERROR: no se blanqueó'})",
+      "Bash(git init *)",
+      "Bash(git add *)",
+      "Bash(git commit *)"
+    ]
+  }
+}
