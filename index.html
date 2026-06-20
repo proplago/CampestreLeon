@@ -504,8 +504,8 @@
   <!-- DÍA -->
   <section class="view" id="v-day">
     <div class="eyebrow">Viernes de juego</div>
-    <h2 class="vtitle">Salidas e invitados</h2>
-    <p class="lead">Convoca a los que juegan hoy y dale Sortear: arma grupos parejos (máx 6). Más de 6 → dos grupos.</p>
+    <h2 class="vtitle" id="dayTitle">Salidas e invitados</h2>
+    <p class="lead" id="dayLead">Convoca a los que juegan hoy y dale Sortear: arma grupos parejos. Más jugadores → más salidas.</p>
     <div id="dayContent"></div>
   </section>
 
@@ -2061,11 +2061,51 @@ const App = (() => {
       {head:'Hoyo por hoyo (gross)', rows}
     ]);
   }
+  // Vista de Salidas para REGULAR: solo confirma su propia asistencia + ve los grupos (solo lectura)
+  function renderDayRegular(box, d){
+    d.salidas=d.salidas||[]; d.playing=d.playing||[];
+    const _t=document.getElementById('dayTitle'), _l=document.getElementById('dayLead');
+    if(_t) _t.textContent='Tu salida'; if(_l) _l.textContent='Confirma tu asistencia y revisa tu grupo.';
+    const me=myPid();
+    const going = !!(me && d.playing.includes(me));
+    const inGroup = !!(me && (d.salidas||[]).some(s=>(s||[]).includes(me)));
+    let html=`<div class="card"><h3>Tu asistencia</h3>`;
+    if(!me){ html+=`<div class="hint">Tu usuario aún no está ligado a un jugador. Pide al admin que te asigne.</div>`; }
+    else if(going){
+      html+=`<div class="row" style="justify-content:space-between;align-items:center;margin-top:6px">
+        <div><div style="font-weight:700;color:var(--good)">✅ Confirmado</div><div class="hint" style="margin:0">${d.label||''}${inGroup?' · ya estás en una salida':''}</div></div>
+        <button class="btn clay outline sm" onclick="App.togglePlaying('${me}')">No podré ir</button></div>`;
+    } else {
+      html+=`<div class="hint" style="margin-bottom:10px">¿Vas a la salida de <b>${d.label||'este día'}</b>?</div>
+        <button class="btn block" onclick="App.togglePlaying('${me}')">Confirmar mi asistencia</button>`;
+    }
+    html+=`</div>`;
+    const cap=flightCap(d);
+    const assigned=(d.salidas||[]).reduce((a,g)=>a.concat((g||[]).filter(Boolean)),[]);
+    if(assigned.length){
+      const gColors=['var(--fairway)','var(--purple)','var(--clay)'];
+      html+=`<div class="card"><h3>Salidas</h3><div class="hint">${courseOf(d).name} · ${holesLabel(d)}</div>`;
+      (d.salidas||[]).forEach((g,s)=>{ const ids=(g||[]).filter(Boolean); if(!ids.length) return;
+        html+=`<div style="margin-top:12px"><div style="font-family:'Newsreader',serif;font-weight:600;font-size:15px;color:${gColors[s%gColors.length]};margin-bottom:6px">Grupo ${s+1} · <span style="color:var(--muted);font-weight:500">${ids.length}/${cap}</span></div><div class="assign">`;
+        ids.forEach(id=>html+=`<span class="chip ${id===me?'on':''}">${pname(id)}${id===me?' (tú)':''}</span>`);
+        html+=`</div></div>`;
+      });
+      html+=`</div>`;
+    } else {
+      html+=`<div class="card"><div class="hint">Aún no se sortean las salidas. Cuando el admin sortee, aquí verás tu grupo.</div></div>`;
+    }
+    box.innerHTML=html;
+  }
   function renderDay(){
     const box=document.getElementById('dayContent');
     const d=curDay();
-    if(!d){ box.innerHTML=emptyState('📅','Sin día activo','Crea un viernes de juego.','App.newDayModal()','Crear día'); return; }
+    if(!d){ box.innerHTML = isAdmin()
+        ? emptyState('📅','Sin día activo','Crea un viernes de juego.','App.newDayModal()','Crear día')
+        : emptyState('📅','Sin salida activa','El admin aún no crea la salida del día. Vuelve más tarde.','',''); return; }
     d.playing=d.playing||[];
+    if(!isAdmin()){ return renderDayRegular(box, d); }
+    const _t=document.getElementById('dayTitle'), _l=document.getElementById('dayLead');
+    if(_t) _t.textContent='Salidas e invitados'; if(_l) _l.textContent='Convoca a los que juegan hoy y dale Sortear: arma grupos parejos. Más jugadores → más salidas.';
 
     let html='';
     // 1. convocados
