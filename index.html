@@ -812,6 +812,7 @@ const App = (() => {
       if(Array.isArray(dd.start)) dd.start = dd.start[0]||1;
       if(typeof dd.start!=='number') dd.start=1;
       if(dd.holes!==9) dd.holes=18;
+      if(!Array.isArray(dd.salidaTimes)) dd.salidaTimes=['2:10','2:20'];
       dd.doubles = dd.doubles||{};
       // V2: convertir doubles de formato viejo pairKey "a|b"=true → direccional {a:{b:true}}
       const dk=Object.keys(dd.doubles);
@@ -1827,10 +1828,23 @@ const App = (() => {
       setSignedV(a,b,to);
       logVent(a,b,from,to,'auto',d.id);
     }
-    d.closed=true; save(); renderLiq();
-    modal(`<h3 style="margin:0 0 6px">✓ Día cerrado</h3><div class="hint" style="margin-bottom:14px">Las ventajas (sliding) quedaron ajustadas para la próxima. ¿Mandas el cierre al grupo?</div>
+    d.closed=true; save();
+    const nd=autoCreateNext(d); renderLiq();
+    modal(`<h3 style="margin:0 0 6px">✓ Día cerrado</h3><div class="hint" style="margin-bottom:14px">Las ventajas (sliding) quedaron ajustadas para la próxima.${nd?` Se generó sola la salida del <b>${nd.label}</b> 📅.`:''} ¿Mandas el cierre al grupo?</div>
       <button class="btn block" onclick="App.closeModal();App.exportImage()">📸 Compartir cierre</button>
       <button class="btn ghost block" style="margin-top:8px" onclick="App.closeModal()">Listo</button>`);
+  }
+  // Al cerrar un día se genera sola la salida de la próxima semana (+7 días, mismo campo/horarios)
+  function autoCreateNext(d){
+    if(!d||!d.date) return null;
+    const m=/^(\d{4})-(\d{2})-(\d{2})/.exec(d.date); if(!m) return null;
+    const dt=new Date(+m[1],+m[2]-1,+m[3]); dt.setDate(dt.getDate()+7);
+    const nextDate=dt.getFullYear()+'-'+String(dt.getMonth()+1).padStart(2,'0')+'-'+String(dt.getDate()).padStart(2,'0');
+    if((state.days||[]).some(x=>x.date===nextDate)) return null;   // ya existe esa fecha
+    const wd=dt.toLocaleDateString('es-MX',{weekday:'long'}); const label=wd.charAt(0).toUpperCase()+wd.slice(1)+' '+dt.toLocaleDateString('es-MX',{day:'numeric',month:'short'});
+    const nd={id:uid(),date:nextDate,label,playing:[],salidas:[[],[]],start:d.start||1,holes:d.holes||18,courseId:d.courseId||'campestre',salidaTimes:(d.salidaTimes||['2:10','2:20']).slice(),doubles:{},closed:false,scores:{}};
+    state.days.unshift(nd); save();
+    return nd;
   }
 
   // ---- Historial de sliding ----
@@ -2098,7 +2112,7 @@ const App = (() => {
       const gColors=['var(--fairway)','var(--purple)','var(--clay)'];
       html+=`<div class="card"><h3>Salidas</h3><div class="hint">${courseOf(d).name} · ${holesLabel(d)}</div>`;
       (d.salidas||[]).forEach((g,s)=>{ const ids=(g||[]).filter(Boolean); if(!ids.length) return;
-        html+=`<div style="margin-top:12px"><div style="font-family:'Newsreader',serif;font-weight:600;font-size:15px;color:${gColors[s%gColors.length]};margin-bottom:6px">Grupo ${s+1} · <span style="color:var(--muted);font-weight:500">${ids.length}/${cap}</span></div><div class="assign">`;
+        html+=`<div style="margin-top:12px"><div style="font-family:'Newsreader',serif;font-weight:600;font-size:15px;color:${gColors[s%gColors.length]};margin-bottom:6px">Grupo ${s+1}${(d.salidaTimes&&d.salidaTimes[s])?' · '+d.salidaTimes[s]:''} · <span style="color:var(--muted);font-weight:500">${ids.length}/${cap}</span></div><div class="assign">`;
         ids.forEach(id=>html+=`<span class="chip ${id===me?'on':''}">${pname(id)}${id===me?' (tú)':''}</span>`);
         html+=`</div></div>`;
       });
@@ -2168,7 +2182,7 @@ const App = (() => {
     for(let s=0;s<nShow;s++){
       const ids=(d.salidas[s]||[]).filter(id=>d.playing.includes(id));
       const next=(s+1)%nShow;
-      html+=`<div style="margin-top:14px"><div style="font-family:'Newsreader',serif;font-weight:600;font-size:15px;color:${gColors[s%gColors.length]};margin-bottom:8px">Grupo ${s+1} · <span style="color:var(--muted);font-weight:500">${ids.length}/${cap}</span></div><div class="assign">`;
+      html+=`<div style="margin-top:14px"><div style="font-family:'Newsreader',serif;font-weight:600;font-size:15px;color:${gColors[s%gColors.length]};margin-bottom:8px">Grupo ${s+1}${(d.salidaTimes&&d.salidaTimes[s])?' · '+d.salidaTimes[s]:''} · <span style="color:var(--muted);font-weight:500">${ids.length}/${cap}</span></div><div class="assign">`;
       if(ids.length===0) html+=`<span class="hint" style="margin:0">—</span>`;
       ids.forEach(id=>{ const p=player(id);
         html+=`<button class="chip ${s===1?'s2':''} on" onclick="App.moveGroup('${id}',${next})">${p?pname(p.id):'—'}${nShow>1?' ↔':''}</button>`;
@@ -2932,8 +2946,9 @@ const App = (() => {
     const date=document.getElementById('m_date').value;
     let label=document.getElementById('m_label').value.trim();
     if(!label){ const dt=new Date(date+'T12:00'); const wd=dt.toLocaleDateString('es-MX',{weekday:'long'}); label=wd.charAt(0).toUpperCase()+wd.slice(1)+' '+dt.toLocaleDateString('es-MX',{day:'numeric',month:'short'}); }
-    const lastCourse=(state.days[0]&&state.days[0].courseId)||'campestre';
-    const d={id:uid(),date,label,playing:[],salidas:[[],[]],start:1,holes:18,courseId:lastCourse,doubles:{},closed:false,scores:{}};
+    const lastDay=state.days[0]; const lastCourse=(lastDay&&lastDay.courseId)||'campestre';
+    const salidaTimes=(lastDay&&Array.isArray(lastDay.salidaTimes))?lastDay.salidaTimes.slice():['2:10','2:20'];
+    const d={id:uid(),date,label,playing:[],salidas:[[],[]],start:1,holes:18,courseId:lastCourse,salidaTimes,doubles:{},closed:false,scores:{}};
     state.days.unshift(d); state.currentDayId=d.id; save(); closeModal(); go('day');
   }
   function switchDay(id){ state.currentDayId=id; save(); render(); }
