@@ -912,7 +912,11 @@ const App = (() => {
   }
   function pname(id){ const m=labelMap(); return m[id] || (player(id)?player(id).name:'?'); }
   const curDay = () => state.days.find(d=>d.id===state.currentDayId);
-  function dayPlayers(d){ if(d.playing) return [...d.playing]; return [...(d.salidas[0]||[]), ...(d.salidas[1]||[])]; }
+  function dayPlayers(d){ if(d.playing) return [...d.playing]; return (d.salidas||[]).reduce((a,g)=>a.concat(g||[]),[]); }
+  // Cap de salida por día de la semana: sáb/dom máx 5 (fivesome), entre semana máx 6 (sixsome).
+  function dayOfWeek(d){ if(!d||!d.date) return null; const m=/^(\d{4})-(\d{2})-(\d{2})/.exec(d.date); if(!m) return null; return new Date(+m[1],+m[2]-1,+m[3]).getDay(); }
+  function flightCap(d){ const w=dayOfWeek(d); return (w===0||w===6)?5:6; }
+  function nFlights(d,n){ return Math.max(1, Math.ceil((n||0)/flightCap(d))); }
   function ensureScore(d,pid){
     if(!d.scores[pid]) d.scores[pid]={gross:Array(18).fill(0),putts:Array(18).fill(null),oyes:{},units:{},cast:{}};
     const s=d.scores[pid]; if(!s.putts) s.putts=Array(18).fill(null); if(!s.oyes) s.oyes={};
@@ -2078,7 +2082,9 @@ const App = (() => {
 
     // 2. sorteo + grupos
     if(typeof d.start!=='number') d.start=1;
-    const nGroups=d.playing.length<=6?1:2;
+    d.salidas=d.salidas||[];
+    const cap=flightCap(d), wknd=(dayOfWeek(d)===0||dayOfWeek(d)===6);
+    const nGroups=nFlights(d, d.playing.length);
     html+=`<div class="card"><div class="row" style="justify-content:space-between"><h3>Grupos</h3>
       <button class="btn gold sm" onclick="App.sorteo()" ${d.playing.length?'':'disabled'}>🎲 Sortear${nGroups>1?' ('+nGroups+')':''}</button></div>
       <div class="row" style="justify-content:space-between;align-items:center;margin:4px 0 6px">
@@ -2087,7 +2093,7 @@ const App = (() => {
           ${state.courses.map(c=>`<option value="${c.id}" ${c.id===(d.courseId||'campestre')?'selected':''}>${c.name}</option>`).join('')}
         </select></div>
       <div class="row" style="justify-content:space-between;margin:2px 0 4px">
-        <span class="hint" style="margin:0">Reparte parejo (máx 6 por grupo).</span>
+        <span class="hint" style="margin:0">Reparte parejo · máx ${cap}/grupo (${wknd?'fin de semana':'entre semana'}).</span>
         <div class="startsel">hoyos
           <button class="${d.holes!==9?'on':''}" onclick="App.setHoles(18)">18</button>
           <button class="${d.holes===9?'on':''}" onclick="App.setHoles(9)">9</button></div></div>
@@ -2096,20 +2102,21 @@ const App = (() => {
           <button class="${d.start===1?'on':''}" onclick="App.setStart(1)">${d.holes===9?'1-9':'1'}</button>
           <button class="${d.start===10?'on':''}" onclick="App.setStart(10)">${d.holes===9?'10-18':'10'}</button></div></div>`;
 
-    const assigned=[...(d.salidas[0]||[]),...(d.salidas[1]||[])];
+    const assigned=(d.salidas||[]).reduce((a,g)=>a.concat((g||[]).filter(Boolean)),[]);
     const sinGrupo=d.playing.filter(id=>!assigned.includes(id));
 
-    [0,1].forEach(s=>{
+    const gColors=['var(--fairway)','var(--purple)','var(--clay)'];
+    const nShow=Math.max(nGroups, (d.salidas||[]).filter(g=>(g||[]).filter(Boolean).length).length, 1);
+    for(let s=0;s<nShow;s++){
       const ids=(d.salidas[s]||[]).filter(id=>d.playing.includes(id));
-      if(ids.length===0 && !(s===0 && nGroups>=1)) return;
-      if(s===1 && nGroups===1 && ids.length===0) return;
-      html+=`<div style="margin-top:14px"><div style="font-family:'Newsreader',serif;font-weight:600;font-size:15px;color:${s===0?'var(--fairway)':'var(--purple)'};margin-bottom:8px">Grupo ${s+1} · <span style="color:var(--muted);font-weight:500">${ids.length}/6</span></div><div class="assign">`;
+      const next=(s+1)%nShow;
+      html+=`<div style="margin-top:14px"><div style="font-family:'Newsreader',serif;font-weight:600;font-size:15px;color:${gColors[s%gColors.length]};margin-bottom:8px">Grupo ${s+1} · <span style="color:var(--muted);font-weight:500">${ids.length}/${cap}</span></div><div class="assign">`;
       if(ids.length===0) html+=`<span class="hint" style="margin:0">—</span>`;
       ids.forEach(id=>{ const p=player(id);
-        html+=`<button class="chip ${s===1?'s2':''} on" onclick="App.moveGroup('${id}',${1-s})">${p?pname(p.id):'—'} ↔</button>`;
+        html+=`<button class="chip ${s===1?'s2':''} on" onclick="App.moveGroup('${id}',${next})">${p?pname(p.id):'—'}${nShow>1?' ↔':''}</button>`;
       });
       html+=`</div></div>`;
-    });
+    }
     if(sinGrupo.length){
       html+=`<div style="margin-top:12px"><div style="font-weight:700;font-size:13px;color:var(--muted);margin-bottom:6px">Sin grupo</div><div class="assign">`;
       sinGrupo.forEach(id=>{ const p=player(id);
@@ -2150,13 +2157,14 @@ const App = (() => {
       d.playing.splice(k,1);
     } else {
       d.playing.push(pid);
-      // si ya se sorteó, balancear: meter al grupo MÁS CHICO (empate → Grupo 2, para que G1≤G2)
+      // si ya se sorteó, balancear: meter al grupo MÁS CHICO con espacio; si todos llenos, nueva salida
       if((d.salidas||[]).some(s=>(s||[]).filter(Boolean).length)){
-        const c0=(d.salidas[0]||[]).filter(Boolean).length, c1=(d.salidas[1]||[]).filter(Boolean).length;
-        let target = (c0>0 && c1>0) ? (c0<c1?0:1) : (c0<6?0:1);
-        if((d.salidas[target]||[]).length>=6) target=1-target;
+        const cap=flightCap(d); d.salidas=d.salidas||[];
+        let target=-1, best=Infinity;
+        d.salidas.forEach((s,i)=>{ const n=(s||[]).filter(Boolean).length; if(n<cap && n<best){ best=n; target=i; } });
+        if(target<0){ d.salidas.push([]); target=d.salidas.length-1; }
         d.salidas[target]=d.salidas[target]||[];
-        if(d.salidas[target].length<6) d.salidas[target].push(pid);
+        d.salidas[target].push(pid);
       }
     }
     save(); renderDay();
@@ -2195,23 +2203,24 @@ const App = (() => {
     closeModal(); doMoveGroup(pid,g,motivo);
   }
   function doMoveGroup(pid,g,motivo){
-    const d=curDay();
-    const fromG=d.salidas[0].includes(pid)?0:(d.salidas[1].includes(pid)?1:null);
-    [0,1].forEach(s=>{ const a=d.salidas[s]||[]; const k=a.indexOf(pid); if(k>=0)a.splice(k,1); });
+    const d=curDay(); d.salidas=d.salidas||[];
+    let fromG=null; d.salidas.forEach((s,i)=>{ if((s||[]).includes(pid)) fromG=i; });
+    d.salidas.forEach(s=>{ const a=s||[]; const k=a.indexOf(pid); if(k>=0)a.splice(k,1); });
     d.salidas[g]=d.salidas[g]||[];
-    if(d.salidas[g].length>=6){ toast('Grupo lleno (6)'); if(fromG!=null) d.salidas[fromG].push(pid); save(); renderDay(); return; }
+    const cap=flightCap(d);
+    if(d.salidas[g].length>=cap){ toast('Grupo lleno ('+cap+')'); if(fromG!=null) d.salidas[fromG].push(pid); save(); renderDay(); return; }
     d.salidas[g].push(pid);
     if(fromG!=null && fromG!==g){ d.moves=d.moves||[]; d.moves.unshift({ts:Date.now(), pid, from:fromG+1, to:g+1, motivo:motivo||'—'}); }
     save(); renderDay();
   }
   function sorteo(){
     const d=curDay(); const pool=[...d.playing];
-    if(pool.length>12) toast('Más de 12: ajusta a mano');
+    const n=nFlights(d, pool.length);   // salidas según el cap del día (5 fin de semana, 6 entre semana)
     for(let i=pool.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [pool[i],pool[j]]=[pool[j],pool[i]]; }
-    d.salidas=[[],[]];
-    if(pool.length<=6){ d.salidas[0]=pool; }
-    else { const g1=Math.floor(pool.length/2); d.salidas[0]=pool.slice(0,g1); d.salidas[1]=pool.slice(g1); }  // Grupo 1 = el más chico (sale adelante, no frena al grande)
-    save(); renderDay(); toast('Grupos sorteados');
+    const groups=Array.from({length:n},()=>[]);
+    pool.forEach((pid,i)=>groups[i%n].push(pid));   // round-robin = grupos parejos, cada uno ≤ cap
+    d.salidas=groups;
+    save(); renderDay(); toast(n>1?('Grupos sorteados ('+n+')'):'Grupo sorteado');
   }
 
   // ---- Tarjeta por grupo (cómo vamos) ----
