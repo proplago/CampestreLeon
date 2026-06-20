@@ -633,9 +633,10 @@ const App = (() => {
   let saveTimer=null, dirty=false;
 
   // ---------- persistencia: Firebase (sync granular) → window.storage → localStorage → memoria ----------
-  // Liga activa (V2). Hasta que exista el login, se fija a la liga por defecto migrada.
+  // Liga activa (V2). Conmutable por el súper admin (dev: se guarda en localStorage).
   // Cuando entre el auth, se resolverá desde /users/{uid}.
   let ACTIVE_LEAGUE='campestre-viernes';
+  try{ const _a=localStorage.getItem('cl_active_league'); if(_a) ACTIVE_LEAGUE=_a; }catch(e){}
   let _backend='memory', _fbRef=null, _shardCache={}, _loadedOnce=false;
   function fbConfigured(){ return !!(FIREBASE_CONFIG && FIREBASE_CONFIG.databaseURL && FIREBASE_CONFIG.databaseURL.trim()); }
   function lsOk(){ try{ localStorage.setItem('__t','1'); localStorage.removeItem('__t'); return true; }catch(e){ return false; } }
@@ -2781,6 +2782,7 @@ const App = (() => {
     const box=document.getElementById('cfgContent');
     if(!isAdmin()){ return renderCfgRegular(box); }
     let html='';
+    html+=cfgLeaguesHtml();   // Liga + miembros/invitaciones (super: gestión completa; admin: invitar regulares)
 
     // ===================== REGLAS DE LA CASA =====================
     html+=`<div class="cfg-sect">Reglas de la casa</div>`;
@@ -3101,10 +3103,10 @@ const App = (() => {
   // Selector abierto para probar roles (super/admin/regular) antes del login real (Google/clave)
   // de la fase final. La identidad vive por-dispositivo en localStorage; al entrar el auth real
   // se reemplazará la fuente (auth.uid → /users/{uid}) sin tocar las reglas de permiso de abajo.
-  const KEY_USER='cl_devuser_'+ACTIVE_LEAGUE;
+  function userKey(){ return 'cl_devuser_'+ACTIVE_LEAGUE; }
   let _devUser=null;   // {playerId, role:'super'|'admin'|'regular'}
-  function loadDevUser(){ try{ const r=localStorage.getItem(KEY_USER); if(r) _devUser=JSON.parse(r); }catch(e){} }
-  function setDevUser(playerId, role){ _devUser={playerId,role}; try{ localStorage.setItem(KEY_USER, JSON.stringify(_devUser)); }catch(e){} }
+  function loadDevUser(){ try{ const r=localStorage.getItem(userKey()); if(r) _devUser=JSON.parse(r); else _devUser=null; }catch(e){ _devUser=null; } }
+  function setDevUser(playerId, role){ _devUser={playerId,role}; try{ localStorage.setItem(userKey(), JSON.stringify(_devUser)); }catch(e){} }
   function isSuper(){ return !!(_devUser&&_devUser.role==='super'); }
   function isAdmin(){ return !!(_devUser&&(_devUser.role==='admin'||_devUser.role==='super')); }   // admin incluye super
   function isRegular(){ return !!(_devUser&&_devUser.role==='regular'); }
@@ -3137,8 +3139,63 @@ const App = (() => {
   function approveVent(id){ const r=(state.ventReq||{})[id]; if(!r) return; setSignedV(r.giver,r.receiver,r.to); lockVent(r.giver,r.receiver,r.requestedBy); logVent(r.giver,r.receiver,r.from,r.to,'aprobado',curDay()&&curDay().id); delete state.ventReq[id]; save(); render(); toast('Ventaja aprobada'); }
   function rejectVent(id){ if(!(state.ventReq||{})[id]) return; delete state.ventReq[id]; save(); render(); toast('Solicitud rechazada'); }
 
+  // ===================== LIGAS (DEV, local) =====================
+  // Registro local de ligas + miembros. Persistencia real y envío de correos llegan con el Auth.
+  const DEFAULT_LEAGUE={id:'campestre-viernes', name:'Campestre León — Viernes'};
+  function loadLeagues(){ try{ let L=JSON.parse(localStorage.getItem('cl_leagues')||'[]'); if(!Array.isArray(L)) L=[]; if(!L.find(x=>x.id===DEFAULT_LEAGUE.id)) L.unshift({...DEFAULT_LEAGUE}); return L; }catch(e){ return [{...DEFAULT_LEAGUE}]; } }
+  function saveLeagues(L){ try{ localStorage.setItem('cl_leagues', JSON.stringify(L)); }catch(e){} }
+  function leagueName(id){ const x=loadLeagues().find(l=>l.id===id); return x?x.name:id; }
+  function createLeague(){ if(!isSuper()){ toast('Solo el súper admin crea ligas'); return; }
+    const el=document.getElementById('lg_name'); const name=(el?el.value:'').trim(); if(!name){ toast('Ponle nombre a la liga'); return; }
+    const base=name.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'').slice(0,24)||'liga';
+    let L=loadLeagues(), id=base, n=1; while(L.find(x=>x.id===id)) id=base+'-'+(++n);
+    L.push({id,name}); saveLeagues(L); renderCfg(); toast('Liga creada: '+name); }
+  function switchLeague(id){ if(!isSuper()){ toast('Solo el súper admin cambia de liga'); return; }
+    if(id===ACTIVE_LEAGUE) return; try{ localStorage.setItem('cl_active_league', id); }catch(e){}
+    toast('Cambiando a '+leagueName(id)+'…'); setTimeout(()=>location.reload(), 450); }
+  function loadMembers(lid){ try{ const m=JSON.parse(localStorage.getItem('cl_members_'+lid)||'[]'); return Array.isArray(m)?m:[]; }catch(e){ return []; } }
+  function saveMembers(lid,m){ try{ localStorage.setItem('cl_members_'+lid, JSON.stringify(m)); }catch(e){} }
+  function addMember(){ if(!isAdmin()){ toast('Sin permiso'); return; }
+    const name=(document.getElementById('mb_name')||{}).value, email=(document.getElementById('mb_email')||{}).value, roleEl=document.getElementById('mb_role');
+    const nm=(name||'').trim(), em=(email||'').trim(); let role=roleEl?roleEl.value:'regular';
+    if(!isSuper()) role='regular';   // el admin solo invita jugadores normales
+    if(!nm && !em){ toast('Pon nombre o correo'); return; }
+    const m=loadMembers(ACTIVE_LEAGUE); m.unshift({name:nm||em, email:em, role, status: em?'invitado (pendiente de login)':'asignado', ts:Date.now()});
+    saveMembers(ACTIVE_LEAGUE,m); renderCfg(); toast(em?'Invitación registrada (se enviará al activar el login)':'Miembro asignado'); }
+  function removeMember(i){ if(!isAdmin()){ toast('Sin permiso'); return; } const m=loadMembers(ACTIVE_LEAGUE); m.splice(i,1); saveMembers(ACTIVE_LEAGUE,m); renderCfg(); }
+  function cfgLeaguesHtml(){
+    const active=ACTIVE_LEAGUE; let h=`<div class="cfg-sect">Liga</div>`;
+    if(isSuper()){
+      const L=loadLeagues();
+      h+=`<div class="card"><h3>Liga activa</h3>
+        <select class="txt" style="margin-top:6px" onchange="App.switchLeague(this.value)">
+          ${L.map(x=>`<option value="${x.id}" ${x.id===active?'selected':''}>${x.name}</option>`).join('')}</select>
+        <div class="row" style="gap:8px;margin-top:10px">
+          <input id="lg_name" class="txt" placeholder="Nombre de nueva liga (ej. TEST)">
+          <button class="btn sm" onclick="App.createLeague()">Crear</button></div>
+        <div class="hint" style="margin-top:6px">Crear una liga la deja vacía para empezar. Cambiar de liga recarga la app.</div></div>`;
+    } else {
+      h+=`<div class="card"><h3>${leagueName(active)}</h3><div class="hint">Tu liga activa. La gestión de ligas la hace el súper admin.</div></div>`;
+    }
+    const mem=loadMembers(active);
+    h+=`<div class="card"><h3>Miembros e invitaciones</h3>
+      <div class="hint">${isSuper()?'Asigna jugadores y admins, o invita por correo.':'Invita jugadores normales a tu liga.'}</div>
+      <div class="row" style="gap:6px;margin-top:8px">
+        <input id="mb_name" class="txt" placeholder="Nombre">
+        <input id="mb_email" class="txt" type="email" placeholder="correo (opcional)"></div>
+      <div class="row" style="gap:6px;margin-top:6px">
+        <select id="mb_role" class="txt">${isSuper()?'<option value="regular">Jugador (regular)</option><option value="admin">Admin de liga</option>':'<option value="regular">Jugador (regular)</option>'}</select>
+        <button class="btn sm" onclick="App.addMember()">Agregar / invitar</button></div>`;
+    if(mem.length){ h+=`<div class="plist" style="margin-top:10px">`;
+      mem.forEach((x,i)=>{ h+=`<div class="prow"><div class="grow"><div class="nm">${x.name}${x.role==='admin'?' <span class="tag">admin</span>':''}</div><div class="desc" style="font-size:11px;color:var(--muted)">${x.email||'sin correo'} · ${x.status}</div></div><button class="icbtn" onclick="App.removeMember(${i})">🗑</button></div>`; });
+      h+=`</div>`; }
+    else h+=`<div class="hint" style="margin-top:8px">Aún no hay miembros registrados aquí.</div>`;
+    h+=`</div>`;
+    return h;
+  }
+
   async function init(){ try{ if(document.fonts&&document.fonts.load){ document.fonts.load("600 40px Newsreader"); document.fonts.load("700 16px 'Hanken Grotesk'"); } }catch(e){} loadDevUser(); await load(); if(!state.currentDayId && state.days[0]) state.currentDayId=state.days[0].id; render(); if(!_devUser) loginModal(); }
-  return { init,loginModal,doLogin,approveVent,rejectVent,go,switchDay,daysModal,editDayModal,saveDayEdit,delDay,newDayModal,createDay,
+  return { init,loginModal,doLogin,approveVent,rejectVent,createLeague,switchLeague,addMember,removeMember,go,switchDay,daysModal,editDayModal,saveDayEdit,delDay,newDayModal,createDay,
     toggleAssign:null,togglePlaying,cancelPlayer,moveGroup,confirmMove,sorteo,addGuestModal,
     pickScore,score,putt,setOyes,quick,toggleUnit,toggleCast,navHole,gotoPending,gotoPlayerPending,setScoreGroup,setStart,setHoles,setCourse,
     setVentFocus,stepV,openBet,openH2H,setLiqTab,setScoreTab,setCmp,adjustVent,
