@@ -504,7 +504,7 @@
   <!-- DÍA -->
   <section class="view" id="v-day">
     <div class="eyebrow">Viernes de juego</div>
-    <h2 class="vtitle" id="dayTitle">Salidas e invitados</h2>
+    <h2 class="vtitle" id="dayTitle">Salidas</h2>
     <p class="lead" id="dayLead">Convoca a los que juegan hoy y dale Sortear: arma grupos parejos. Más jugadores → más salidas.</p>
     <div id="dayContent"></div>
   </section>
@@ -665,7 +665,7 @@ const App = (() => {
   function buildShards(st){
     const out={};
     out['meta']  = st._leagueMeta || {name:'Liga', schema:2};
-    out['rules'] = { rayaValue:(st.rayaValue!=null?st.rayaValue:20), activeBets: st.activeBets || _defActiveBets() };
+    out['rules'] = { rayaValue:(st.rayaValue!=null?st.rayaValue:20), activeBets: st.activeBets || _defActiveBets(), maxWeekday:(st.maxWeekday||6), maxWeekend:(st.maxWeekend||5) };
     const players={}; (st.players||[]).forEach(p=>{ if(p&&p.id){ const o=Object.assign({},p); delete o.id; players[p.id]=o; } }); out['players']=players;
     const courses={}; (st.courses||[]).forEach(c=>{ if(c&&c.id){ const o=Object.assign({},c); delete o.id; courses[c.id]=o; } }); out['courses']=courses;
     out['units']      = st.units||[];
@@ -712,6 +712,7 @@ const App = (() => {
     const rules = sh['rules']||{};
     g.rayaValue = (rules.rayaValue!=null?rules.rayaValue:20);
     g.activeBets = rules.activeBets || _defActiveBets();
+    g.maxWeekday = rules.maxWeekday||6; g.maxWeekend = rules.maxWeekend||5;
     g.players  = sh['players']?Object.keys(sh['players']).map(id=>Object.assign({},sh['players'][id],{id})):[];
     g.courses  = sh['courses']?Object.keys(sh['courses']).map(id=>Object.assign({},sh['courses'][id],{id})):[];
     g.units    = _arr(sh['units']);
@@ -805,6 +806,8 @@ const App = (() => {
     if(typeof state.sound!=='boolean') state.sound=true;
     // V2: metadatos de liga y reglas custom
     state.activeBets = state.activeBets || _defActiveBets();
+    if(typeof state.maxWeekday!=='number') state.maxWeekday=6;
+    if(typeof state.maxWeekend!=='number') state.maxWeekend=5;
     state.ventMeta = state.ventMeta || {};
     state.ventReq = state.ventReq || {};
     if(!state._leagueMeta) state._leagueMeta={name:'Campestre León — Viernes', schema:2};
@@ -918,7 +921,7 @@ const App = (() => {
   function dayPlayers(d){ if(d.playing) return [...d.playing]; return (d.salidas||[]).reduce((a,g)=>a.concat(g||[]),[]); }
   // Cap de salida por día de la semana: sáb/dom máx 5 (fivesome), entre semana máx 6 (sixsome).
   function dayOfWeek(d){ if(!d||!d.date) return null; const m=/^(\d{4})-(\d{2})-(\d{2})/.exec(d.date); if(!m) return null; return new Date(+m[1],+m[2]-1,+m[3]).getDay(); }
-  function flightCap(d){ const w=dayOfWeek(d); return (w===0||w===6)?5:6; }
+  function flightCap(d){ const w=dayOfWeek(d); return (w===0||w===6)?(state.maxWeekend||5):(state.maxWeekday||6); }
   function nFlights(d,n){ return Math.max(1, Math.ceil((n||0)/flightCap(d))); }
   function ensureScore(d,pid){
     if(!d.scores[pid]) d.scores[pid]={gross:Array(18).fill(0),putts:Array(18).fill(null),oyes:{},units:{},cast:{}};
@@ -2127,7 +2130,7 @@ const App = (() => {
     d.playing=d.playing||[];
     if(!isAdmin()){ return renderDayRegular(box, d); }
     const _t=document.getElementById('dayTitle'), _l=document.getElementById('dayLead');
-    if(_t) _t.textContent='Salidas e invitados'; if(_l) _l.textContent='Convoca a los que juegan hoy y dale Sortear: arma grupos parejos. Más jugadores → más salidas.';
+    if(_t) _t.textContent='Salidas'; if(_l) _l.textContent='Convoca a los que juegan hoy y dale Sortear: arma grupos parejos. Más jugadores → más salidas.';
 
     let html='';
     // 1. convocados
@@ -2789,6 +2792,16 @@ const App = (() => {
     if(fbConfigured())  return {emoji:'⚠️', cls:'warn', t:'Firebase configurado, sin conexión', d:'Revisa el databaseURL o tu internet y recarga.'};
     return {emoji:'📱', cls:'', t:'Solo este dispositivo', d:'Para que el grupo vea lo mismo en vivo, configura Firebase (instrucciones que te pasé).'};
   }
+  // Máximo de jugadores por grupo (config del club). Editable por TODOS (si el admin no va, igual se puede fijar).
+  function setMaxGroup(kind,v){ const n=Math.max(1,Math.min(12,parseInt(v)||0)); if(kind==='wknd') state.maxWeekend=n; else state.maxWeekday=n; save(); renderCfg(); if(curView==='day') renderDay(); }
+  function cfgMaxGroupHtml(){
+    return `<div class="card"><h3>Máximo por grupo</h3>
+      <div class="hint">Jugadores por salida (varía por club). Cualquiera lo puede ajustar.</div>
+      <div class="row" style="gap:10px;margin-top:8px">
+        <label class="fl" style="flex:1;margin:0">Entre semana<input class="txt" type="number" inputmode="numeric" min="1" max="12" value="${state.maxWeekday||6}" onchange="App.setMaxGroup('wd',this.value)"></label>
+        <label class="fl" style="flex:1;margin:0">Fin de semana<input class="txt" type="number" inputmode="numeric" min="1" max="12" value="${state.maxWeekend||5}" onchange="App.setMaxGroup('wknd',this.value)"></label>
+      </div></div>`;
+  }
   // Ajustes mínimos para REGULAR: identidad, reglas (lectura), soniditos, estado de sync.
   function renderCfgRegular(box){
     const si=syncInfo();
@@ -2803,6 +2816,7 @@ const App = (() => {
       <div class="card"><div class="row" style="justify-content:space-between">
         <div><h3 style="margin:0">Soniditos</h3><div class="hint" style="margin:2px 0 0">Celebración de birdies, eagles…</div></div>
         <button class="sw ${state.sound?'on':''}" onclick="App.toggleSound()"><span></span></button></div></div>
+      <div class="cfg-sect">Salidas</div>${cfgMaxGroupHtml()}
       <div class="cfg-sect">App</div>
       <div class="card" style="display:flex;gap:10px;align-items:center">
         <div style="font-size:26px">${si.emoji}</div>
@@ -2829,6 +2843,9 @@ const App = (() => {
     html+=`<div class="card"><h3>Valor de la raya</h3>
       <div class="row"><span style="font-size:22px;font-weight:700">$</span>
       <input class="txt" type="number" inputmode="numeric" value="${state.rayaValue}" onchange="App.setRaya(this.value)" style="max-width:120px"></div></div>`;
+
+    // máximo por grupo (config del club)
+    html+=cfgMaxGroupHtml();
 
     // sonido
     html+=`<div class="card"><div class="row" style="justify-content:space-between">
@@ -3228,7 +3245,7 @@ const App = (() => {
   }
 
   async function init(){ try{ if(document.fonts&&document.fonts.load){ document.fonts.load("600 40px Newsreader"); document.fonts.load("700 16px 'Hanken Grotesk'"); } }catch(e){} loadDevUser(); await load(); if(!state.currentDayId && state.days[0]) state.currentDayId=state.days[0].id; render(); if(!_devUser) loginModal(); }
-  return { init,loginModal,doLogin,approveVent,rejectVent,createLeague,switchLeague,addMember,removeMember,go,switchDay,daysModal,editDayModal,saveDayEdit,delDay,newDayModal,createDay,
+  return { init,loginModal,doLogin,approveVent,rejectVent,createLeague,switchLeague,addMember,removeMember,setMaxGroup,go,switchDay,daysModal,editDayModal,saveDayEdit,delDay,newDayModal,createDay,
     toggleAssign:null,togglePlaying,cancelPlayer,moveGroup,confirmMove,sorteo,addGuestModal,
     pickScore,score,putt,setOyes,quick,toggleUnit,toggleCast,navHole,gotoPending,gotoPlayerPending,setScoreGroup,setStart,setHoles,setCourse,
     setVentFocus,stepV,openBet,openH2H,setLiqTab,setScoreTab,setCmp,adjustVent,
