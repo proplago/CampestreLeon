@@ -1,0 +1,7 @@
+# Estado local de Claude Code (no es parte de la app)
+.claude/
+
+# OS / editor
+Thumbs.db
+.DS_Store
+*.swp
