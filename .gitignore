@@ -1,6 +1,9 @@
 # Estado local de Claude Code (no es parte de la app)
 .claude/
 
+# Respaldos con datos (nombres/scores) — NO publicar; viven solo en disco local
+backups/
+
 # OS / editor
 Thumbs.db
 .DS_Store
