@@ -632,13 +632,16 @@ const App = (() => {
   let saveTimer=null, dirty=false;
 
   // ---------- persistencia: Firebase (sync granular) → window.storage → localStorage → memoria ----------
+  // Liga activa (V2). Hasta que exista el login, se fija a la liga por defecto migrada.
+  // Cuando entre el auth, se resolverá desde /users/{uid}.
+  let ACTIVE_LEAGUE='campestre-viernes';
   let _backend='memory', _fbRef=null, _shardCache={}, _loadedOnce=false;
   function fbConfigured(){ return !!(FIREBASE_CONFIG && FIREBASE_CONFIG.databaseURL && FIREBASE_CONFIG.databaseURL.trim()); }
   function lsOk(){ try{ localStorage.setItem('__t','1'); localStorage.removeItem('__t'); return true; }catch(e){ return false; } }
   function detectBackend(){
     if(fbConfigured() && typeof firebase!=='undefined'){
       try{ if(!firebase.apps || !firebase.apps.length) firebase.initializeApp(FIREBASE_CONFIG);
-        _fbRef=firebase.database().ref('rayas'); _backend='fb'; return; }catch(e){ /* cae a fallback */ }
+        _fbRef=firebase.database().ref('leagues/'+ACTIVE_LEAGUE); _backend='fb'; return; }catch(e){ /* cae a fallback */ }
     }
     if(typeof window!=='undefined' && window.storage && window.storage.get){ _backend='wstorage'; return; }
     if(lsOk()){ _backend='local'; return; }
@@ -646,52 +649,97 @@ const App = (() => {
   }
   function mergeState(v){ try{ const o=(typeof v==='string')?JSON.parse(v):v; if(o&&typeof o==='object') state=Object.assign(state,o); }catch(e){} }
 
-  // --- SHARDS: cada jugador-tarjeta es su propia ranura, para que dos teléfonos no se pisen ---
+  // --- SHARDS V2: árbol real por-liga (/leagues/{lid}), inspeccionable por las reglas ---
+  //  Cada valor del shard es el VALOR REAL (objeto/booleano/número/array), NO un blob string,
+  //  para que ventajas y doubles sean nodos que las Security Rules puedan validar.
+  //  Las llaves con '/' son rutas profundas que _fbRef.update() escribe granularmente.
+  const _defActiveBets = ()=>({hoyos:true,medal:true,unidades:true,oyes:true,doblar:true,castigos:true});
+  function _sig(v){ return v===undefined?undefined:(typeof v==='string'?v:JSON.stringify(v)); }
+  function _arr(o){ // RTDB puede entregar {0:..,1:..} o array; normaliza a array sin huecos
+    if(Array.isArray(o)) return o.filter(x=>x!=null);
+    if(o && typeof o==='object') return Object.keys(o).sort((a,b)=>(+a)-(+b)).map(k=>o[k]).filter(x=>x!=null);
+    return [];
+  }
   function buildShards(st){
-    const out={}; const days=st.days||[]; const rest=Object.assign({},st); delete rest.days;
-    out['global']=JSON.stringify(rest);
-    out['order']=JSON.stringify(days.map(d=>d.id));
-    days.forEach(d=>{ const meta=Object.assign({},d); delete meta.scores;
-      out['days/'+d.id+'/meta']=JSON.stringify(meta);
-      const sc=d.scores||{}; Object.keys(sc).forEach(pid=>{ out['days/'+d.id+'/scores/'+pid]=JSON.stringify(sc[pid]); });
+    const out={};
+    out['meta']  = st._leagueMeta || {name:'Liga', schema:2};
+    out['rules'] = { rayaValue:(st.rayaValue!=null?st.rayaValue:20), activeBets: st.activeBets || _defActiveBets() };
+    const players={}; (st.players||[]).forEach(p=>{ if(p&&p.id){ const o=Object.assign({},p); delete o.id; players[p.id]=o; } }); out['players']=players;
+    const courses={}; (st.courses||[]).forEach(c=>{ if(c&&c.id){ const o=Object.assign({},c); delete o.id; courses[c.id]=o; } }); out['courses']=courses;
+    out['units']      = st.units||[];
+    out['castigos']   = st.castigos||[];
+    out['ventHistory']= st.ventHistory||[];
+    out['dblHistory'] = st.dblHistory||[];
+    out['order']      = (st.days||[]).map(d=>d.id);
+    // ventajas anidadas giver/receiver (con locked para el workflow de aprobación)
+    const vm=st.ventMeta||{};
+    Object.keys(st.ventajas||{}).forEach(k=>{ const p=k.split('>'); if(p.length!==2)return; const g=p[0],r=p[1]; if(!g||!r)return;
+      const m=vm[k]||{}; out['ventajas/'+g+'/'+r]={strokes:st.ventajas[k], locked:(m.locked!==false), setBy:(m.setBy||'migrated')}; });
+    // solicitudes de ventaja
+    const vr=st.ventReq||{}; Object.keys(vr).forEach(id=>{ out['ventReq/'+id]=vr[id]; });
+    // días: setup / closed / scores / doubles (direccional)
+    (st.days||[]).forEach(d=>{
+      const setup=Object.assign({},d); delete setup.scores; delete setup.closed; delete setup.doubles; delete setup.id;
+      out['days/'+d.id+'/setup']=setup;
+      out['days/'+d.id+'/closed']=!!d.closed;
+      const sc=d.scores||{}; Object.keys(sc).forEach(pid=>{ out['days/'+d.id+'/scores/'+pid]=sc[pid]; });
+      const db=d.doubles||{}; Object.keys(db).forEach(dr=>{ const tg=db[dr]||{}; Object.keys(tg).forEach(t=>{ if(tg[t]) out['days/'+d.id+'/doubles/'+dr+'/'+t]=true; }); });
     });
     return out;
   }
   function flattenTree(root){
-    const out={}; if(!root) return out;
-    if(typeof root.global==='string') out['global']=root.global;
-    if(typeof root.order==='string')  out['order']=root.order;
+    const out={}; if(!root||typeof root!=='object') return out;
+    ['meta','rules','players','courses','units','castigos','ventHistory','dblHistory','order'].forEach(k=>{ if(root[k]!==undefined) out[k]=root[k]; });
+    const vn=root.ventajas||{}; Object.keys(vn).forEach(g=>{ const rr=vn[g]||{}; Object.keys(rr).forEach(r=>{ out['ventajas/'+g+'/'+r]=rr[r]; }); });
+    const vq=root.ventReq||{}; Object.keys(vq).forEach(id=>{ out['ventReq/'+id]=vq[id]; });
     const dn=root.days||{};
     Object.keys(dn).forEach(id=>{ const node=dn[id]||{};
-      if(typeof node.meta==='string') out['days/'+id+'/meta']=node.meta;
-      const sc=node.scores||{}; Object.keys(sc).forEach(pid=>{ if(typeof sc[pid]==='string') out['days/'+id+'/scores/'+pid]=sc[pid]; });
+      if(node.setup!==undefined)  out['days/'+id+'/setup']=node.setup;
+      if(node.closed!==undefined) out['days/'+id+'/closed']=!!node.closed;
+      const sc=node.scores||{}; Object.keys(sc).forEach(pid=>{ out['days/'+id+'/scores/'+pid]=sc[pid]; });
+      const db=node.doubles||{}; Object.keys(db).forEach(dr=>{ const tg=db[dr]||{}; Object.keys(tg).forEach(t=>{ if(tg[t]) out['days/'+id+'/doubles/'+dr+'/'+t]=true; }); });
     });
     return out;
   }
   function rebuildFromShards(sh){
-    if(typeof sh['global']!=='string') return null;
-    let g; try{ g=JSON.parse(sh['global']); }catch(e){ return null; }
-    let order=[]; try{ order=JSON.parse(sh['order']||'[]'); }catch(e){}
-    const days=[];
-    order.forEach(id=>{ const mk='days/'+id+'/meta'; if(typeof sh[mk]!=='string') return;
-      let meta={}; try{ meta=JSON.parse(sh[mk]); }catch(e){ return; }
-      const scores={}, pre='days/'+id+'/scores/';
-      Object.keys(sh).forEach(k=>{ if(k.indexOf(pre)===0){ const pid=k.slice(pre.length); try{ scores[pid]=JSON.parse(sh[k]); }catch(e){} } });
-      meta.id=id; meta.scores=scores; days.push(meta);
+    const hasPlayers = sh['players'] && typeof sh['players']==='object' && Object.keys(sh['players']).length;
+    const order = _arr(sh['order']);
+    if(!hasPlayers && !order.length) return null;   // liga vacía → deja que seed() arranque
+    const g={};
+    g._leagueMeta = sh['meta']||{name:'Liga',schema:2};
+    const rules = sh['rules']||{};
+    g.rayaValue = (rules.rayaValue!=null?rules.rayaValue:20);
+    g.activeBets = rules.activeBets || _defActiveBets();
+    g.players  = sh['players']?Object.keys(sh['players']).map(id=>Object.assign({},sh['players'][id],{id})):[];
+    g.courses  = sh['courses']?Object.keys(sh['courses']).map(id=>Object.assign({},sh['courses'][id],{id})):[];
+    g.units    = _arr(sh['units']);
+    g.castigos = _arr(sh['castigos']);
+    g.ventHistory = _arr(sh['ventHistory']);
+    g.dblHistory  = _arr(sh['dblHistory']);
+    // ventajas → mapa plano + ventMeta (locked/setBy)
+    g.ventajas={}; g.ventMeta={};
+    Object.keys(sh).forEach(k=>{ if(k.indexOf('ventajas/')===0){ const p=k.slice(9).split('/'); if(p.length!==2)return; const leaf=sh[k]||{}; if(leaf.strokes!=null){ const key=p[0]+'>'+p[1]; g.ventajas[key]=leaf.strokes; g.ventMeta[key]={locked:(leaf.locked!==false), setBy:(leaf.setBy||'migrated')}; } } });
+    // solicitudes
+    g.ventReq={}; Object.keys(sh).forEach(k=>{ if(k.indexOf('ventReq/')===0) g.ventReq[k.slice(8)]=sh[k]; });
+    // días
+    const dayMap={}, ensure=id=>(dayMap[id]=dayMap[id]||{id,scores:{},doubles:{},closed:false});
+    Object.keys(sh).forEach(k=>{ let m;
+      if((m=k.match(/^days\/([^/]+)\/setup$/)))            { Object.assign(ensure(m[1]), sh[k]||{}); ensure(m[1]).id=m[1]; }
+      else if((m=k.match(/^days\/([^/]+)\/closed$/)))      { ensure(m[1]).closed=!!sh[k]; }
+      else if((m=k.match(/^days\/([^/]+)\/scores\/([^/]+)$/))) { ensure(m[1]).scores[m[2]]=sh[k]; }
+      else if((m=k.match(/^days\/([^/]+)\/doubles\/([^/]+)\/([^/]+)$/))) { if(sh[k]) (ensure(m[1]).doubles[m[2]]=ensure(m[1]).doubles[m[2]]||{})[m[3]]=true; }
     });
-    return Object.assign({}, g, {days});
+    g.days = (order.length?order.map(id=>dayMap[id]):Object.keys(dayMap).map(id=>dayMap[id])).filter(Boolean);
+    return g;
   }
   // Merge 3-vías: aplica lo que cambió el peer y CONSERVA ediciones locales en vuelo
   function applyRemoteTree(root){
-    if(root && !root.global && typeof root.state==='string'){ // migración de versión anterior (un solo blob)
-      if(!_loadedOnce){ mergeState(root.state); return; }
-    }
     const remote=flattenTree(root), local=buildShards(state), merged={};
     let peerChanged=false;
     const keys=new Set([...Object.keys(remote),...Object.keys(local),...Object.keys(_shardCache)]);
     keys.forEach(k=>{ const r=remote[k], c=_shardCache[k], l=local[k];
-      if(r!==c){ peerChanged=true; if(r!==undefined) merged[k]=r; }   // el peer creó/cambió/borró este shard
-      else if(l!==undefined) merged[k]=l;                            // sin cambio remoto → conservar local
+      if(_sig(r)!==_sig(c)){ peerChanged=true; if(r!==undefined) merged[k]=r; }   // el peer creó/cambió/borró este shard
+      else if(l!==undefined) merged[k]=l;                                          // sin cambio remoto → conservar local
     });
     if(!peerChanged) return;
     const ns=rebuildFromShards(merged);
@@ -704,8 +752,7 @@ const App = (() => {
       await new Promise(res=>{ let done=false; const fin=()=>{ if(!done){ done=true; res(); } };
         _fbRef.on('value', snap=>{ const root=snap.val();
           if(!done){
-            if(root && !root.global && typeof root.state==='string') mergeState(root.state); // migra blob viejo
-            else { const ns=rebuildFromShards(flattenTree(root)); if(ns) state=Object.assign(state,ns); }
+            const ns=rebuildFromShards(flattenTree(root)); if(ns) state=Object.assign(state,ns);
             _shardCache=flattenTree(root);   // cache = lo que REALMENTE hay en la base (migrate luego escribe su diff)
             fin();
           } else applyRemoteTree(root);
@@ -754,11 +801,19 @@ const App = (() => {
     state.dblHistory = state.dblHistory||[];
     state.celebrated = state.celebrated||{};
     if(typeof state.sound!=='boolean') state.sound=true;
+    // V2: metadatos de liga y reglas custom
+    state.activeBets = state.activeBets || _defActiveBets();
+    state.ventMeta = state.ventMeta || {};
+    state.ventReq = state.ventReq || {};
+    if(!state._leagueMeta) state._leagueMeta={name:'Campestre León — Viernes', schema:2};
     state.days.forEach(dd=>{
       if(Array.isArray(dd.start)) dd.start = dd.start[0]||1;
       if(typeof dd.start!=='number') dd.start=1;
       if(dd.holes!==9) dd.holes=18;
       dd.doubles = dd.doubles||{};
+      // V2: convertir doubles de formato viejo pairKey "a|b"=true → direccional {a:{b:true}}
+      const dk=Object.keys(dd.doubles);
+      if(dk.some(k=>k.indexOf('|')>=0)){ const nd={}; dk.forEach(k=>{ if(!dd.doubles[k])return; if(k.indexOf('|')>=0){ const ab=k.split('|'); (nd[ab[0]]=nd[ab[0]]||{})[ab[1]]=true; } else { nd[k]=dd.doubles[k]; } }); dd.doubles=nd; }
       if(typeof dd.closed!=='boolean') dd.closed=false;
     });
     save();
@@ -770,8 +825,8 @@ const App = (() => {
     saveTimer=setTimeout(()=>{
       if(_backend==='fb' && _fbRef){
         const cur=buildShards(state), updates={};
-        for(const k in cur){ if(_shardCache[k]!==cur[k]) updates[k]=cur[k]; }       // nuevos/cambiados
-        for(const k in _shardCache){ if(!(k in cur)) updates[k]=null; }             // borrados
+        for(const k in cur){ if(_sig(_shardCache[k])!==_sig(cur[k])) updates[k]=cur[k]; }   // nuevos/cambiados
+        for(const k in _shardCache){ if(!(k in cur)) updates[k]=null; }                     // borrados
         _shardCache=cur;
         if(Object.keys(updates).length){
           _fbRef.update(updates).then(()=>{ dirty=false; flashSave(); }).catch(()=>{ dirty=false; });
@@ -895,8 +950,12 @@ const App = (() => {
     return true;
   }
   function pairKey(a,b){ return [a,b].sort().join('|'); }
-  function isDoubled(d,a,b){ return !!(d.doubles && d.doubles[pairKey(a,b)]); }
-  function toggleDouble(d,a,b){ d.doubles=d.doubles||{}; const k=pairKey(a,b); if(d.doubles[k])delete d.doubles[k]; else d.doubles[k]=true; }
+  // doubles DIRECCIONAL en memoria: d.doubles[doubler][target]=true. isDoubled sigue siendo simétrico (el par está doblado).
+  function isDoubled(d,a,b){ const D=d.doubles||{}; return !!((D[a]&&D[a][b]) || (D[b]&&D[b][a])); }
+  function toggleDouble(d,a,b){ d.doubles=d.doubles||{};   // a = el que dobla (perdedor de la 1ª vuelta)
+    if(isDoubled(d,a,b)){ if(d.doubles[a]) delete d.doubles[a][b]; if(d.doubles[b]) delete d.doubles[b][a];
+      if(d.doubles[a]&&!Object.keys(d.doubles[a]).length) delete d.doubles[a]; if(d.doubles[b]&&!Object.keys(d.doubles[b]).length) delete d.doubles[b]; }
+    else { (d.doubles[a]=d.doubles[a]||{})[b]=true; } }
   const unitRayaOf = uid=>{ const u=state.units.find(x=>x.id===uid); return u?u.rayas:1; };
   function validManual(sc,h,holes){ const g=sc.gross[h], par=(holes||state.courses[0].holes)[h].par;
     return (sc.units[h]||[]).filter(uid=>{ const u=state.units.find(x=>x.id===uid); if(u&&u.reqPar) return g>0 && (g-par)<=0; return true; }); }
@@ -1695,11 +1754,11 @@ const App = (() => {
       html+=`<div class="vrow"><div class="who">${pname(o.id)} <span style="color:var(--clay)">(${o.fn})</span></div>
         <button class="flag ${dbl?'on':''}" onclick="App.toggleDbl('${me}','${o.id}')">${dbl?'doblado ×2':'doblar'}</button></div>`;
     });
-    // dobles activos de cualquiera
-    const active=Object.keys(d.doubles||{});
+    // dobles activos de cualquiera (direccional: doubler → target)
+    const active=[]; const D=d.doubles||{}; Object.keys(D).forEach(x=>Object.keys(D[x]||{}).forEach(y=>{ if(D[x][y]) active.push([x,y]); }));
     if(active.length){ html+=`<div style="margin-top:10px;font-size:12px;color:var(--muted)">Dobles activos:</div>`;
-      active.forEach(k=>{ const [x,y]=k.split('|'); const px=player(x),py=player(y);
-        html+=`<div class="vrow"><div class="who">${pname(x)} ↔ ${pname(y)}</div>
+      active.forEach(([x,y])=>{
+        html+=`<div class="vrow"><div class="who">${pname(x)} → ${pname(y)}</div>
           <button class="flag on" onclick="App.toggleDbl('${x}','${y}')">quitar</button></div>`; });
     }
     // registro / evidencia del día
