@@ -1084,7 +1084,7 @@ const App = (() => {
     const el=document.getElementById('dayPill'); if(!el) return;
     const txt=el.querySelector('.dp-txt'); if(!txt) return;
     const cur=curDay();
-    txt.textContent = cur ? cur.label : 'Crear día';
+    txt.textContent = cur ? cur.label : (isAdmin()?'Crear día':'Días');
   }
 
   // ---- Estado del día: en vivo (provisional) vs final ----
@@ -2206,8 +2206,12 @@ const App = (() => {
     const d=curDay(); d.playing=d.playing||[];
     const k=d.playing.indexOf(pid);
     if(k>=0){
-      // si ya está sorteado (en un grupo) → cancela/no-show con carrilla
-      if((d.salidas||[]).some(s=>(s||[]).includes(pid))){ cancelModal(pid); return; }
+      // si ya está sorteado (en un grupo) → carrilla por cancelar
+      if((d.salidas||[]).some(s=>(s||[]).includes(pid))){
+        if(isAdmin()) cancelModal(pid);   // admin: elige canceló vs no se presentó
+        else confirmModal('¿Cancelar tu asistencia? Después de sortear es mal visto: queda registrado y va a la carrilla 🐔.','Sí, cancelar',()=>cancelPlayer(pid,'cancel'));
+        return;
+      }
       d.playing.splice(k,1);
     } else {
       d.playing.push(pid);
@@ -2233,8 +2237,9 @@ const App = (() => {
   }
   function cancelPlayer(pid,type){
     const d=curDay();
+    if(type==='noshow' && !isAdmin()){ type='cancel'; }   // 'no se presentó' solo lo marca admin/super
     const k=(d.playing||[]).indexOf(pid); if(k>=0) d.playing.splice(k,1);
-    [0,1].forEach(s=>{ const a=d.salidas[s]||[]; const j=a.indexOf(pid); if(j>=0)a.splice(j,1); });
+    (d.salidas||[]).forEach(s=>{ const a=s||[]; const j=a.indexOf(pid); if(j>=0)a.splice(j,1); });
     d.cancels=d.cancels||[]; d.cancels.unshift({pid,type,ts:Date.now()});
     save(); closeModal(); renderDay();
     toast(type==='noshow'?'👻 No llegó — a la carrilla':'🐔 Canceló — a la carrilla');
@@ -2257,6 +2262,7 @@ const App = (() => {
     closeModal(); doMoveGroup(pid,g,motivo);
   }
   function doMoveGroup(pid,g,motivo){
+    if(!isAdmin()){ toast('Solo el admin mueve jugadores'); return; }
     const d=curDay(); d.salidas=d.salidas||[];
     let fromG=null; d.salidas.forEach((s,i)=>{ if((s||[]).includes(pid)) fromG=i; });
     d.salidas.forEach(s=>{ const a=s||[]; const k=a.indexOf(pid); if(k>=0)a.splice(k,1); });
@@ -2268,6 +2274,7 @@ const App = (() => {
     save(); renderDay();
   }
   function sorteo(){
+    if(!isAdmin()){ toast('Solo el admin sortea'); return; }
     const d=curDay(); const pool=[...d.playing];
     const n=nFlights(d, pool.length);   // salidas según el cap del día (5 fin de semana, 6 entre semana)
     for(let i=pool.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [pool[i],pool[j]]=[pool[j],pool[i]]; }
@@ -2450,12 +2457,12 @@ const App = (() => {
     if(d && playOrder(d)[curHoleNav]!==prev) commitHole(d,prev);
     renderScore(); }
   function setScoreGroup(g){ curScoreGroup=g; renderScore(); }
-  function setStart(v){ const d=curDay(); d.start=v; save(); renderDay(); }
-  function setHoles(v){ const d=curDay(); d.holes=(v===9?9:18); curHoleNav=0; save(); renderDay(); }
-  function setCourse(id){ const d=curDay(); if(!d||!state.courses.find(c=>c.id===id))return; d.courseId=id; curHoleNav=0; save(); renderDay(); }
+  function setStart(v){ if(!isAdmin())return; const d=curDay(); d.start=v; save(); renderDay(); }
+  function setHoles(v){ if(!isAdmin())return; const d=curDay(); d.holes=(v===9?9:18); curHoleNav=0; save(); renderDay(); }
+  function setCourse(id){ if(!isAdmin())return; const d=curDay(); if(!d||!state.courses.find(c=>c.id===id))return; d.courseId=id; curHoleNav=0; save(); renderDay(); }
   function toggleSound(){ state.sound=!state.sound; save(); if(state.sound) playSound('mini'); renderCfg(); }
   function quick(pid,h,rel){ const d=curDay(); const sc=ensureScore(d,pid); const par=holesOf(d)[h].par;
-    sc.gross[h]=Math.max(1,par+rel); if(sc.putts[h]==null)sc.putts[h]=2; cleanReqPar(sc,h); save(); checkCelebrate(pid,h); renderScore(); }
+    sc.gross[h]=Math.max(1,par+rel); if(sc.putts[h]==null)sc.putts[h]=2; save(); checkCelebrate(pid,h); renderScore(); }
   function pickScore(id){ curScorePlayer=id; renderScore(); }
   function celebrate(name){
     const o=document.createElement('div'); o.className='celebrate';
@@ -2982,6 +2989,7 @@ const App = (() => {
       <button class="btn block" style="margin-top:6px" onclick="App.createPlayer(true)">Agregar invitado</button>`);
   }
   function createPlayer(guest){
+    if(!isAdmin()){ toast('Solo el admin agrega jugadores'); return; }
     const name=document.getElementById('m_name').value.trim();
     if(!name){ toast('Pon un nombre'); return; }
     const apEl=document.getElementById('m_apodo'); const apodo=apEl?apEl.value.trim():'';
