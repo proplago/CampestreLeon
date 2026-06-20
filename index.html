@@ -489,6 +489,7 @@
   </div>
 </header>
 
+<div id="idbar" onclick="App.loginModal()" title="Cambiar usuario (modo prueba)" style="cursor:pointer;background:#fff;border-bottom:1px solid var(--line);padding:7px 16px;font-size:12.5px;color:var(--muted);display:flex;justify-content:space-between;align-items:center;gap:8px"></div>
 <div id="feedbar" class="feedbar" style="display:none;cursor:pointer" onclick="App.go('high')" title="Ver todos los trofeos del día"></div>
 
 <main>
@@ -1067,6 +1068,7 @@ const App = (() => {
     render();
   }
   function render(){
+    updateIdBar();
     renderDaySelect();
     renderFeed();
     if(curView==='liq') renderLiq();
@@ -1787,13 +1789,17 @@ const App = (() => {
     return html;
   }
   function setDblPlayer(id){ dblPlayer=id; render(); }
-  function toggleDbl(a,b){ const d=curDay();
+  function toggleDbl(a,b){ const d=curDay();   // a = el que dobla (perdedor de la 1ª vuelta)
+    if(!_devUser){ toast('Elige usuario primero'); loginModal(); return; }
+    if(!isAdmin() && !(isRegular() && myPid()===a)){ toast('Solo puedes doblar tú (o el admin)'); return; }
     const was=isDoubled(d,a,b);
     if(!was && !firstNineDone(d,a,b)){ toast('Primero capturen los 9 hoyos de la 1ª vuelta'); return; }
-    toggleDouble(d,a,b);
-    state.dblHistory=state.dblHistory||[];
-    state.dblHistory.unshift({ts:Date.now(), type:was?'quitar':'doblar', a, b, dayId:d.id});
-    save(); render();
+    const apply=()=>{ toggleDouble(d,a,b);
+      state.dblHistory=state.dblHistory||[];
+      state.dblHistory.unshift({ts:Date.now(), type:was?'quitar':'doblar', a, b, dayId:d.id});
+      save(); render(); };
+    if(isAdmin() && myPid()!==a){ confirmModal(`${was?'Quitar el doble de':'Doblar a nombre de'} ${pname(a)} contra ${pname(b)}. ¿Continuar?`, was?'Quitar':'Doblar', apply); return; }
+    apply();
   }
 
   // ---- Cerrar viernes + sliding automático ----
@@ -2602,15 +2608,31 @@ const App = (() => {
     const box=document.getElementById('ventContent');
     if(state.players.length<2){ box.innerHTML=emptyState('⚖️','Faltan jugadores','Agrega al menos dos en Ajustes.','App.go(\'cfg\')','Ir a Ajustes'); return; }
     if(!ventFocus||!player(ventFocus)) ventFocus=state.players[0].id;
+    if(isRegular() && myPid() && player(myPid())) ventFocus=myPid();   // el regular solo ve/edita las suyas
     // regulares primero (alfabético), invitados al final
     const sorted=[...state.players].sort((a,b)=>(a.guest?1:0)-(b.guest?1:0)||a.name.localeCompare(b.name));
 
-    let html=`<div class="card"><div class="row" style="justify-content:space-between">
-        <label class="fl" style="margin:0">Ver ventajas de</label>
-        <button class="btn outline sm" onclick="App.historyModal()">Historial / sliding</button></div>
-      <select class="txt" style="margin-top:6px" onchange="App.setVentFocus(this.value)">`;
-    sorted.forEach(p=>html+=`<option value="${p.id}" ${p.id===ventFocus?'selected':''}>${p.name}${p.guest?' (inv)':''}</option>`);
-    html+=`</select></div>`;
+    let html='';
+    // solicitudes pendientes de ventaja (admin/super)
+    if(isAdmin()){
+      const reqs=Object.keys(state.ventReq||{}).map(id=>Object.assign({id},state.ventReq[id])).filter(r=>r.status==='pending');
+      if(reqs.length){
+        html+=`<div class="card"><h3>Solicitudes de ventaja (${reqs.length})</h3><div class="hint">Cambios pedidos por jugadores. Aprueba o rechaza.</div>`;
+        reqs.forEach(r=>html+=`<div class="vrow"><div><div class="who">${pname(r.giver)} vs ${pname(r.receiver)}</div><div class="desc">${r.from} → ${r.to} · pidió ${pname(r.requestedBy)}</div></div>
+          <div class="row" style="gap:6px"><button class="flag on" onclick="App.approveVent('${r.id}')">Aprobar</button><button class="flag" onclick="App.rejectVent('${r.id}')">Rechazar</button></div></div>`);
+        html+=`</div>`;
+      }
+    }
+    html+=`<div class="card"><div class="row" style="justify-content:space-between">
+        <label class="fl" style="margin:0">${isRegular()?'Tus ventajas':'Ver ventajas de'}</label>
+        <button class="btn outline sm" onclick="App.historyModal()">Historial / sliding</button></div>`;
+    if(isRegular()){ html+=`<div style="margin-top:6px;font-weight:700">${pname(ventFocus)}</div>`; }
+    else {
+      html+=`<select class="txt" style="margin-top:6px" onchange="App.setVentFocus(this.value)">`;
+      sorted.forEach(p=>html+=`<option value="${p.id}" ${p.id===ventFocus?'selected':''}>${p.name}${p.guest?' (inv)':''}</option>`);
+      html+=`</select>`;
+    }
+    html+=`</div>`;
 
     const me=player(ventFocus);
     const vrowH=p=>{ const v=signedV(ventFocus,p.id);   // + = ${me} da (rojo) · − = le dan a ${me} (verde)
@@ -2669,10 +2691,19 @@ const App = (() => {
     modal(h);
   }
   function stepV(other,delta){
-    const from=signedV(ventFocus,other), to=from+delta;
-    setSignedV(ventFocus,other,to);
-    logVent(ventFocus,other,from,to,'manual',curDay()&&curDay().id);
-    renderVent();
+    const a=ventFocus, b=other;
+    const from=signedV(a,b), to=from+delta;
+    if(!_devUser){ toast('Elige usuario primero'); loginModal(); return; }
+    if(!isAdmin()){
+      if(!ventajaIsMine(a,b)){ toast('Solo puedes editar TUS ventajas'); return; }
+      if(ventajaLocked(a,b)){ requestVent(a,b,from,to); renderVent(); toast('Ventaja ya fijada → cambio enviado a aprobación del admin'); return; }
+      setSignedV(a,b,to); lockVent(a,b,myPid());   // 1ª vez libre → queda lockeada
+      logVent(a,b,from,to,'manual',curDay()&&curDay().id); renderVent(); return;
+    }
+    // admin/super: bug#4 → confirmar con NOMBRES si edita ventaja ajena
+    const apply=()=>{ setSignedV(a,b,to); lockVent(a,b,'admin'); logVent(a,b,from,to,'manual',curDay()&&curDay().id); renderVent(); };
+    if(myPid()!==a && myPid()!==b){ confirmModal(`Cambiar la ventaja entre ${pname(a)} y ${pname(b)} (${from} → ${to}). ¿Continuar?`,'Cambiar',apply); return; }
+    apply();
   }
 
   // ---- Ajustes ----
@@ -2995,8 +3026,48 @@ const App = (() => {
   function toast(msg){ const t=document.getElementById('toast'); t.textContent=msg; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),1800); }
   function flashSave(){ const s=document.getElementById('savehint'); if(s){s.classList.add('show'); setTimeout(()=>s.classList.remove('show'),900);} }
 
-  async function init(){ try{ if(document.fonts&&document.fonts.load){ document.fonts.load("600 40px Newsreader"); document.fonts.load("700 16px 'Hanken Grotesk'"); } }catch(e){} await load(); if(!state.currentDayId && state.days[0]) state.currentDayId=state.days[0].id; render(); }
-  return { init,go,switchDay,daysModal,editDayModal,saveDayEdit,delDay,newDayModal,createDay,
+  // ===================== IDENTIDAD (DEV, sin clave) =====================
+  // Selector abierto para probar roles (super/admin/regular) antes del login real (Google/clave)
+  // de la fase final. La identidad vive por-dispositivo en localStorage; al entrar el auth real
+  // se reemplazará la fuente (auth.uid → /users/{uid}) sin tocar las reglas de permiso de abajo.
+  const KEY_USER='cl_devuser_'+ACTIVE_LEAGUE;
+  let _devUser=null;   // {playerId, role:'super'|'admin'|'regular'}
+  function loadDevUser(){ try{ const r=localStorage.getItem(KEY_USER); if(r) _devUser=JSON.parse(r); }catch(e){} }
+  function setDevUser(playerId, role){ _devUser={playerId,role}; try{ localStorage.setItem(KEY_USER, JSON.stringify(_devUser)); }catch(e){} }
+  function isSuper(){ return !!(_devUser&&_devUser.role==='super'); }
+  function isAdmin(){ return !!(_devUser&&(_devUser.role==='admin'||_devUser.role==='super')); }   // admin incluye super
+  function isRegular(){ return !!(_devUser&&_devUser.role==='regular'); }
+  function myPid(){ return _devUser?_devUser.playerId:null; }
+  function curUserLabel(){ if(!_devUser) return 'Sin sesión'; const rl=_devUser.role==='super'?'Súper admin':_devUser.role==='admin'?'Admin':'Regular'; return (pname(_devUser.playerId)||'?')+' · '+rl; }
+  function updateIdBar(){ const b=document.getElementById('idbar'); if(!b) return;
+    b.innerHTML='<span>👤 '+(_devUser?curUserLabel():'Modo prueba — elige usuario')+'</span><span style="color:var(--fairway);font-weight:700">cambiar</span>'; }
+  function loginModal(){
+    const ps=[...state.players].sort((a,b)=>(a.guest?1:0)-(b.guest?1:0)||a.name.localeCompare(b.name));
+    modal(`<h3>¿Quién eres? <span style="font-weight:600;color:var(--muted);font-size:12px">prueba · sin clave</span></h3>
+      <div class="hint" style="margin-bottom:10px">Elige jugador y rol para probar permisos. Temporal — el login real entra al final.</div>
+      <label class="fl">Jugador</label>
+      <select id="lg_pid" class="txt">${ps.map(p=>`<option value="${p.id}" ${myPid()===p.id?'selected':''}>${p.name}${p.guest?' (inv)':''}</option>`).join('')}</select>
+      <label class="fl" style="margin-top:10px">Rol</label>
+      <select id="lg_role" class="txt">
+        <option value="regular">Regular (solo lo suyo)</option>
+        <option value="admin">Admin de liga</option>
+        <option value="super">Súper admin (todo)</option></select>
+      <button class="btn block" style="margin-top:14px" onclick="App.doLogin()">Entrar</button>`);
+    if(_devUser){ const r=document.getElementById('lg_role'); if(r) r.value=_devUser.role; }
+  }
+  function doLogin(){ const pid=document.getElementById('lg_pid').value, role=document.getElementById('lg_role').value; setDevUser(pid,role); closeModal(); render(); toast('Entraste como '+curUserLabel()); }
+
+  // permisos de ventaja / dobladas (mismas reglas que firebase-rules.json, pero en cliente)
+  function ventajaIsMine(a,b){ return !!(myPid()&&(myPid()===a||myPid()===b)); }
+  function ventajaLocked(a,b){ return !!((state.ventMeta[vkey(a,b)]||{}).locked || (state.ventMeta[vkey(b,a)]||{}).locked); }
+  function ventActiveKey(a,b){ return (state.ventajas[vkey(a,b)]!=null)?vkey(a,b):(state.ventajas[vkey(b,a)]!=null?vkey(b,a):vkey(a,b)); }
+  function lockVent(a,b,by){ const ak=ventActiveKey(a,b), other=(ak===vkey(a,b))?vkey(b,a):vkey(a,b); state.ventMeta[ak]={locked:true,setBy:by||myPid()||'dev'}; delete state.ventMeta[other]; }
+  function requestVent(a,b,from,to){ state.ventReq=state.ventReq||{}; const id=uid(); state.ventReq[id]={giver:a,receiver:b,from,to,requestedBy:myPid(),status:'pending',ts:Date.now()}; save(); }
+  function approveVent(id){ const r=(state.ventReq||{})[id]; if(!r) return; setSignedV(r.giver,r.receiver,r.to); lockVent(r.giver,r.receiver,r.requestedBy); logVent(r.giver,r.receiver,r.from,r.to,'aprobado',curDay()&&curDay().id); delete state.ventReq[id]; save(); render(); toast('Ventaja aprobada'); }
+  function rejectVent(id){ if(!(state.ventReq||{})[id]) return; delete state.ventReq[id]; save(); render(); toast('Solicitud rechazada'); }
+
+  async function init(){ try{ if(document.fonts&&document.fonts.load){ document.fonts.load("600 40px Newsreader"); document.fonts.load("700 16px 'Hanken Grotesk'"); } }catch(e){} loadDevUser(); await load(); if(!state.currentDayId && state.days[0]) state.currentDayId=state.days[0].id; render(); if(!_devUser) loginModal(); }
+  return { init,loginModal,doLogin,approveVent,rejectVent,go,switchDay,daysModal,editDayModal,saveDayEdit,delDay,newDayModal,createDay,
     toggleAssign:null,togglePlaying,cancelPlayer,moveGroup,confirmMove,sorteo,addGuestModal,
     pickScore,score,putt,setOyes,quick,toggleUnit,toggleCast,navHole,gotoPending,gotoPlayerPending,setScoreGroup,setStart,setHoles,setCourse,
     setVentFocus,stepV,openBet,openH2H,setLiqTab,setScoreTab,setCmp,adjustVent,
