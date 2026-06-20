@@ -1160,7 +1160,9 @@ const App = (() => {
       : `<div class="valbar warn" style="margin-top:12px">⚠ Descuadre de $${res.sum} (revisa capturas incompletas)</div>`;
     html+= d.closed
       ? `<div class="valbar ok" style="margin-top:6px">✓ Día cerrado · ventajas ajustadas (ver historial en Ventajas)</div>`
-      : `<button class="btn block" onclick="App.closeDay()">Cerrar el día y ajustar ventajas</button>`;
+      : (isAdmin()
+          ? `<button class="btn block" onclick="App.closeDay()">Cerrar el día y ajustar ventajas</button>`
+          : `<div class="hint" style="margin-top:6px">El admin cierra el día al terminar (ajusta las ventajas).</div>`);
     html+=`<div class="exprow"><button class="expbtn" onclick="App.exportImage()">📸 Imagen</button></div>`;
 
     // desglose
@@ -1805,6 +1807,7 @@ const App = (() => {
   // ---- Cerrar viernes + sliding automático ----
   function closeDay(){
     const d=curDay(); if(!d) return;
+    if(!isAdmin()){ toast('Solo el admin cierra el día'); return; }
     if(d.closed){ toast('Este día ya está cerrado'); return; }
     const val=validateDay(d);
     const proceed=()=>confirmModal('Cerrar el día ajusta las ventajas (sliding) según quién ganó el head-to-head. ¿Continuar?','Cerrar y ajustar',()=>doCloseDay(d));
@@ -2752,8 +2755,31 @@ const App = (() => {
     if(fbConfigured())  return {emoji:'⚠️', cls:'warn', t:'Firebase configurado, sin conexión', d:'Revisa el databaseURL o tu internet y recarga.'};
     return {emoji:'📱', cls:'', t:'Solo este dispositivo', d:'Para que el grupo vea lo mismo en vivo, configura Firebase (instrucciones que te pasé).'};
   }
+  // Ajustes mínimos para REGULAR: identidad, reglas (lectura), soniditos, estado de sync.
+  function renderCfgRegular(box){
+    const si=syncInfo();
+    let html=`<div class="cfg-sect">Tu sesión</div>
+      <div class="card"><div class="row" style="justify-content:space-between;align-items:center">
+        <div><h3 style="margin:0">👤 ${pname(myPid())||'Jugador'}</h3><div class="hint" style="margin:2px 0 0">${curUserLabel()}</div></div>
+        <button class="btn outline sm" onclick="App.loginModal()">Cambiar usuario</button></div></div>
+      <div class="cfg-sect">Reglas de la casa</div>
+      <div class="card"><div class="row" style="justify-content:space-between"><h3>📜 Reglas del grupo</h3>
+        <button class="btn outline sm" onclick="App.rulesModal()">Ver reglas</button></div>
+        <div class="hint">Las reglas oficiales de los viernes.</div></div>
+      <div class="card"><div class="row" style="justify-content:space-between">
+        <div><h3 style="margin:0">Soniditos</h3><div class="hint" style="margin:2px 0 0">Celebración de birdies, eagles…</div></div>
+        <button class="sw ${state.sound?'on':''}" onclick="App.toggleSound()"><span></span></button></div></div>
+      <div class="cfg-sect">App</div>
+      <div class="card" style="display:flex;gap:10px;align-items:center">
+        <div style="font-size:26px">${si.emoji}</div>
+        <div><div style="font-weight:700;font-size:14px">${si.t}</div>
+          <div style="font-size:12px;color:var(--muted);margin-top:2px">${si.d}</div></div></div>
+      <div class="hint" style="text-align:center;margin-top:4px">La configuración del grupo (jugadores, campos, unidades, valor de raya) la maneja el admin.</div>`;
+    box.innerHTML=html;
+  }
   function renderCfg(){
     const box=document.getElementById('cfgContent');
+    if(!isAdmin()){ return renderCfgRegular(box); }
     let html='';
 
     // ===================== REGLAS DE LA CASA =====================
@@ -2873,6 +2899,7 @@ const App = (() => {
   function confirmYes(){ const cb=_confirmCb; _confirmCb=null; closeModal(); if(cb) try{cb();}catch(e){} }
 
   function newDayModal(){
+    if(!isAdmin()){ toast('Solo el admin crea días'); return; }
     const today=new Date();
     const def=today.toISOString().slice(0,10);
     modal(`<h3>Nuevo día de juego</h3>
@@ -2882,6 +2909,7 @@ const App = (() => {
       <button class="btn block" style="margin-top:14px" onclick="App.createDay()">Crear día</button>`);
   }
   function createDay(){
+    if(!isAdmin()){ toast('Solo el admin crea días'); return; }
     const date=document.getElementById('m_date').value;
     let label=document.getElementById('m_label').value.trim();
     if(!label){ const dt=new Date(date+'T12:00'); const wd=dt.toLocaleDateString('es-MX',{weekday:'long'}); label=wd.charAt(0).toUpperCase()+wd.slice(1)+' '+dt.toLocaleDateString('es-MX',{day:'numeric',month:'short'}); }
@@ -2892,9 +2920,10 @@ const App = (() => {
   function switchDay(id){ state.currentDayId=id; save(); render(); }
 
   function daysModal(){
-    let h=`<h3>Días de juego</h3>
-      <button class="btn block" style="margin-bottom:10px" onclick="App.closeModal();App.newDayModal()">+ Nuevo día</button>`;
-    if(!state.days.length){ h+=`<div class="hint">Aún no hay días. Crea uno para empezar.</div>`; }
+    const admin=isAdmin();
+    let h=`<h3>Días de juego</h3>`;
+    if(admin) h+=`<button class="btn block" style="margin-bottom:10px" onclick="App.closeModal();App.newDayModal()">+ Nuevo día</button>`;
+    if(!state.days.length){ h+=`<div class="hint">${admin?'Aún no hay días. Crea uno para empezar.':'Aún no hay días. El admin creará la salida.'}</div>`; }
     else {
       h+=`<div class="plist">`;
       state.days.forEach(d=>{
@@ -2903,14 +2932,15 @@ const App = (() => {
           <div class="grow" onclick="App.closeModal();App.switchDay('${d.id}')" style="cursor:pointer">
             <div class="nm">${d.label}${cur?' · <b style="color:var(--fairway)">actual</b>':''}</div>
             <div class="desc" style="font-size:11px;color:var(--muted)">${d.date||''} · ${status} · ${np} jug. · ${courseOf(d).name}</div></div>
-          <button class="icbtn" onclick="App.editDayModal('${d.id}')" title="Editar">✏️</button>
-          <button class="icbtn" onclick="App.delDay('${d.id}')" title="Eliminar">🗑</button></div>`;
+          ${admin?`<button class="icbtn" onclick="App.editDayModal('${d.id}')" title="Editar">✏️</button>
+          <button class="icbtn" onclick="App.delDay('${d.id}')" title="Eliminar">🗑</button>`:''}</div>`;
       });
       h+=`</div>`;
     }
     modal(h);
   }
   function editDayModal(id){
+    if(!isAdmin()){ toast('Solo el admin edita días'); return; }
     const d=state.days.find(x=>x.id===id); if(!d) return;
     modal(`<h3>Editar día</h3>
       <label class="fl">Fecha</label><input id="ed_date" class="txt" type="date" value="${d.date||''}">
@@ -2928,6 +2958,7 @@ const App = (() => {
     save(); renderDaySelect(); closeModal(); daysModal();
   }
   function delDay(id){
+    if(!isAdmin()){ toast('Solo el admin elimina días'); return; }
     const d=state.days.find(x=>x.id===id); if(!d) return;
     confirmModal(`¿Eliminar “${d.label}”? Se borran sus capturas. No se puede deshacer.`, 'Eliminar', ()=>{
       state.days=state.days.filter(x=>x.id!==id);
