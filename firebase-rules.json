@@ -1,0 +1,90 @@
+{
+  "rules": {
+    // Denegar por defecto en la raíz. Todo acceso es explícito abajo.
+    ".read": false,
+    ".write": false,
+
+    // -------- /users --------
+    // Cada quien lee su propio doc; el super lee/escribe todos.
+    // SOLO el super crea/edita usuarios (asigna liga, rol y playerId).
+    "users": {
+      "$uid": {
+        ".read": "auth != null && (auth.uid === $uid || root.child('users').child(auth.uid).child('super').val() === true)",
+        ".write": "auth != null && root.child('users').child(auth.uid).child('super').val() === true"
+      }
+    },
+
+    // -------- /leagues/{lid} --------
+    "leagues": {
+      "$lid": {
+        // Lee cualquier miembro de la liga (o el super). Necesario para calcular rayas de todos.
+        ".read": "auth != null && (root.child('users').child(auth.uid).child('super').val() === true || root.child('users').child(auth.uid).child('leagues').child($lid).exists())",
+        ".write": false,
+
+        // ---- metadatos y reglas custom: SOLO super ----
+        "meta":  { ".write": "auth != null && root.child('users').child(auth.uid).child('super').val() === true" },
+        "rules": { ".write": "auth != null && root.child('users').child(auth.uid).child('super').val() === true" },
+
+        // ---- catálogos y jugadores: admin de la liga o super ----
+        "players":  { ".write": "auth != null && (root.child('users').child(auth.uid).child('super').val() === true || root.child('users').child(auth.uid).child('leagues').child($lid).child('role').val() === 'admin')" },
+        "courses":  { ".write": "auth != null && (root.child('users').child(auth.uid).child('super').val() === true || root.child('users').child(auth.uid).child('leagues').child($lid).child('role').val() === 'admin')" },
+        "units":    { ".write": "auth != null && (root.child('users').child(auth.uid).child('super').val() === true || root.child('users').child(auth.uid).child('leagues').child($lid).child('role').val() === 'admin')" },
+        "castigos": { ".write": "auth != null && (root.child('users').child(auth.uid).child('super').val() === true || root.child('users').child(auth.uid).child('leagues').child($lid).child('role').val() === 'admin')" },
+
+        // ---- logs: cualquier miembro de la liga (o super) ----
+        "ventHistory": { ".write": "auth != null && (root.child('users').child(auth.uid).child('super').val() === true || root.child('users').child(auth.uid).child('leagues').child($lid).exists())" },
+        "dblHistory":  { ".write": "auth != null && (root.child('users').child(auth.uid).child('super').val() === true || root.child('users').child(auth.uid).child('leagues').child($lid).exists())" },
+
+        // ---- VENTAJAS: anidado giver/receiver ----
+        // admin/super: siempre. regular: solo si participa (giver o receiver === su playerId)
+        //   Y la entrada no está lockeada (1ª vez libre). Al escribir DEBE dejar locked=true.
+        "ventajas": {
+          "$giver": {
+            "$receiver": {
+              ".write": "auth != null && ( root.child('users').child(auth.uid).child('super').val() === true || root.child('users').child(auth.uid).child('leagues').child($lid).child('role').val() === 'admin' || ( root.child('users').child(auth.uid).child('leagues').child($lid).exists() && ( root.child('users').child(auth.uid).child('leagues').child($lid).child('playerId').val() === $giver || root.child('users').child(auth.uid).child('leagues').child($lid).child('playerId').val() === $receiver ) && ( !data.exists() || data.child('locked').val() !== true ) ) )",
+              ".validate": "newData.hasChild('strokes') && ( root.child('users').child(auth.uid).child('super').val() === true || root.child('users').child(auth.uid).child('leagues').child($lid).child('role').val() === 'admin' || newData.child('locked').val() === true )",
+              "strokes": { ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 54" },
+              "locked":  { ".validate": "newData.isBoolean()" },
+              "setBy":   { ".validate": "newData.isString()" },
+              "$other":  { ".validate": false }
+            }
+          }
+        },
+
+        // ---- SOLICITUDES de cambio de ventaja (lockeada) ----
+        // miembro crea; admin/super resuelve (status). Validamos forma mínima.
+        "ventReq": {
+          "$req": {
+            ".write": "auth != null && (root.child('users').child(auth.uid).child('super').val() === true || root.child('users').child(auth.uid).child('leagues').child($lid).exists())",
+            ".validate": "newData.hasChildren(['giver','receiver','to','requestedBy','status'])",
+            "status": { ".validate": "newData.val() === 'pending' || newData.val() === 'approved' || newData.val() === 'rejected'" }
+          }
+        },
+
+        // ---- DÍAS ----
+        "days": {
+          "$day": {
+            // setup del día (fecha, label, campo, salidas, start, holes): cualquier miembro
+            "setup":  { ".write": "auth != null && (root.child('users').child(auth.uid).child('super').val() === true || root.child('users').child(auth.uid).child('leagues').child($lid).exists())" },
+
+            // cerrar el día (ajusta ventajas sliding): SOLO admin/super
+            "closed": { ".write": "auth != null && (root.child('users').child(auth.uid).child('super').val() === true || root.child('users').child(auth.uid).child('leagues').child($lid).child('role').val() === 'admin')" },
+
+            // SCORES: cualquier miembro captura la tarjeta de cualquiera (captura dinámica)
+            "scores": { ".write": "auth != null && (root.child('users').child(auth.uid).child('super').val() === true || root.child('users').child(auth.uid).child('leagues').child($lid).exists())" },
+
+            // DOBLADAS direccional: el doubler escribe lo suyo; admin/super cualquier cosa
+            "doubles": {
+              "$doubler": {
+                "$target": {
+                  ".write": "auth != null && ( root.child('users').child(auth.uid).child('super').val() === true || root.child('users').child(auth.uid).child('leagues').child($lid).child('role').val() === 'admin' || ( root.child('users').child(auth.uid).child('leagues').child($lid).child('playerId').val() === $doubler ) )",
+                  ".validate": "newData.isBoolean()"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
