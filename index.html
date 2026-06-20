@@ -1084,7 +1084,7 @@ const App = (() => {
     const el=document.getElementById('dayPill'); if(!el) return;
     const txt=el.querySelector('.dp-txt'); if(!txt) return;
     const cur=curDay();
-    txt.textContent = cur ? cur.label : (isAdmin()?'Crear día':'Días');
+    txt.textContent = cur ? cur.label : 'Crear día';
   }
 
   // ---- Estado del día: en vivo (provisional) vs final ----
@@ -2070,7 +2070,7 @@ const App = (() => {
   function renderDayRegular(box, d){
     d.salidas=d.salidas||[]; d.playing=d.playing||[];
     const _t=document.getElementById('dayTitle'), _l=document.getElementById('dayLead');
-    if(_t) _t.textContent='Tu salida'; if(_l) _l.textContent='Confirma tu asistencia y revisa tu grupo.';
+    if(_t) _t.textContent='Tu salida'; if(_l) _l.textContent='Confirma tu asistencia, organiza y sortea la salida.';
     const me=myPid();
     const going = !!(me && d.playing.includes(me));
     const inGroup = !!(me && (d.salidas||[]).some(s=>(s||[]).includes(me)));
@@ -2086,7 +2086,14 @@ const App = (() => {
     }
     html+=`</div>`;
     const cap=flightCap(d);
+    const confirmados=(d.playing||[]).length;
     const assigned=(d.salidas||[]).reduce((a,g)=>a.concat((g||[]).filter(Boolean)),[]);
+    // Organizar salida (simple): cualquiera puede sortear — útil cuando el admin no asiste
+    if(!captureLocked()){
+      html+=`<div class="card"><div class="row" style="justify-content:space-between"><h3>Organizar salida</h3>
+        <button class="btn gold sm" onclick="App.sorteo()" ${confirmados?'':'disabled'}>🎲 ${assigned.length?'Re-sortear':'Sortear'}</button></div>
+        <div class="hint">${confirmados} confirmado${confirmados===1?'':'s'} · máx ${cap}/grupo. Cuando estén listos, sortea.</div></div>`;
+    }
     if(assigned.length){
       const gColors=['var(--fairway)','var(--purple)','var(--clay)'];
       html+=`<div class="card"><h3>Salidas</h3><div class="hint">${courseOf(d).name} · ${holesLabel(d)}</div>`;
@@ -2096,17 +2103,13 @@ const App = (() => {
         html+=`</div></div>`;
       });
       html+=`</div>`;
-    } else {
-      html+=`<div class="card"><div class="hint">Aún no se sortean las salidas. Cuando el admin sortee, aquí verás tu grupo.</div></div>`;
     }
     box.innerHTML=html;
   }
   function renderDay(){
     const box=document.getElementById('dayContent');
     const d=curDay();
-    if(!d){ box.innerHTML = isAdmin()
-        ? emptyState('📅','Sin día activo','Crea un viernes de juego.','App.newDayModal()','Crear día')
-        : emptyState('📅','Sin salida activa','El admin aún no crea la salida del día. Vuelve más tarde.','',''); return; }
+    if(!d){ box.innerHTML=emptyState('📅','Sin día activo','Crea un viernes de juego — cualquiera puede.','App.newDayModal()','Crear día'); return; }
     d.playing=d.playing||[];
     if(!isAdmin()){ return renderDayRegular(box, d); }
     const _t=document.getElementById('dayTitle'), _l=document.getElementById('dayLead');
@@ -2275,8 +2278,8 @@ const App = (() => {
     save(); renderDay();
   }
   function sorteo(){
-    if(!isAdmin()){ toast('Solo el admin sortea'); return; }
-    const d=curDay(); const pool=[...d.playing];
+    const d=curDay(); if(!d) return; const pool=[...(d.playing||[])];
+    if(captureLocked()){ toast('Día cerrado'); return; }
     const n=nFlights(d, pool.length);   // salidas según el cap del día (5 fin de semana, 6 entre semana)
     for(let i=pool.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [pool[i],pool[j]]=[pool[j],pool[i]]; }
     const groups=Array.from({length:n},()=>[]);
@@ -2917,7 +2920,6 @@ const App = (() => {
   function confirmYes(){ const cb=_confirmCb; _confirmCb=null; closeModal(); if(cb) try{cb();}catch(e){} }
 
   function newDayModal(){
-    if(!isAdmin()){ toast('Solo el admin crea días'); return; }
     const today=new Date();
     const def=today.toISOString().slice(0,10);
     modal(`<h3>Nuevo día de juego</h3>
@@ -2927,7 +2929,6 @@ const App = (() => {
       <button class="btn block" style="margin-top:14px" onclick="App.createDay()">Crear día</button>`);
   }
   function createDay(){
-    if(!isAdmin()){ toast('Solo el admin crea días'); return; }
     const date=document.getElementById('m_date').value;
     let label=document.getElementById('m_label').value.trim();
     if(!label){ const dt=new Date(date+'T12:00'); const wd=dt.toLocaleDateString('es-MX',{weekday:'long'}); label=wd.charAt(0).toUpperCase()+wd.slice(1)+' '+dt.toLocaleDateString('es-MX',{day:'numeric',month:'short'}); }
@@ -2939,9 +2940,9 @@ const App = (() => {
 
   function daysModal(){
     const admin=isAdmin();
-    let h=`<h3>Días de juego</h3>`;
-    if(admin) h+=`<button class="btn block" style="margin-bottom:10px" onclick="App.closeModal();App.newDayModal()">+ Nuevo día</button>`;
-    if(!state.days.length){ h+=`<div class="hint">${admin?'Aún no hay días. Crea uno para empezar.':'Aún no hay días. El admin creará la salida.'}</div>`; }
+    let h=`<h3>Días de juego</h3>
+      <button class="btn block" style="margin-bottom:10px" onclick="App.closeModal();App.newDayModal()">+ Nuevo día</button>`;
+    if(!state.days.length){ h+=`<div class="hint">Aún no hay días. Crea uno para empezar.</div>`; }
     else {
       h+=`<div class="plist">`;
       state.days.forEach(d=>{
