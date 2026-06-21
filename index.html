@@ -1144,9 +1144,10 @@ const App = (() => {
     if(!res){ box.innerHTML=seg+emptyState('⛳','Asigna jugadores a las salidas','Ve a “Salidas” y arma los grupos del día.','App.go(\'day\')','Ir a Salidas'); return; }
 
     const val=validateDay(d);
-    const valBanner = val.allOk
+    // El aviso de validación solo aplica antes de cerrar; en un día cerrado se omite (ya hay banner de "Día cerrado").
+    const valBanner = d.closed ? '' : (val.allOk
       ? `<div class="valbar ok">✓ Tarjetas completas, listo para cerrar</div>`
-      : `<div class="valbar warn"><b>⚠ Revisa antes de cerrar</b><div class="valdet">${val.issues.map(x=>x.name+': '+x.msg).join(' · ')}</div></div>`;
+      : `<div class="valbar warn"><b>⚠ Revisa antes de cerrar</b><div class="valdet">${val.issues.map(x=>x.name+': '+x.msg).join(' · ')}</div></div>`);
 
     const ini=s=>(s||'').trim().split(/\s+/).slice(0,2).map(w=>w[0]||'').join('').toUpperCase();
     const fmtP=n=> n>0?'+'+n.toLocaleString('es-MX') : n<0?'−'+Math.abs(n).toLocaleString('es-MX') : '0';
@@ -2428,7 +2429,7 @@ const App = (() => {
 
     // ---- CAPTURA HOYO POR HOYO ----
     if(!Array.isArray(d.start) && typeof d.start!=='number') d.start=1;
-    const groups=[0,1].filter(g=>(d.salidas[g]||[]).filter(Boolean).length>0);
+    const groups=(d.salidas||[]).map((g,i)=>i).filter(g=>(d.salidas[g]||[]).filter(Boolean).length>0);   // todos los grupos (no solo 2)
     if(groups.length===0){ box.innerHTML=seg+emptyState('⛳','Sin grupos','Sortea en “Salidas”.','App.go(\'day\')','Ir a Salidas'); return; }
     if(!groups.includes(curScoreGroup)) curScoreGroup=groups[0];
     const gids=(d.salidas[curScoreGroup]||[]).filter(Boolean);
@@ -2439,7 +2440,7 @@ const App = (() => {
     let html=seg;
     if(groups.length>1){
       html+=`<div class="gtabs">`;
-      groups.forEach(g=>html+=`<button class="${g===curScoreGroup?'on':''} ${g===1?'g2':''}" onclick="App.setScoreGroup(${g})">Grupo ${g+1}</button>`);
+      groups.forEach(g=>html+=`<button class="${g===curScoreGroup?'on':''} ${g>0?'g2':''}" onclick="App.setScoreGroup(${g})">Grupo ${g+1}</button>`);
       html+=`</div>`;
     }
     html+=`<div class="holenav">
