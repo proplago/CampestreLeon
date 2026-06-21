@@ -1,0 +1,16 @@
+{
+  "name": "Rayas Campestre",
+  "short_name": "Rayas",
+  "description": "Las rayas del golf de los viernes — Club Campestre de León.",
+  "start_url": ".",
+  "scope": ".",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#0a6a3a",
+  "theme_color": "#0a6a3a",
+  "lang": "es-MX",
+  "icons": [
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

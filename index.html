@@ -8,6 +8,9 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Rayas">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" type="image/png" href="icon-512.png">
+<link rel="apple-touch-icon" href="icon-512.png">
 <title>Golf Viernes · 2:10 y 2:20</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -1665,10 +1668,7 @@ const App = (() => {
       <select onchange="App.setCmp('b',this.value)">${idsAlpha.filter(id=>!(lockA&&id===cmpA)).map(id=>`<option value="${id}" ${id===cmpB?'selected':''}>${pname(id)}</option>`).join('')}</select>
     </div></div>`;
 
-    const hemo=(pid,i)=>{ const sc=ensureScore(d,pid); const ids2=new Set([...(sc.gross[i]?autoUnits(sc.gross[i],i,sc.putts[i],holesOf(d)):[]),...validManual(sc,i,holesOf(d))]);
-      let e=''; ids2.forEach(uid=>{const u=state.units.find(z=>z.id===uid); if(u&&u.emoji)e+=u.emoji;});
-      if(holesOf(d)[i].par===3 && (sc.oyes[i]||0)===1) e+='📍';
-      return e; };
+    const hemo=(pid,i)=>unitEmojis(d,pid,i);   // emojis de unidad + 📍 (helper compartido con la tarjeta)
     const dbl2=isDoubled(d,cmpA,cmpB);
     let hA=0,hB=0;
     const ord=playOrder(d), nine=isNine(d);
@@ -1767,12 +1767,6 @@ const App = (() => {
     // regular, sin invitados: una sola solicitud con el valor objetivo
     if(!ventajaIsMine(a,b)){ toast('Solo puedes pedir cambios de TUS ventajas'); render(); return; }
     requestVent(a,b,from,v); render(); toast('Cambio enviado a aprobación del admin');
-  }
-  function adjustVent(delta){
-    const from=signedV(cmpA,cmpB), to=from+delta;
-    setSignedV(cmpA,cmpB,to);
-    logVent(cmpA,cmpB,from,to,'manual',curDay()&&curDay().id);
-    render();
   }
   function logVent(a,b,from,to,type,dayId){
     state.ventHistory=state.ventHistory||[];
@@ -3293,6 +3287,11 @@ const App = (() => {
     const base=name.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'').slice(0,24)||'liga';
     let L=loadLeagues(), id=base, n=1; while(L.find(x=>x.id===id)) id=base+'-'+(++n);
     L.push({id,name}); saveLeagues(L); renderCfg(); toast('Liga creada: '+name); }
+  function renameLeague(){ if(!isAdmin()){ toast('Sin permiso para renombrar'); return; }
+    const el=document.getElementById('lg_rename'); const name=(el?el.value:'').trim(); if(!name){ toast('Pon un nombre'); return; }
+    let L=loadLeagues(); const x=L.find(l=>l.id===ACTIVE_LEAGUE); if(x) x.name=name; else L.push({id:ACTIVE_LEAGUE,name}); saveLeagues(L);
+    state._leagueMeta=state._leagueMeta||{schema:2}; state._leagueMeta.name=name; save();
+    updateBrand(); renderCfg(); toast('Nombre del grupo: '+name); }
   function switchLeague(id){ if(!isSuper()){ toast('Solo el súper admin cambia de liga'); return; }
     if(id===ACTIVE_LEAGUE) return; try{ localStorage.setItem('cl_active_league', id); }catch(e){}
     toast('Cambiando a '+leagueName(id)+'…'); setTimeout(()=>location.reload(), 450); }
@@ -3314,11 +3313,18 @@ const App = (() => {
         <select class="txt" style="margin-top:6px" onchange="App.switchLeague(this.value)">
           ${L.map(x=>`<option value="${x.id}" ${x.id===active?'selected':''}>${x.name}</option>`).join('')}</select>
         <div class="row" style="gap:8px;margin-top:10px">
+          <input id="lg_rename" class="txt" value="${leagueName(active).replace(/"/g,'&quot;')}" placeholder="Nombre del grupo">
+          <button class="btn sm outline" onclick="App.renameLeague()">Renombrar</button></div>
+        <div class="row" style="gap:8px;margin-top:8px">
           <input id="lg_name" class="txt" placeholder="Nombre de nueva liga (ej. TEST)">
           <button class="btn sm" onclick="App.createLeague()">Crear</button></div>
-        <div class="hint" style="margin-top:6px">Crear una liga la deja vacía para empezar. Cambiar de liga recarga la app.</div></div>`;
+        <div class="hint" style="margin-top:6px">Renombrar cambia el nombre del grupo (arriba y al instalar). Crear una liga la deja vacía; cambiar de liga recarga la app.</div></div>`;
     } else {
-      h+=`<div class="card"><h3>${leagueName(active)}</h3><div class="hint">Tu liga activa. La gestión de ligas la hace el súper admin.</div></div>`;
+      h+=`<div class="card"><h3>Nombre del grupo</h3>
+        <div class="row" style="gap:8px;margin-top:6px">
+          <input id="lg_rename" class="txt" value="${leagueName(active).replace(/"/g,'&quot;')}" placeholder="Nombre del grupo">
+          <button class="btn sm outline" onclick="App.renameLeague()">Renombrar</button></div>
+        <div class="hint" style="margin-top:6px">Cambia el nombre de tu liga (se ve arriba). Crear o cambiar de liga lo hace el súper admin.</div></div>`;
     }
     const mem=loadMembers(active);
     h+=`<div class="card"><h3>Miembros e invitaciones</h3>
@@ -3356,10 +3362,10 @@ const App = (() => {
     window.addEventListener('touchcancel',()=>{ pulling=false; hide(); },{passive:true});
   }
   async function init(){ try{ if(document.fonts&&document.fonts.load){ document.fonts.load("600 40px Newsreader"); document.fonts.load("700 16px 'Hanken Grotesk'"); } }catch(e){} loadDevUser(); await load(); if(!state.currentDayId && state.days[0]) state.currentDayId=state.days[0].id; render(); initPullRefresh(); if(!_devUser) loginModal(); }
-  return { init,loginModal,doLogin,approveVent,rejectVent,createLeague,switchLeague,addMember,removeMember,setMaxGroup,go,switchDay,daysModal,editDayModal,saveDayEdit,delDay,newDayModal,createDay,
+  return { init,loginModal,doLogin,approveVent,rejectVent,createLeague,renameLeague,switchLeague,addMember,removeMember,setMaxGroup,go,switchDay,daysModal,editDayModal,saveDayEdit,delDay,newDayModal,createDay,
     toggleAssign:null,togglePlaying,cancelPlayer,moveGroup,confirmMove,sorteo,addGuestModal,
     pickScore,score,putt,setOyes,quick,toggleUnit,toggleCast,navHole,gotoPending,gotoPlayerPending,setScoreGroup,setStart,setHoles,setCourse,
-    setVentFocus,stepV,openBet,openH2H,setLiqTab,setScoreTab,setCmp,adjustVent,setVentPick,
+    setVentFocus,stepV,openBet,openH2H,setLiqTab,setScoreTab,setCmp,setVentPick,
     setDblPlayer,toggleDbl,closeDay,historyModal,exportImage,exportHigh,exportProfile,exportSalidas,exportSeasonTable,exportCompare,exportScorecard,toggleSound,
     setRaya,addPlayerModal,createPlayer,editPlayerModal,savePlayer,delPlayer,toggleFav,
     courseModal,setHole,setCfgCourse,addCourse,renameCourse,deleteCourse,unitModal,createUnit,delUnit,castModal,createCast,delCast,toggleCastTipo,
