@@ -3,6 +3,11 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0a6a3a">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Rayas">
 <title>Golf Viernes · 2:10 y 2:20</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -357,7 +362,15 @@
   @keyframes spark{0%{transform:rotate(var(--a)) translateX(0);opacity:1}100%{transform:rotate(var(--a)) translateX(var(--d));opacity:0}}
   @keyframes popin{from{opacity:0;transform:scale(.85)}to{opacity:1;transform:scale(1)}}
   @media (prefers-reduced-motion:reduce){ .feed-track{animation:none} .feed-i{animation:none} }
-  .cmp .ue{font-size:11px}
+  /* Celda con número centrado fijo + renglón de emojis de unidad debajo (el número nunca pierde su centro) */
+  .gcell{display:flex;flex-direction:column;align-items:center;justify-content:center;line-height:1}
+  .gcell .gnum{display:inline-flex;align-items:center;justify-content:center;line-height:1}
+  .ue{display:block;line-height:1;min-height:11px}
+  .cmp .ue{font-size:11px;min-height:12px}
+  .sccard .ue{font-size:9px;min-height:10px;margin-top:1px}
+  .cmpme{font-weight:700;font-size:14px;color:var(--ink);padding:6px 4px}
+  select.vsel{font-weight:800;font-variant-numeric:tabular-nums}
+  select.vsel.neg{color:var(--clay)} select.vsel.pos{color:var(--good)}
   .cmp tr.x2row td{background:#fbf3df}
   .cmp tr.segrow td{background:#eef5ef;border-top:1.5px solid var(--line);border-bottom:1.5px solid var(--line);font-size:12px}
   .cmp tr.segrow td:first-child{color:var(--fairway);letter-spacing:.04em}
@@ -463,6 +476,12 @@
   .ruleslist li{margin-bottom:7px}
   .toast{position:fixed;left:50%;bottom:96px;transform:translateX(-50%) translateY(20px);background:var(--ink);color:#fff;padding:11px 18px;border-radius:999px;font-size:13px;font-weight:600;opacity:0;transition:.25s;z-index:60;pointer-events:none}
   .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+  /* Pull-to-refresh (para uso como web app instalada en el teléfono) */
+  #ptr{position:fixed;top:calc(env(safe-area-inset-top) + 6px);left:50%;transform:translateX(-50%) translateY(-46px);z-index:70;width:36px;height:36px;border-radius:50%;background:#fff;box-shadow:0 4px 14px rgba(10,40,24,.18);display:flex;align-items:center;justify-content:center;color:var(--fairway);font-size:18px;opacity:0;pointer-events:none;transition:opacity .15s}
+  #ptr .ptr-ic{display:block;transition:transform .15s}
+  #ptr.ready .ptr-ic{transform:rotate(180deg)}
+  #ptr.go .ptr-ic{animation:ptrspin .7s linear infinite}
+  @keyframes ptrspin{to{transform:rotate(360deg)}}
   .seglabel{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;text-align:center;font-size:11px;color:var(--muted);font-weight:600;margin:8px 0 2px}
   .savehint{font-size:11px;color:var(--good);text-align:center;margin-top:8px;opacity:0;transition:.3s}
   .savehint.show{opacity:1}
@@ -480,7 +499,7 @@
 <header>
   <div class="appbar">
     <div class="ab-brand">
-      <span style="display:inline-flex"><svg width="24" height="24" viewBox="0 0 24 24"><path d="M3 16 C5 13 9 12 12 12 C16 12 19 13.5 21 16 C19.5 17.6 16 18.6 12 18.6 C8 18.6 4.5 17.6 3 16 Z" fill="#e6c34a" stroke="#0a6a3a" stroke-width="1.3" stroke-linejoin="round"/><ellipse cx="13.6" cy="15.1" rx="1.3" ry="0.72" fill="#0a6a3a"/><path d="M13.6 15 L13.6 4.2" stroke="#0a6a3a" stroke-width="1.3" stroke-linecap="round"/><path d="M13.6 4.4 L19.2 6.1 L13.6 7.9 Z" fill="#c1272d"/></svg></span>Golf Viernes</div>
+      <span style="display:inline-flex"><svg width="24" height="24" viewBox="0 0 24 24"><path d="M3 16 C5 13 9 12 12 12 C16 12 19 13.5 21 16 C19.5 17.6 16 18.6 12 18.6 C8 18.6 4.5 17.6 3 16 Z" fill="#e6c34a" stroke="#0a6a3a" stroke-width="1.3" stroke-linejoin="round"/><ellipse cx="13.6" cy="15.1" rx="1.3" ry="0.72" fill="#0a6a3a"/><path d="M13.6 15 L13.6 4.2" stroke="#0a6a3a" stroke-width="1.3" stroke-linecap="round"/><path d="M13.6 4.4 L19.2 6.1 L13.6 7.9 Z" fill="#c1272d"/></svg></span><span id="brandName">Golf Viernes</span></div>
     <button class="daypill" id="dayPill" onclick="App.daysModal()" aria-label="Día y administración">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="4.5" width="17" height="16" rx="2.5"/><path d="M3.5 9h17M8 3v3M16 3v3"/></svg>
       <span class="dp-txt">Días</span>
@@ -503,7 +522,7 @@
 
   <!-- DÍA -->
   <section class="view" id="v-day">
-    <div class="eyebrow">Viernes de juego</div>
+    <div class="eyebrow">Día de juego</div>
     <h2 class="vtitle" id="dayTitle">Salidas</h2>
     <p class="lead" id="dayLead">Convoca a los que juegan hoy y dale Sortear: arma grupos parejos. Más jugadores → más salidas.</p>
     <div id="dayContent"></div>
@@ -767,7 +786,8 @@ const App = (() => {
     } else if(_backend==='local'){
       try{ const raw=localStorage.getItem(KEY); if(raw) mergeState(raw); }catch(e){}
     }
-    if(state.players.length===0) seed();
+    // Solo la liga original arranca con el roster de Campestre. Cualquier liga nueva nace vacía.
+    if(state.players.length===0 && ACTIVE_LEAGUE==='campestre-viernes') seed();
     migrate();
     _loadedOnce=true;
   }
@@ -810,7 +830,8 @@ const App = (() => {
     if(typeof state.maxWeekend!=='number') state.maxWeekend=5;
     state.ventMeta = state.ventMeta || {};
     state.ventReq = state.ventReq || {};
-    if(!state._leagueMeta) state._leagueMeta={name:'Campestre León — Viernes', schema:2};
+    if(!state._leagueMeta) state._leagueMeta={name:leagueName(ACTIVE_LEAGUE)||'Campestre León — Viernes', schema:2};
+    if(!state._leagueMeta.name) state._leagueMeta.name=leagueName(ACTIVE_LEAGUE)||'Liga';
     state.days.forEach(dd=>{
       if(Array.isArray(dd.start)) dd.start = dd.start[0]||1;
       if(typeof dd.start!=='number') dd.start=1;
@@ -1072,8 +1093,14 @@ const App = (() => {
     document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('active',b.dataset.v===v));
     render();
   }
+  function updateBrand(){
+    const nm=(state._leagueMeta&&state._leagueMeta.name)||leagueName(ACTIVE_LEAGUE)||'Golf';
+    const el=document.getElementById('brandName'); if(el) el.textContent=nm;
+    try{ document.title=nm; }catch(e){}
+  }
   function render(){
     updateIdBar();
+    updateBrand();
     renderDaySelect();
     renderFeed();
     if(curView==='liq') renderLiq();
@@ -1102,12 +1129,11 @@ const App = (() => {
   function renderLiq(){
     const box=document.getElementById('liqContent');
     const lead=document.getElementById('liqLead');
-    const seg=`<div class="seg3">
+    const seg=`<div class="seg2">
       <button class="${liqTab==='hoy'?'on':''}" onclick="App.setLiqTab('hoy')">Hoy</button>
-      <button class="${liqTab==='cmp'?'on':''}" onclick="App.setLiqTab('cmp')">Comparar</button>
       <button class="${liqTab==='temp'?'on':''}" onclick="App.setLiqTab('temp')">💰 Temporada</button></div>`;
+    if(liqTab==='cmp') liqTab='hoy';   // 'Comparar' se movió a Captura
     if(liqTab==='temp'){ lead.style.display='none'; box.innerHTML=seg+renderSeason(); return; }
-    if(liqTab==='cmp'){ lead.style.display='none'; box.innerHTML=seg+renderCompare(); return; }
     const d=curDay();
     if(!d){ box.innerHTML=seg+emptyState('🏌️','Aún no hay un día activo','Crea un viernes de juego para empezar a capturar.','App.newDayModal()','Crear día'); lead.style.display='none'; return; }
     lead.style.display='block';
@@ -1170,16 +1196,8 @@ const App = (() => {
           : `<div class="hint" style="margin-top:6px">El admin cierra el día al terminar (ajusta las ventajas).</div>`);
     html+=`<div class="exprow"><button class="expbtn" onclick="App.exportImage()">📸 Imagen</button></div>`;
 
-    // desglose
-    const anyCastig=res.rows.some(r=>r.castig);
-    html+=`<details class="card disclosure"><summary>Ver desglose por concepto →</summary><div style="margin-top:8px">`;
-    html+=`<table style="width:100%;border-collapse:collapse;font-size:12.5px">
-      <tr style="color:#7c8a80;text-align:right"><th style="text-align:left">Jugador</th><th>Hoyos</th><th>Unid.</th><th>Oyes</th><th>Medal</th>${anyCastig?'<th>Cast$</th>':''}<th>Total</th></tr>`;
-    res.rows.forEach(r=>{ const p=player(r.id);
-      html+=`<tr style="text-align:right;border-top:1px solid var(--line)"><td style="text-align:left;padding:6px 0">${pname(r.id)}</td>
-      <td>${sgn(r.hoyos)}</td><td>${sgn(r.unidades)}</td><td>${sgn(r.oyes)}</td><td>${sgn(r.medal)}</td>${anyCastig?`<td>${sgn(r.castig||0)}</td>`:''}<td><b>${sgn(r.total)}</b></td></tr>`;
-    });
-    html+=`</table><div class="hint" style="margin-top:6px">Unidades, oyes y medal son <b>netos</b> contra todos (lo que ganas menos lo que te ganan). Si doblaron, la 2ª vuelta de esa pareja ya va ×2.</div></div></details>`;
+    // desglose por concepto
+    html+=desgloseHtml(res);
 
     // castigos / cuenta del 19
     const anyDrink=Object.values(res.drinks).some(o=>Object.keys(o).length);
@@ -1197,6 +1215,20 @@ const App = (() => {
     box.innerHTML=html;
   }
   const sgn=n=> (n>0?'+':'')+n;
+  // Desglose por concepto (Hoyos / Unidades / Oyes / Medal / Castigo$ / Total). Reutilizado en El 19 y en Comparar.
+  function desgloseHtml(res){
+    if(!res||!res.rows||!res.rows.length) return '';
+    const anyCastig=res.rows.some(r=>r.castig);
+    let html=`<details class="card disclosure"><summary>Ver desglose por concepto →</summary><div style="margin-top:8px">`;
+    html+=`<table style="width:100%;border-collapse:collapse;font-size:12.5px">
+      <tr style="color:#7c8a80;text-align:right"><th style="text-align:left">Jugador</th><th>Hoyos</th><th>Unid.</th><th>Oyes</th><th>Medal</th>${anyCastig?'<th>Cast$</th>':''}<th>Total</th></tr>`;
+    res.rows.forEach(r=>{
+      html+=`<tr style="text-align:right;border-top:1px solid var(--line)"><td style="text-align:left;padding:6px 0">${pname(r.id)}</td>
+      <td>${sgn(r.hoyos)}</td><td>${sgn(r.unidades)}</td><td>${sgn(r.oyes)}</td><td>${sgn(r.medal)}</td>${anyCastig?`<td>${sgn(r.castig||0)}</td>`:''}<td><b>${sgn(r.total)}</b></td></tr>`;
+    });
+    html+=`</table><div class="hint" style="margin-top:6px">Unidades, oyes y medal son <b>netos</b> contra todos (lo que ganas menos lo que te ganan). Si doblaron, la 2ª vuelta de esa pareja ya va ×2.</div></div></details>`;
+    return html;
+  }
 
   // ---- Temporada (acumulado + estadística + HCP interno) ----
   function intHcp(diffs){
@@ -1613,6 +1645,9 @@ const App = (() => {
     if(!d) return emptyState('🆚','Sin día','Crea un día.','App.newDayModal()','Crear día');
     const ids=dayPlayers(d).filter(Boolean);
     if(ids.length<2) return emptyState('🆚','Faltan jugadores','Convoca al menos dos.','App.go(\'day\')','Ir a Salidas');
+    // El jugador regular solo ve SU comparativa: A fijo a sí mismo, solo elige el rival.
+    const lockA = isRegular() && myPid() && ids.includes(myPid());
+    if(lockA) cmpA=myPid();
     if(!ids.includes(cmpA)) cmpA=ids[0];
     if(!ids.includes(cmpB)||cmpB===cmpA) cmpB=ids.find(x=>x!==cmpA)||ids[0];
     const A=player(cmpA),B=player(cmpB), nA=pname(cmpA), nB=pname(cmpB);
@@ -1621,10 +1656,13 @@ const App = (() => {
     const sameGroup=d.salidas.some(g=>(g||[]).includes(cmpA)&&(g||[]).includes(cmpB));
 
     const idsAlpha=[...ids].sort((a,b)=>pname(a).localeCompare(pname(b)));
+    const aSide = lockA
+      ? `<div class="cmpme">${pname(cmpA)}</div>`
+      : `<select onchange="App.setCmp('a',this.value)">${idsAlpha.map(id=>`<option value="${id}" ${id===cmpA?'selected':''}>${pname(id)}</option>`).join('')}</select>`;
     let html=`<div class="card"><div class="cmpsel">
-      <select onchange="App.setCmp('a',this.value)">${idsAlpha.map(id=>`<option value="${id}" ${id===cmpA?'selected':''}>${pname(id)}</option>`).join('')}</select>
+      ${aSide}
       <span class="vs">vs</span>
-      <select onchange="App.setCmp('b',this.value)">${idsAlpha.map(id=>`<option value="${id}" ${id===cmpB?'selected':''}>${pname(id)}</option>`).join('')}</select>
+      <select onchange="App.setCmp('b',this.value)">${idsAlpha.filter(id=>!(lockA&&id===cmpA)).map(id=>`<option value="${id}" ${id===cmpB?'selected':''}>${pname(id)}</option>`).join('')}</select>
     </div></div>`;
 
     const hemo=(pid,i)=>{ const sc=ensureScore(d,pid); const ids2=new Set([...(sc.gross[i]?autoUnits(sc.gross[i],i,sc.putts[i],holesOf(d)):[]),...validManual(sc,i,holesOf(d))]);
@@ -1659,8 +1697,8 @@ const App = (() => {
       const da=allocA[i]?'-'+allocA[i]:'', db=allocB[i]?'-'+allocB[i]:'';
       const x2 = dbl2 && isSecond(d,i);
       html+=`<tr class="${x2?'x2row':''}"><td>${h.n}${x2?' <span class="x2">×2</span>':''}</td><td class="par">${h.par}</td>
-        <td>${gsymHtml(ga,h.par)}<sup>${da}</sup> <span class="ue">${hemo(cmpA,i)}</span></td>
-        <td>${gsymHtml(gb,h.par)}<sup>${db}</sup> <span class="ue">${hemo(cmpB,i)}</span></td>
+        <td><span class="gcell"><span class="gnum">${gsymHtml(ga,h.par)}<sup>${da}</sup></span><span class="ue">${hemo(cmpA,i)}</span></span></td>
+        <td><span class="gcell"><span class="gnum">${gsymHtml(gb,h.par)}<sup>${db}</sup></span><span class="ue">${hemo(cmpB,i)}</span></span></td>
         <td class="rk ${cls}">${mk}</td>${acumCell(running)}</tr>`;
       if(!nine && k===8){ running+=medalContrib(ms.first); html+=segRow('OUT', ord.slice(0,9), running); }
     });
@@ -1692,24 +1730,49 @@ const App = (() => {
       <div class="cr2" style="border:none;margin-top:4px"><b>Neto ${nA}</b>
         <b style="color:${col};font-size:15px">${net>0?'+':''}${net} ray · ${net>0?'+':''}$${pesos.toLocaleString('es-MX')}</b></div></div>`;
 
-    const cur=signedV(cmpA,cmpB);   // + = ${nA} da (rojo) · − = le dan a ${nA} (verde)
+    const cur=signedV(cmpA,cmpB);   // + = ${nA} da (rojo) · − = le dan a ${nA} (verde)  (misma fuente que la pestaña Ventajas)
     const desc = cur>0?`${nA} le da ${cur} a ${nB}`:cur<0?`${nB} le da ${-cur} a ${nA}`:'parejos';
-    html+=`<div class="card"><b style="font-size:13px">Ajustar ventaja (acordada)</b>
-      <div class="hint">Hoy: ${desc}. Si la mueves a mano, queda marcada en el historial.</div>
-      <div class="stepper ${cur>0?'neg':cur<0?'pos':''}" style="margin-top:2px">
-        <button onclick="App.adjustVent(-1)">−</button>
-        <span class="val">${cur>0?'+':''}${cur}</span>
-        <button onclick="App.adjustVent(1)">+</button></div>
-      <div class="hint" style="margin-top:6px"><b style="color:var(--clay)">+</b> = ${nA} da · <b style="color:var(--good)">−</b> = le dan a ${nA}</div></div>`;
+    const guestPair = (A&&A.guest)||(B&&B.guest);
+    const R=30; let vopts=''; for(let v=R;v>=-R;v--){ vopts+=`<option value="${v}" ${v===cur?'selected':''}>${v>0?'+'+v:v}</option>`; }
+    if(isAdmin() || guestPair){
+      html+=`<div class="card"><b style="font-size:13px">Ajustar ventaja (acordada)</b>
+        <div class="hint">Hoy: ${desc}. Elige el valor directo${guestPair?' (invitado · cualquiera lo puede ajustar)':''}. Coincide con la pestaña Ventajas; queda en el historial.</div>
+        <select class="txt vsel ${cur>0?'neg':cur<0?'pos':''}" style="margin-top:6px" onchange="App.setVentPick(this.value)">${vopts}</select>
+        <div class="hint" style="margin-top:6px"><b style="color:var(--clay)">+</b> = ${nA} da · <b style="color:var(--good)">−</b> = le dan a ${nA}</div></div>`;
+    } else if(lockA && ventajaIsMine(cmpA,cmpB)){
+      html+=`<div class="card"><b style="font-size:13px">Pedir ajuste de ventaja</b>
+        <div class="hint">Hoy: <b>${desc}</b>. Elige el valor que propones; se manda como <b>una sola solicitud</b> al administrador (no se aplica hasta que la apruebe).</div>
+        <select class="txt vsel ${cur>0?'neg':cur<0?'pos':''}" style="margin-top:6px" onchange="App.setVentPick(this.value)">${vopts}</select>
+        <div class="hint" style="margin-top:6px"><b style="color:var(--clay)">+</b> = ${nA} da · <b style="color:var(--good)">−</b> = le dan a ${nA}</div></div>`;
+    } else {
+      html+=`<div class="card"><b style="font-size:13px">Ventaja (acordada)</b>
+        <div class="hint">Hoy: <b>${desc}</b>. Coincide con la pestaña Ventajas. El ajuste lo hace el administrador.</div></div>`;
+    }
     html+=`<div class="exprow"><button class="expbtn" onclick="App.exportCompare()">📸 Exportar comparativa</button></div>`;
     return html;
   }
-  function setCmp(which,id){ if(which==='a')cmpA=id; else cmpB=id; renderLiq(); }
+  function setCmp(which,id){ if(which==='a')cmpA=id; else cmpB=id; render(); }
+  // Selector de ventaja en la comparativa (reemplaza los +/−).
+  //  admin o pareja con invitado → ajuste directo · regular (su propia ventaja) → solicitud única al admin.
+  function setVentPick(v){
+    v=parseInt(v,10)||0; const a=cmpA,b=cmpB; const from=signedV(a,b);
+    if(from===v) return;
+    if(!_devUser){ toast('Elige usuario primero'); loginModal(); return; }
+    const pa=player(a), pb=player(b); const involvesGuest=(pa&&pa.guest)||(pb&&pb.guest);
+    const direct=()=>{ setSignedV(a,b,v); if(!involvesGuest) lockVent(a,b,isAdmin()?'admin':myPid()); logVent(a,b,from,v,'manual',curDay()&&curDay().id); render(); };
+    if(isAdmin() || involvesGuest){
+      if(isAdmin() && myPid()!==a && myPid()!==b && !involvesGuest){ confirmModal(`Cambiar la ventaja entre ${pname(a)} y ${pname(b)} (${from} → ${v}). ¿Continuar?`,'Cambiar',direct); return; }
+      direct(); return;
+    }
+    // regular, sin invitados: una sola solicitud con el valor objetivo
+    if(!ventajaIsMine(a,b)){ toast('Solo puedes pedir cambios de TUS ventajas'); render(); return; }
+    requestVent(a,b,from,v); render(); toast('Cambio enviado a aprobación del admin');
+  }
   function adjustVent(delta){
     const from=signedV(cmpA,cmpB), to=from+delta;
     setSignedV(cmpA,cmpB,to);
     logVent(cmpA,cmpB,from,to,'manual',curDay()&&curDay().id);
-    renderLiq();
+    render();
   }
   function logVent(a,b,from,to,type,dayId){
     state.ventHistory=state.ventHistory||[];
@@ -2310,6 +2373,14 @@ const App = (() => {
   function gsymHtml(g,par){ if(!g) return '·'; const df=g-par;
     const sym = df<=-2?'eagle':df===-1?'birdie':df===0?'par':df===1?'bogey':'dbogey';
     return `<span class="gsym ${sym}">${g}</span>`; }
+  // Emojis de unidades (auto + manuales válidas) + 📍 del oye ganador de un hoyo. Compartido por tarjeta y comparativa.
+  function unitEmojis(d,pid,i){
+    const sc=ensureScore(d,pid);
+    const set=new Set([...(sc.gross[i]?autoUnits(sc.gross[i],i,sc.putts[i],holesOf(d)):[]),...validManual(sc,i,holesOf(d))]);
+    let e=''; set.forEach(uid=>{ const u=state.units.find(z=>z.id===uid); if(u&&u.emoji)e+=u.emoji; });
+    if(holesOf(d)[i].par===3 && (sc.oyes[i]||0)===1) e+='📍';
+    return e;
+  }
   function renderCard(d, onlyGroup, hlHole){
     const res=computeDay(d); const holes=holesOf(d); const ord=playOrder(d); const nine=isNine(d);
     const front=ord.slice(0,9), back=ord.slice(9,18);
@@ -2334,8 +2405,8 @@ const App = (() => {
         const outG=front.reduce((a,i)=>a+(sc.gross[i]||0),0), inG=back.reduce((a,i)=>a+(sc.gross[i]||0),0);
         const r=res?res.rows.find(x=>x.id===id):null, rr=r?r.total:0;
         html+=`<tr><th class="pn">${p?pname(p.id):'—'}</th>`;
-        ord.forEach((i,k)=>{ const h=holes[i], g=sc.gross[i];
-          html+=`<td class="${i===hlHole?'hl':''}">${gsymHtml(g,h.par)}</td>`;
+        ord.forEach((i,k)=>{ const h=holes[i], g=sc.gross[i]; const em=g?unitEmojis(d,id,i):'';
+          html+=`<td class="${i===hlHole?'hl':''}"><span class="gcell"><span class="gnum">${gsymHtml(g,h.par)}</span><span class="ue">${em}</span></span></td>`;
           if(!nine&&k===8) html+=`<td class="tt sub"><b>${outG||'·'}</b></td>`; });
         if(!nine) html+=`<td class="tt sub"><b>${inG||'·'}</b></td>`;
         const rc=rr>0?'pos':rr<0?'neg':'';
@@ -2354,12 +2425,12 @@ const App = (() => {
     const box=document.getElementById('scoreContent');
     renderFeed();
     const d=curDay();
-    const seg=`<div class="seg2"><button class="${scoreTab==='cap'?'on':''}" onclick="App.setScoreTab('cap')">Capturar</button><button class="${scoreTab==='card'?'on':''}" onclick="App.setScoreTab('card')">Tarjeta</button></div>`
+    const seg=`<div class="seg2"><button class="${scoreTab==='cap'?'on':''}" onclick="App.setScoreTab('cap')">Capturar</button><button class="${scoreTab==='cmp'?'on':''}" onclick="App.setScoreTab('cmp')">Comparar</button></div>`
       + (captureLocked()?`<div class="valbar warn" style="margin-top:8px">🔒 Día cerrado · solo lectura (el admin puede corregir)</div>`:'');
     if(!d){ box.innerHTML=seg+emptyState('📝','Sin día activo','Crea un día y asigna salidas.','App.go(\'day\')','Ir a Salidas'); return; }
     const ids=dayPlayers(d).filter(Boolean);
     if(ids.length===0){ box.innerHTML=seg+emptyState('⛳','No hay jugadores','Asigna jugadores en “Salidas”.','App.go(\'day\')','Ir a Salidas'); return; }
-    if(scoreTab==='card'){ box.innerHTML=seg+renderCard(d)+`<div class="exprow"><button class="expbtn" onclick="App.exportScorecard()">📸 Imagen</button></div><div class="hint" style="text-align:center;line-height:1.5">Verde = bajo par · ámbar = bogey · rojo = doble+ · <b>Ray</b> = rayas en vivo</div>`; return; }
+    if(scoreTab==='cmp'){ box.innerHTML=seg+renderCompare()+desgloseHtml(compute()); return; }
 
     // ---- CAPTURA HOYO POR HOYO ----
     if(!Array.isArray(d.start) && typeof d.start!=='number') d.start=1;
@@ -2423,6 +2494,7 @@ const App = (() => {
     });
     html+=`</div>`;
     html+=renderCard(d, curScoreGroup, hi);
+    html+=`<div class="exprow"><button class="expbtn" onclick="App.exportScorecard()">📸 Tarjeta completa</button></div>`;
     html+=renderDoubles(d);
     // pie: pendientes / ir a cerrar
     const pend=pendingHoles(d);
@@ -2688,7 +2760,14 @@ const App = (() => {
     const box=document.getElementById('ventContent');
     if(state.players.length<2){ box.innerHTML=emptyState('⚖️','Faltan jugadores','Agrega al menos dos en Ajustes.','App.go(\'cfg\')','Ir a Ajustes'); return; }
     if(!ventFocus||!player(ventFocus)) ventFocus=state.players[0].id;
-    if(isRegular() && myPid() && player(myPid())) ventFocus=myPid();   // el regular solo ve/edita las suyas
+    // Invitados del día: cualquiera los puede gestionar (aún no tienen login propio). Sus ventajas solo se ven contra quienes van ese día.
+    const _d=curDay();
+    const inDay=new Set(_d?dayPlayers(_d).filter(Boolean):[]);
+    const dayGuestIds=[...inDay].filter(id=>{ const p=player(id); return p&&p.guest; });
+    if(isRegular() && myPid() && player(myPid())){
+      const allowed=new Set([myPid(),...dayGuestIds]);   // sus propias ventajas + las de los invitados del día
+      if(!allowed.has(ventFocus)) ventFocus=myPid();
+    }
     // regulares primero (alfabético), invitados al final
     const sorted=[...state.players].sort((a,b)=>(a.guest?1:0)-(b.guest?1:0)||a.name.localeCompare(b.name));
 
@@ -2704,9 +2783,16 @@ const App = (() => {
       }
     }
     html+=`<div class="card"><div class="row" style="justify-content:space-between">
-        <label class="fl" style="margin:0">${isRegular()?'Tus ventajas':'Ver ventajas de'}</label>
+        <label class="fl" style="margin:0">${isRegular()?(dayGuestIds.length?'Tus ventajas / invitados del día':'Tus ventajas'):'Ver ventajas de'}</label>
         <button class="btn outline sm" onclick="App.historyModal()">Historial / sliding</button></div>`;
-    if(isRegular()){ html+=`<div style="margin-top:6px;font-weight:700">${pname(ventFocus)}</div>`; }
+    if(isRegular()){
+      const focusList=[myPid(),...dayGuestIds].filter((v,i,a)=>v&&player(v)&&a.indexOf(v)===i);
+      if(focusList.length>1){
+        html+=`<select class="txt" style="margin-top:6px" onchange="App.setVentFocus(this.value)">`;
+        focusList.forEach(id=>html+=`<option value="${id}" ${id===ventFocus?'selected':''}>${pname(id)}${player(id).guest?' (inv)':''}</option>`);
+        html+=`</select>`;
+      } else { html+=`<div style="margin-top:6px;font-weight:700">${pname(ventFocus)}</div>`; }
+    }
     else {
       html+=`<select class="txt" style="margin-top:6px" onchange="App.setVentFocus(this.value)">`;
       sorted.forEach(p=>html+=`<option value="${p.id}" ${p.id===ventFocus?'selected':''}>${p.name}${p.guest?' (inv)':''}</option>`);
@@ -2724,8 +2810,11 @@ const App = (() => {
           <span class="val">${v>0?'+':''}${v}</span>
           <button onclick="App.stepV('${p.id}',1)">+</button>
         </div></div>`; };
-    const opps=sorted.filter(p=>p.id!==ventFocus);
-    const regOpps=opps.filter(p=>!p.guest), guestOpps=opps.filter(p=>p.guest);
+    const meIsGuest=me&&me.guest;
+    let opps=sorted.filter(p=>p.id!==ventFocus);
+    if(meIsGuest) opps=opps.filter(p=>inDay.has(p.id));   // invitado: solo vs los que van ese día
+    const regOpps=opps.filter(p=>!p.guest);
+    const guestOpps=opps.filter(p=>p.guest && inDay.has(p.id));   // invitados rivales: solo los del día
     html+=`<div class="card"><h3>${me.name} vs…</h3>
       <div class="hint"><b style="color:var(--clay)">+ (rojo)</b> = ${pname(me.id)} <b>da</b> ventaja (juega en su contra) · <b style="color:var(--good)">− (verde)</b> = se la <b>dan</b>.</div>`;
     regOpps.forEach(p=>html+=vrowH(p));
@@ -2774,6 +2863,10 @@ const App = (() => {
     const a=ventFocus, b=other;
     const from=signedV(a,b), to=from+delta;
     if(!_devUser){ toast('Elige usuario primero'); loginModal(); return; }
+    const pa=player(a), pb=player(b);
+    if((pa&&pa.guest)||(pb&&pb.guest)){   // ventajas de invitado: cualquiera las puede ajustar, sin lock ni aprobación
+      setSignedV(a,b,to); logVent(a,b,from,to,'manual',curDay()&&curDay().id); renderVent(); return;
+    }
     if(!isAdmin()){
       if(!ventajaIsMine(a,b)){ toast('Solo puedes editar TUS ventajas'); return; }
       if(ventajaLocked(a,b)){ requestVent(a,b,from,to); renderVent(); toast('Ventaja ya fijada → cambio enviado a aprobación del admin'); return; }
@@ -3244,11 +3337,29 @@ const App = (() => {
     return h;
   }
 
-  async function init(){ try{ if(document.fonts&&document.fonts.load){ document.fonts.load("600 40px Newsreader"); document.fonts.load("700 16px 'Hanken Grotesk'"); } }catch(e){} loadDevUser(); await load(); if(!state.currentDayId && state.days[0]) state.currentDayId=state.days[0].id; render(); if(!_devUser) loginModal(); }
+  // Pull-to-refresh: jala hacia abajo desde arriba para recargar (pensado para la app instalada en el teléfono).
+  function initPullRefresh(){
+    if(window.__ptrInit) return; window.__ptrInit=true;
+    const ind=document.createElement('div'); ind.id='ptr'; ind.innerHTML='<span class="ptr-ic">↓</span>'; document.body.appendChild(ind);
+    const TH=72; let startY=0, pulling=false, ready=false;
+    const hide=()=>{ ind.style.opacity='0'; ind.style.transform='translateX(-50%) translateY(-46px)'; ind.classList.remove('ready'); };
+    const atTop=()=>((window.scrollY||document.documentElement.scrollTop||0)<=0) && !document.getElementById('modalBg').classList.contains('show');
+    window.addEventListener('touchstart',e=>{ if(e.touches.length!==1||!atTop()){ pulling=false; return; } startY=e.touches[0].clientY; pulling=true; ready=false; },{passive:true});
+    window.addEventListener('touchmove',e=>{ if(!pulling) return; const dy=e.touches[0].clientY-startY;
+      if(dy<=0||!atTop()){ pulling=false; hide(); return; }
+      const d=Math.min(dy*0.5,96); ind.style.opacity=Math.min(1,d/TH); ind.style.transform='translateX(-50%) translateY('+(Math.min(d,70)-46)+'px)';
+      ready=d>=TH; ind.classList.toggle('ready',ready); },{passive:true});
+    const end=()=>{ if(!pulling) return; pulling=false;
+      if(ready){ ind.classList.add('go'); ind.style.opacity='1'; ind.style.transform='translateX(-50%) translateY(24px)'; setTimeout(()=>location.reload(),140); }
+      else hide(); };
+    window.addEventListener('touchend',end,{passive:true});
+    window.addEventListener('touchcancel',()=>{ pulling=false; hide(); },{passive:true});
+  }
+  async function init(){ try{ if(document.fonts&&document.fonts.load){ document.fonts.load("600 40px Newsreader"); document.fonts.load("700 16px 'Hanken Grotesk'"); } }catch(e){} loadDevUser(); await load(); if(!state.currentDayId && state.days[0]) state.currentDayId=state.days[0].id; render(); initPullRefresh(); if(!_devUser) loginModal(); }
   return { init,loginModal,doLogin,approveVent,rejectVent,createLeague,switchLeague,addMember,removeMember,setMaxGroup,go,switchDay,daysModal,editDayModal,saveDayEdit,delDay,newDayModal,createDay,
     toggleAssign:null,togglePlaying,cancelPlayer,moveGroup,confirmMove,sorteo,addGuestModal,
     pickScore,score,putt,setOyes,quick,toggleUnit,toggleCast,navHole,gotoPending,gotoPlayerPending,setScoreGroup,setStart,setHoles,setCourse,
-    setVentFocus,stepV,openBet,openH2H,setLiqTab,setScoreTab,setCmp,adjustVent,
+    setVentFocus,stepV,openBet,openH2H,setLiqTab,setScoreTab,setCmp,adjustVent,setVentPick,
     setDblPlayer,toggleDbl,closeDay,historyModal,exportImage,exportHigh,exportProfile,exportSalidas,exportSeasonTable,exportCompare,exportScorecard,toggleSound,
     setRaya,addPlayerModal,createPlayer,editPlayerModal,savePlayer,delPlayer,toggleFav,
     courseModal,setHole,setCfgCourse,addCourse,renameCourse,deleteCourse,unitModal,createUnit,delUnit,castModal,createCast,delCast,toggleCastTipo,
