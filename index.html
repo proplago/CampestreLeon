@@ -1878,31 +1878,40 @@ const App = (() => {
   function renderDoubles(d){
     if(isNine(d)) return ''; // no hay 2ª vuelta que doblar en 9 hoyos
     const ids=dayPlayers(d).filter(Boolean); if(ids.length<2) return '';
+    const admin=isAdmin();
+    // El jugador regular solo gestiona/ve SUS dobladas: queda fijo a sí mismo.
+    if(!admin && myPid() && ids.includes(myPid())) dblPlayer=myPid();
     if(!ids.includes(dblPlayer)) dblPlayer=ids[0];
     const me=dblPlayer;
     let html=`<details class="card"><summary>Doblar · 2ª vuelta</summary><div style="margin-top:8px">
-      <div class="hint">Al hacer el turn, el que va perdiendo dobla la 2ª vuelta contra quien le gana. Multiplica ×2 todo lo de los segundos 9 entre esos dos.</div>
-      <label class="fl">Jugador</label>
-      <select class="txt" onchange="App.setDblPlayer(this.value)">${[...ids].sort((a,b)=>pname(a).localeCompare(pname(b))).map(id=>`<option value="${id}" ${id===me?'selected':''}>${player(id).name}</option>`).join('')}</select>`;
+      <div class="hint">Al hacer el turn, el que va perdiendo dobla la 2ª vuelta contra quien le gana. Multiplica ×2 todo lo de los segundos 9 entre esos dos.</div>`;
+    if(admin){
+      html+=`<label class="fl">Jugador</label>
+        <select class="txt" onchange="App.setDblPlayer(this.value)">${[...ids].sort((a,b)=>pname(a).localeCompare(pname(b))).map(id=>`<option value="${id}" ${id===me?'selected':''}>${player(id).name}</option>`).join('')}</select>`;
+    } else {
+      html+=`<div style="margin-top:6px;font-weight:700">${pname(me)}</div>`;
+    }
     const opps=ids.filter(id=>id!==me).map(id=>({id, fn:h2h(d,me,id).firstNet, ready:firstNineDone(d,me,id)})).filter(o=>o.ready && o.fn<0);
-    html+=`<div style="margin-top:10px;font-size:12px;color:var(--muted)">Te van ganando al turn (1ª vuelta):</div>`;
+    html+=`<div style="margin-top:10px;font-size:12px;color:var(--muted)">${admin?pname(me)+' va perdiendo al turn contra:':'Te van ganando al turn (1ª vuelta):'}</div>`;
     if(!opps.length) html+=`<div class="hint">Nadie todavía (o aún no terminan los 9 de la 1ª vuelta).</div>`;
     opps.sort((a,b)=>a.fn-b.fn).forEach(o=>{ const dbl=isDoubled(d,me,o.id);
       html+=`<div class="vrow"><div class="who">${pname(o.id)} <span style="color:var(--clay)">(${o.fn})</span></div>
         <button class="flag ${dbl?'on':''}" onclick="App.toggleDbl('${me}','${o.id}')">${dbl?'doblado ×2':'doblar'}</button></div>`;
     });
-    // dobles activos de cualquiera (direccional: doubler → target)
+    // dobles activos (direccional: doubler → target). Admin+ ve TODOS; el regular solo los suyos.
     const active=[]; const D=d.doubles||{}; Object.keys(D).forEach(x=>Object.keys(D[x]||{}).forEach(y=>{ if(D[x][y]) active.push([x,y]); }));
-    if(active.length){ html+=`<div style="margin-top:10px;font-size:12px;color:var(--muted)">Dobles activos:</div>`;
-      active.forEach(([x,y])=>{
+    const visActive = admin ? active : active.filter(([x,y])=>x===myPid()||y===myPid());
+    if(visActive.length){ html+=`<div style="margin-top:10px;font-size:12px;color:var(--muted)">Dobles activos${admin?'':' (tuyos)'}:</div>`;
+      visActive.forEach(([x,y])=>{ const canRemove = admin || x===myPid();   // el regular solo quita los que ÉL dobló
         html+=`<div class="vrow"><div class="who">${pname(x)} → ${pname(y)}</div>
-          <button class="flag on" onclick="App.toggleDbl('${x}','${y}')">quitar</button></div>`; });
+          ${canRemove?`<button class="flag on" onclick="App.toggleDbl('${x}','${y}')">quitar</button>`:`<span class="hint" style="margin:0">×2</span>`}</div>`; });
     }
-    // registro / evidencia del día
-    const log=(state.dblHistory||[]).filter(e=>e.dayId===d.id);
+    // registro / evidencia del día. Admin+ ve TODO; el regular solo lo suyo.
+    const logAll=(state.dblHistory||[]).filter(e=>e.dayId===d.id);
+    const log = admin ? logAll : logAll.filter(e=>e.a===myPid()||e.b===myPid());
     if(log.length){
-      html+=`<div style="margin-top:12px;font-size:12px;color:var(--muted)">Registro (evidencia):</div>`;
-      log.slice(0,12).forEach(e=>{ const A=player(e.a),B=player(e.b);
+      html+=`<div style="margin-top:12px;font-size:12px;color:var(--muted)">Registro (evidencia)${admin?'':' (tuyo)'}:</div>`;
+      log.slice(0,12).forEach(e=>{
         const nA=pname(e.a), nB=pname(e.b);
         const hr=new Date(e.ts).toLocaleTimeString('es-MX',{hour:'2-digit',minute:'2-digit'});
         const txt=e.type==='doblar'?`${nA} dobló a ${nB}`:`se quitó el doble ${nA} ↔ ${nB}`;
@@ -1923,7 +1932,8 @@ const App = (() => {
       state.dblHistory=state.dblHistory||[];
       state.dblHistory.unshift({ts:Date.now(), type:was?'quitar':'doblar', a, b, dayId:d.id});
       save(); render(); };
-    if(isAdmin() && myPid()!==a){ confirmModal(`${was?'Quitar el doble de':'Doblar a nombre de'} ${pname(a)} contra ${pname(b)}. ¿Continuar?`, was?'Quitar':'Doblar', apply); return; }
+    // admin/super: SIEMPRE confirma con nombres (para no equivocarse de jugador)
+    if(isAdmin()){ confirmModal(`${was?'Quitar el doble de':'Doblar a nombre de'} <b>${pname(a)}</b> contra <b>${pname(b)}</b>. ¿Continuar?`, was?'Quitar':'Doblar', apply); return; }
     apply();
   }
 
