@@ -318,6 +318,14 @@
   table.cmp td.rk{font-size:11px;font-weight:700}
   table.cmp td.rk.a{color:var(--fairway)}
   table.cmp td.rk.b{color:#5b3a8a}
+  /* Barra de avisos en-app (solicitudes dirigidas a ti + trofeos que vas ganando) */
+  #notifbar{background:#fffaf0;border-bottom:1px solid #f0e4c8}
+  .notif-i{display:flex;align-items:center;gap:8px;padding:8px 16px;cursor:pointer;font-size:13px;color:var(--ink);border-top:1px solid #f5ecd6}
+  .notif-i:first-child{border-top:none}
+  .notif-i:active{background:#fff4dd}
+  .notif-e{font-size:16px;line-height:1}
+  .notif-t{flex:1;min-width:0;font-weight:600}
+  .notif-go{color:var(--fairway);font-weight:700;font-size:12px;white-space:nowrap}
   .startsel{font-size:11px;color:var(--muted);display:flex;align-items:center;gap:6px}
   .coursesel{appearance:none;-webkit-appearance:none;font-size:13.5px;font-weight:700;color:var(--fairway);background:#fff;border:1.5px solid var(--line-3);border-radius:999px;padding:6px 26px 6px 13px;max-width:62%;
     background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='11' height='11' viewBox='0 0 24 24' fill='none' stroke='%230a6a3a' stroke-width='2.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 10px center}
@@ -512,6 +520,7 @@
 </header>
 
 <div id="idbar" onclick="App.loginModal()" title="Cambiar usuario (modo prueba)" style="cursor:pointer;background:#fff;border-bottom:1px solid var(--line);padding:7px 16px;font-size:12.5px;color:var(--muted);display:flex;justify-content:space-between;align-items:center;gap:8px"></div>
+<div id="notifbar" style="display:none"></div>
 <div id="feedbar" class="feedbar" style="display:none;cursor:pointer" onclick="App.go('high')" title="Ver todos los trofeos del día"></div>
 
 <main>
@@ -1126,6 +1135,7 @@ const App = (() => {
     updateIdBar();
     updateBrand();
     renderDaySelect();
+    renderNotif();
     renderFeed();
     if(curView==='liq') renderLiq();
     if(curView==='day') renderDay();
@@ -1816,6 +1826,32 @@ const App = (() => {
     return ev;
   }
   let lastFeedSig='';
+  // Avisos en-app dirigidos al usuario actual: solicitudes por aprobar + trofeos que va ganando.
+  // (Etapa 1 de notificaciones; el push real al teléfono llega con el login.) Blindado: nunca rompe el render.
+  function renderNotif(){
+    const bar=document.getElementById('notifbar'); if(!bar) return;
+    let items=[];
+    try{
+      const me=myPid();
+      if(_devUser){
+        const rreq=Object.keys(state.rayaReq||{}).map(id=>state.rayaReq[id]).filter(r=>r&&r.status==='pending');
+        if(isAdmin()){
+          if(rreq.length) items.push({i:'💵', t:`${rreq.length} solicitud${rreq.length>1?'es':''} de raya por aprobar`, go:'cfg'});
+          const vreq=Object.keys(state.ventReq||{}).map(id=>state.ventReq[id]).filter(r=>r&&r.status==='pending');
+          if(vreq.length) items.push({i:'⚖️', t:`${vreq.length} solicitud${vreq.length>1?'es':''} de ventaja por aprobar`, go:'vent'});
+        } else if(me){
+          rreq.filter(r=>(r.requestedBy===r.a?r.b:r.a)===me)
+              .forEach(r=>items.push({i:'💵', t:`${pname(r.requestedBy)} te propone raya de $${r.value} — acéptala o recházala`, go:'cfg'}));
+        }
+        const d=curDay();
+        if(d && me){ const mine=dayHighlights(dayStats(d)).filter(h=>h.n===pname(me) && h.c!=='bad');
+          if(mine.length) items.push({i:'🏆', t:`Vas ganando: ${mine.slice(0,3).map(h=>h.e+' '+h.t).join(' · ')}`, go:'high'}); }
+      }
+    }catch(e){ items=[]; }
+    if(!items.length){ bar.style.display='none'; bar.innerHTML=''; return; }
+    bar.style.display='block';
+    bar.innerHTML=items.map(it=>`<div class="notif-i" onclick="App.go('${it.go}')"><span class="notif-e">${it.i}</span><span class="notif-t">${it.t}</span><span class="notif-go">ver ›</span></div>`).join('');
+  }
   function renderFeed(){
     const bar=document.getElementById('feedbar'); if(!bar) return;
     const d=curDay();
