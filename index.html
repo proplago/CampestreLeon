@@ -1927,7 +1927,10 @@ const App = (() => {
     if(captureLocked()){ toast('Día cerrado · solo el admin puede editar'); return; }
     if(!isAdmin() && !(isRegular() && myPid()===a)){ toast('Solo puedes doblar tú (o el admin)'); return; }
     const was=isDoubled(d,a,b);
-    if(!was && !firstNineDone(d,a,b)){ toast('Primero capturen los 9 hoyos de la 1ª vuelta'); return; }
+    if(!was){   // al DOBLAR: ambos deben tener capturados los 9 de la 1ª vuelta, y solo dobla quien va perdiendo al turn
+      if(!firstNineDone(d,a,b)){ toast('Primero capturen los 9 hoyos de la 1ª vuelta'); return; }
+      if(h2h(d,a,b).firstNet>=0){ toast('Solo dobla quien va perdiendo al turn (1ª vuelta)'); return; }
+    }
     const apply=()=>{ toggleDouble(d,a,b);
       state.dblHistory=state.dblHistory||[];
       state.dblHistory.unshift({ts:Date.now(), type:was?'quitar':'doblar', a, b, dayId:d.id});
