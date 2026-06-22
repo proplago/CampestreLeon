@@ -2365,7 +2365,7 @@ const App = (() => {
     closeModal(); doMoveGroup(pid,g,motivo);
   }
   function doMoveGroup(pid,g,motivo){
-    if(!isAdmin()){ toast('Solo el admin mueve jugadores'); return; }
+    if(!isAdmin()){ toast('Solo el admin puede mover jugadores'); return; }
     const d=curDay(); d.salidas=d.salidas||[];
     let fromG=null; d.salidas.forEach((s,i)=>{ if((s||[]).includes(pid)) fromG=i; });
     d.salidas.forEach(s=>{ const a=s||[]; const k=a.indexOf(pid); if(k>=0)a.splice(k,1); });
