@@ -2298,7 +2298,8 @@ const App = (() => {
     if(!d || !(d.salidas||[]).some(s=>(s||[]).filter(Boolean).length)) return;
     const cap=flightCap(d); d.salidas=d.salidas||[];
     let target=-1, best=Infinity;
-    d.salidas.forEach((s,i)=>{ const n=(s||[]).filter(Boolean).length; if(n<cap && n<best){ best=n; target=i; } });
+    // grupo más chico con espacio; en empate prefiere el ÚLTIMO (mantiene los grupos más grandes al final)
+    d.salidas.forEach((s,i)=>{ const n=(s||[]).filter(Boolean).length; if(n<cap && n<=best){ best=n; target=i; } });
     if(target<0){ d.salidas.push([]); target=d.salidas.length-1; }
     d.salidas[target]=d.salidas[target]||[];
     if(!d.salidas[target].includes(pid)) d.salidas[target].push(pid);
@@ -2373,6 +2374,7 @@ const App = (() => {
     for(let i=pool.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [pool[i],pool[j]]=[pool[j],pool[i]]; }
     const groups=Array.from({length:n},()=>[]);
     pool.forEach((pid,i)=>groups[i%n].push(pid));   // round-robin = grupos parejos, cada uno ≤ cap
+    groups.sort((a,b)=>a.length-b.length);          // el grupo con MÁS jugadores siempre va al final
     d.salidas=groups;
     save(); renderDay(); toast(n>1?('Grupos sorteados ('+n+')'):'Grupo sorteado');
   }
