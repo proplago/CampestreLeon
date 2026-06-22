@@ -2812,22 +2812,21 @@ const App = (() => {
     html+=`</div>`;
 
     const me=player(ventFocus);
-    const vrowH=p=>{ const v=signedV(ventFocus,p.id);   // + = ${me} da (rojo) · − = le dan a ${me} (verde)
+    const R=30;
+    const vrowH=p=>{ const v=signedV(ventFocus,p.id);   // + = ${me} da (rojo, va en su contra) · − = le dan a ${me} (verde)
       const desc = v>0?`${pname(me.id)} le da ${v}`:v<0?`le da ${-v} a ${pname(me.id)}`:'parejos';
+      let opts=''; for(let n=R;n>=-R;n--){ opts+=`<option value="${n}" ${n===v?'selected':''}>${n>0?'+'+n:n}</option>`; }
       return `<div class="vrow">
         <div><div class="who">${p.name}${p.guest?' ·inv':''}</div><div class="desc">${desc}</div></div>
-        <div class="stepper ${v>0?'neg':v<0?'pos':''}">
-          <button onclick="App.stepV('${p.id}',-1)">−</button>
-          <span class="val">${v>0?'+':''}${v}</span>
-          <button onclick="App.stepV('${p.id}',1)">+</button>
-        </div></div>`; };
+        <select class="txt vsel ${v>0?'neg':v<0?'pos':''}" style="max-width:92px" onchange="App.pickVent('${p.id}',this.value)">${opts}</select>
+        </div>`; };
     const meIsGuest=me&&me.guest;
     let opps=sorted.filter(p=>p.id!==ventFocus);
     if(meIsGuest) opps=opps.filter(p=>inDay.has(p.id));   // invitado: solo vs los que van ese día
     const regOpps=opps.filter(p=>!p.guest);
     const guestOpps=opps.filter(p=>p.guest && inDay.has(p.id));   // invitados rivales: solo los del día
     html+=`<div class="card"><h3>${me.name} vs…</h3>
-      <div class="hint"><b style="color:var(--clay)">+ (rojo)</b> = ${pname(me.id)} <b>da</b> ventaja (juega en su contra) · <b style="color:var(--good)">− (verde)</b> = se la <b>dan</b>.</div>`;
+      <div class="hint">Elige el valor directo (sin ir de uno en uno). <b style="color:var(--clay)">+ (rojo)</b> = ${pname(me.id)} <b>le da</b> ventaja al otro · <b style="color:var(--good)">− (verde)</b> = el otro <b>le da</b> a ${pname(me.id)}.${isRegular()?' Tu primer ajuste queda fijo; para cambiarlo después se pide al admin.':''}</div>`;
     regOpps.forEach(p=>html+=vrowH(p));
     html+=`</div>`;
     if(guestOpps.length){
@@ -2872,21 +2871,24 @@ const App = (() => {
       <button class="btn block" style="margin-top:12px" onclick="App.closeModal()">Cerrar</button>`;
     modal(h);
   }
-  function stepV(other,delta){
+  // Selector de ventaja en la pestaña Ventajas: se elige el VALOR final de una (no de uno en uno).
+  //  invitado → libre · admin → directo (confirma si es ajena) · regular → 1ª vez libre y queda fija; luego pide al admin.
+  function pickVent(other,val){
     const a=ventFocus, b=other;
-    const from=signedV(a,b), to=from+delta;
+    const from=signedV(a,b), to=parseInt(val,10)||0;
+    if(from===to) return;
     if(!_devUser){ toast('Elige usuario primero'); loginModal(); return; }
     const pa=player(a), pb=player(b);
     if((pa&&pa.guest)||(pb&&pb.guest)){   // ventajas de invitado: cualquiera las puede ajustar, sin lock ni aprobación
       setSignedV(a,b,to); logVent(a,b,from,to,'manual',curDay()&&curDay().id); renderVent(); return;
     }
     if(!isAdmin()){
-      if(!ventajaIsMine(a,b)){ toast('Solo puedes editar TUS ventajas'); return; }
+      if(!ventajaIsMine(a,b)){ toast('Solo puedes editar TUS ventajas'); renderVent(); return; }
       if(ventajaLocked(a,b)){ requestVent(a,b,from,to); renderVent(); toast('Ventaja ya fijada → cambio enviado a aprobación del admin'); return; }
-      setSignedV(a,b,to); lockVent(a,b,myPid());   // 1ª vez libre → queda lockeada
+      setSignedV(a,b,to); lockVent(a,b,myPid());   // 1ª vez libre → queda fija
       logVent(a,b,from,to,'manual',curDay()&&curDay().id); renderVent(); return;
     }
-    // admin/super: bug#4 → confirmar con NOMBRES si edita ventaja ajena
+    // admin/super: confirmar con NOMBRES si edita ventaja ajena
     const apply=()=>{ setSignedV(a,b,to); lockVent(a,b,'admin'); logVent(a,b,from,to,'manual',curDay()&&curDay().id); renderVent(); };
     if(myPid()!==a && myPid()!==b){ confirmModal(`Cambiar la ventaja entre ${pname(a)} y ${pname(b)} (${from} → ${to}). ¿Continuar?`,'Cambiar',apply); return; }
     apply();
@@ -3460,7 +3462,7 @@ const App = (() => {
   return { init,loginModal,doLogin,approveVent,rejectVent,createLeague,renameLeague,switchLeague,addMember,removeMember,setMaxGroup,go,switchDay,daysModal,editDayModal,saveDayEdit,delDay,newDayModal,createDay,
     toggleAssign:null,togglePlaying,cancelPlayer,moveGroup,confirmMove,sorteo,addGuestModal,
     pickScore,score,putt,setOyes,quick,toggleUnit,toggleCast,navHole,gotoPending,gotoPlayerPending,setScoreGroup,setStart,setHoles,setCourse,
-    setVentFocus,stepV,openBet,openH2H,setLiqTab,setScoreTab,setCmp,setVentPick,
+    setVentFocus,pickVent,openBet,openH2H,setLiqTab,setScoreTab,setCmp,setVentPick,
     setDblPlayer,toggleDbl,closeDay,historyModal,exportImage,exportHigh,exportProfile,exportSalidas,exportSeasonTable,exportCompare,exportScorecard,toggleSound,
     setRaya,submitRayaPair,approveRayaReq,rejectRayaReq,removeRayaPair,addPlayerModal,createPlayer,editPlayerModal,savePlayer,delPlayer,toggleFav,
     courseModal,setHole,setCfgCourse,addCourse,renameCourse,deleteCourse,unitModal,createUnit,delUnit,castModal,createCast,delCast,toggleCastTipo,
