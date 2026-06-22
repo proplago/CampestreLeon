@@ -1884,7 +1884,7 @@ const App = (() => {
     if(!ids.includes(dblPlayer)) dblPlayer=ids[0];
     const me=dblPlayer;
     let html=`<details class="card"><summary>Doblar · 2ª vuelta</summary><div style="margin-top:8px">
-      <div class="hint">Al hacer el turn, el que va perdiendo dobla la 2ª vuelta contra quien le gana. Multiplica ×2 todo lo de los segundos 9 entre esos dos.</div>`;
+      <div class="hint">Al hacer el turn, el que va perdiendo dobla la 2ª vuelta contra quien le gana. Multiplica ×2 todo lo de los segundos 9 entre esos dos. <b>Una vez doblado no se puede quitar</b> (solo el admin).</div>`;
     if(admin){
       html+=`<label class="fl">Jugador</label>
         <select class="txt" onchange="App.setDblPlayer(this.value)">${[...ids].sort((a,b)=>pname(a).localeCompare(pname(b))).map(id=>`<option value="${id}" ${id===me?'selected':''}>${player(id).name}</option>`).join('')}</select>`;
@@ -1895,16 +1895,17 @@ const App = (() => {
     html+=`<div style="margin-top:10px;font-size:12px;color:var(--muted)">${admin?pname(me)+' va perdiendo al turn contra:':'Te van ganando al turn (1ª vuelta):'}</div>`;
     if(!opps.length) html+=`<div class="hint">Nadie todavía (o aún no terminan los 9 de la 1ª vuelta).</div>`;
     opps.sort((a,b)=>a.fn-b.fn).forEach(o=>{ const dbl=isDoubled(d,me,o.id);
+      const lockOff = dbl && !admin;   // una vez doblado, el regular ya no lo puede quitar (solo el admin)
       html+=`<div class="vrow"><div class="who">${pname(o.id)} <span style="color:var(--clay)">(${o.fn})</span></div>
-        <button class="flag ${dbl?'on':''}" onclick="App.toggleDbl('${me}','${o.id}')">${dbl?'doblado ×2':'doblar'}</button></div>`;
+        ${lockOff ? `<span class="flag on" style="opacity:.9">doblado ×2 🔒</span>` : `<button class="flag ${dbl?'on':''}" onclick="App.toggleDbl('${me}','${o.id}')">${dbl?'doblado ×2':'doblar'}</button>`}</div>`;
     });
     // dobles activos (direccional: doubler → target). Admin+ ve TODOS; el regular solo los suyos.
     const active=[]; const D=d.doubles||{}; Object.keys(D).forEach(x=>Object.keys(D[x]||{}).forEach(y=>{ if(D[x][y]) active.push([x,y]); }));
     const visActive = admin ? active : active.filter(([x,y])=>x===myPid()||y===myPid());
     if(visActive.length){ html+=`<div style="margin-top:10px;font-size:12px;color:var(--muted)">Dobles activos${admin?'':' (tuyos)'}:</div>`;
-      visActive.forEach(([x,y])=>{ const canRemove = admin || x===myPid();   // el regular solo quita los que ÉL dobló
+      visActive.forEach(([x,y])=>{   // quitar un doble: SOLO admin/súper (una vez hecho no se deshace)
         html+=`<div class="vrow"><div class="who">${pname(x)} → ${pname(y)}</div>
-          ${canRemove?`<button class="flag on" onclick="App.toggleDbl('${x}','${y}')">quitar</button>`:`<span class="hint" style="margin:0">×2</span>`}</div>`; });
+          ${admin?`<button class="flag on" onclick="App.toggleDbl('${x}','${y}')">quitar</button>`:`<span class="hint" style="margin:0">×2 🔒</span>`}</div>`; });
     }
     // registro / evidencia del día. Admin+ ve TODO; el regular solo lo suyo.
     const logAll=(state.dblHistory||[]).filter(e=>e.dayId===d.id);
@@ -1927,6 +1928,7 @@ const App = (() => {
     if(captureLocked()){ toast('Día cerrado · solo el admin puede editar'); return; }
     if(!isAdmin() && !(isRegular() && myPid()===a)){ toast('Solo puedes doblar tú (o el admin)'); return; }
     const was=isDoubled(d,a,b);
+    if(was && !isAdmin()){ toast('Doblado ya hecho · solo el admin/súper puede quitarlo'); return; }   // no se deshace (evita quitarlo si va perdiendo la 2ª)
     if(!was){   // al DOBLAR: ambos deben tener capturados los 9 de la 1ª vuelta, y solo dobla quien va perdiendo al turn
       if(!firstNineDone(d,a,b)){ toast('Primero capturen los 9 hoyos de la 1ª vuelta'); return; }
       if(h2h(d,a,b).firstNet>=0){ toast('Solo dobla quien va perdiendo al turn (1ª vuelta)'); return; }
