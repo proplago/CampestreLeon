@@ -1,0 +1,23 @@
+{
+  "//": "REGLAS FASE LOGIN (Google). Pega esto en Firebase Console -> Realtime Database -> Reglas -> Publicar.",
+  "//2": "Permite: leer/escribir tu propio /users/{uid} (perfil minimo, NO super ni leagues),",
+  "//3": "el super gestiona /users completo, y cualquier usuario autenticado lee/escribe las ligas.",
+  "//4": "Mas adelante se aprieta a las reglas granulares (firebase-rules.json).",
+  "rules": {
+    ".read": false,
+    ".write": false,
+    "users": {
+      "$uid": {
+        ".read": "auth != null && (auth.uid === $uid || root.child('users').child(auth.uid).child('super').val() === true)",
+        ".write": "auth != null && ( root.child('users').child(auth.uid).child('super').val() === true || (auth.uid === $uid && !newData.hasChild('super') && !newData.hasChild('leagues')) )"
+      },
+      ".read": "auth != null && root.child('users').child(auth.uid).child('super').val() === true"
+    },
+    "leagues": {
+      "$lid": {
+        ".read": "auth != null",
+        ".write": "auth != null"
+      }
+    }
+  }
+}

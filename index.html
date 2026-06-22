@@ -3417,20 +3417,75 @@ const App = (() => {
   function isRegular(){ return !!(_devUser&&_devUser.role==='regular'); }
   function myPid(){ return _devUser?_devUser.playerId:null; }
   function curUserLabel(){ if(!_devUser) return 'Sin sesión'; const rl=_devUser.role==='super'?'Súper admin':_devUser.role==='admin'?'Admin':'Regular'; return (pname(_devUser.playerId)||'?')+' · '+rl; }
+  // ===================== AUTH REAL (Google) — fase login =====================
+  // Coexiste con el "modo prueba": si hay sesión de Google y /users/{uid} resuelve, manda la identidad real.
+  let _authUser=null, _authPending=false;
+  function authAvailable(){ return _backend==='fb' && typeof firebase!=='undefined' && !!firebase.auth; }
+  function isRealAuth(){ return !!(_devUser&&_devUser.real); }
+  function startAuth(){
+    if(!authAvailable()) return;
+    try{
+      firebase.auth().getRedirectResult().catch(function(err){ if(err&&err.message) toast('Login: '+err.message); });
+      firebase.auth().onAuthStateChanged(function(u){
+        _authUser=u||null;
+        if(!u){ _authPending=false; if(_devUser&&_devUser.real){ _devUser=null; } render(); if(!_devUser) loginModal(); return; }
+        resolveAuthIdentity(u).then(function(){ if(isRealAuth()) closeModal(); render(); if(_authPending){ loginModal(); } });
+      });
+    }catch(e){}
+  }
+  function resolveAuthIdentity(u){
+    _authPending=false;
+    return firebase.database().ref('users/'+u.uid).once('value').then(function(snap){
+      const ud=snap.val()||null;
+      if(ud && ud.super===true){ _devUser={playerId:(ud.playerId||(state.players[0]&&state.players[0].id)||null), role:'super', uid:u.uid, email:u.email, real:true}; return; }
+      if(ud && ud.leagues){
+        const lids=Object.keys(ud.leagues);
+        const lid = ud.leagues[ACTIVE_LEAGUE]?ACTIVE_LEAGUE:lids[0];
+        const m=ud.leagues[lid]||{};
+        if(m.playerId){
+          if(lid!==ACTIVE_LEAGUE){ try{localStorage.setItem('cl_active_league',lid);}catch(e){} location.reload(); return; }
+          _devUser={playerId:m.playerId, role:(m.role||'regular'), uid:u.uid, email:u.email, real:true}; return;
+        }
+      }
+      // sin asignación → pendiente; deja su perfil mínimo para que el admin lo asigne
+      _authPending=true;
+      try{ firebase.database().ref('users/'+u.uid).update({email:u.email||'', name:u.displayName||''}); }catch(e){}
+    }).catch(function(){ _authPending=true; });
+  }
+  function signInGoogle(){
+    if(!authAvailable()){ toast('Falta habilitar Google en Firebase'); return; }
+    closeModal();
+    try{ firebase.auth().signInWithRedirect(new firebase.auth.GoogleAuthProvider()); }catch(e){ toast('No se pudo iniciar Google'); }
+  }
+  function signOutAuth(){ try{ if(authAvailable()) firebase.auth().signOut(); }catch(e){} _authUser=null; _authPending=false; _devUser=null; try{localStorage.removeItem(userKey());}catch(e){} render(); loginModal(); }
+
   function updateIdBar(){ const b=document.getElementById('idbar'); if(!b) return;
-    b.innerHTML='<span>👤 '+(_devUser?curUserLabel():'Modo prueba — elige usuario')+'</span><span style="color:var(--fairway);font-weight:700">cambiar</span>'; }
+    let left;
+    if(_authPending && _authUser) left='⏳ '+(_authUser.email||'tu cuenta')+' · pendiente de asignar';
+    else left='👤 '+(_devUser?curUserLabel():'Modo prueba — elige usuario');
+    const right = (isRealAuth()||_authPending)?'salir':'cambiar';
+    b.innerHTML='<span>'+left+'</span><span style="color:var(--fairway);font-weight:700">'+right+'</span>'; }
   function loginModal(){
     const ps=[...state.players].sort((a,b)=>(a.guest?1:0)-(b.guest?1:0)||a.name.localeCompare(b.name));
-    modal(`<h3>¿Quién eres? <span style="font-weight:600;color:var(--muted);font-size:12px">prueba · sin clave</span></h3>
-      <div class="hint" style="margin-bottom:10px">Elige jugador y rol para probar permisos. Temporal — el login real entra al final.</div>
-      <label class="fl">Jugador</label>
+    const signedIn = isRealAuth() || _authPending;
+    let top='';
+    if(signedIn){
+      top=`<div class="hint" style="margin-bottom:8px">Sesión de Google: <b>${(_authUser&&_authUser.email)||''}</b>${_authPending?' · <span style="color:var(--clay)">pendiente de que el admin te asigne</span>':''}</div>
+        <button class="btn outline block" onclick="App.signOutAuth()">Cerrar sesión de Google</button>
+        <div class="hint" style="margin:12px 0 4px;text-align:center">— o usa el modo prueba (temporal) —</div>`;
+    } else if(authAvailable()){
+      top=`<button class="btn block" onclick="App.signInGoogle()">Entrar con Google</button>
+        <div class="hint" style="margin:12px 0 4px;text-align:center">— o modo prueba (temporal, sin clave) —</div>`;
+    }
+    modal(`<h3>Entrar</h3>${top}
+      <label class="fl">Jugador (modo prueba)</label>
       <select id="lg_pid" class="txt">${ps.map(p=>`<option value="${p.id}" ${myPid()===p.id?'selected':''}>${p.name}${p.guest?' (inv)':''}</option>`).join('')}</select>
       <label class="fl" style="margin-top:10px">Rol</label>
       <select id="lg_role" class="txt">
         <option value="regular">Regular (solo lo suyo)</option>
         <option value="admin">Admin de liga</option>
         <option value="super">Súper admin (todo)</option></select>
-      <button class="btn block" style="margin-top:14px" onclick="App.doLogin()">Entrar</button>`);
+      <button class="btn ${signedIn?'outline ':''}block" style="margin-top:14px" onclick="App.doLogin()">${signedIn?'Usar modo prueba':'Entrar'}</button>`);
     if(_devUser){ const r=document.getElementById('lg_role'); if(r) r.value=_devUser.role; }
   }
   function doLogin(){ const pid=document.getElementById('lg_pid').value, role=document.getElementById('lg_role').value; setDevUser(pid,role); closeModal(); render(); toast('Entraste como '+curUserLabel()); }
@@ -3529,8 +3584,8 @@ const App = (() => {
     window.addEventListener('touchend',end,{passive:true});
     window.addEventListener('touchcancel',()=>{ pulling=false; hide(); },{passive:true});
   }
-  async function init(){ try{ if(document.fonts&&document.fonts.load){ document.fonts.load("600 40px Newsreader"); document.fonts.load("700 16px 'Hanken Grotesk'"); } }catch(e){} loadDevUser(); await load(); if(!state.currentDayId && state.days[0]) state.currentDayId=state.days[0].id; render(); initPullRefresh(); if(!_devUser) loginModal(); }
-  return { init,loginModal,doLogin,approveVent,rejectVent,createLeague,renameLeague,switchLeague,addMember,removeMember,setMaxGroup,go,switchDay,daysModal,editDayModal,saveDayEdit,delDay,newDayModal,createDay,
+  async function init(){ try{ if(document.fonts&&document.fonts.load){ document.fonts.load("600 40px Newsreader"); document.fonts.load("700 16px 'Hanken Grotesk'"); } }catch(e){} loadDevUser(); await load(); if(!state.currentDayId && state.days[0]) state.currentDayId=state.days[0].id; render(); initPullRefresh(); startAuth(); if(!_devUser) loginModal(); }   // muestra la entrada al instante; si hay sesión de Google, se cierra sola al resolver
+  return { init,loginModal,doLogin,signInGoogle,signOutAuth,approveVent,rejectVent,createLeague,renameLeague,switchLeague,addMember,removeMember,setMaxGroup,go,switchDay,daysModal,editDayModal,saveDayEdit,delDay,newDayModal,createDay,
     toggleAssign:null,togglePlaying,cancelPlayer,moveGroup,confirmMove,sorteo,setSalidaTime,addGuestModal,
     pickScore,score,putt,setOyes,quick,toggleUnit,toggleCast,navHole,gotoPending,gotoPlayerPending,setScoreGroup,setStart,setHoles,setCourse,
     setVentFocus,pickVent,openBet,openH2H,setLiqTab,setScoreTab,setCmp,setVentPick,
