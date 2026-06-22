@@ -1,0 +1,12 @@
+{
+  "//": "REGLAS DE DESARROLLO (mientras no entra el login real). Pega esto en",
+  "//2": "Firebase Console -> Realtime Database -> Reglas, y Publicar.",
+  "//3": "Permiten leer/escribir las ligas sin autenticacion para que el grupo",
+  "//4": "comparta datos en vivo. Cuando se active el login, cambiar a firebase-rules.json.",
+  "rules": {
+    "leagues": {
+      ".read": true,
+      ".write": true
+    }
+  }
+}

@@ -662,6 +662,10 @@ const App = (() => {
   let _backend='memory', _fbRef=null, _shardCache={}, _loadedOnce=false;
   function fbConfigured(){ return !!(FIREBASE_CONFIG && FIREBASE_CONFIG.databaseURL && FIREBASE_CONFIG.databaseURL.trim()); }
   function lsOk(){ try{ localStorage.setItem('__t','1'); localStorage.removeItem('__t'); return true; }catch(e){ return false; } }
+  // Respaldo local por-liga: se escribe SIEMPRE (también en modo Firebase) para que un refresh
+  // nunca pierda lo capturado, aunque Firebase rechace por permisos o no haya conexión.
+  function lsBackupKey(){ return KEY+'::'+ACTIVE_LEAGUE; }
+  function writeLocalBackup(){ try{ localStorage.setItem(lsBackupKey(), JSON.stringify(state)); }catch(e){} }
   function detectBackend(){
     if(fbConfigured() && typeof firebase!=='undefined'){
       try{ if(!firebase.apps || !firebase.apps.length) firebase.initializeApp(FIREBASE_CONFIG);
@@ -782,9 +786,13 @@ const App = (() => {
             _shardCache=flattenTree(root);   // cache = lo que REALMENTE hay en la base (migrate luego escribe su diff)
             fin();
           } else applyRemoteTree(root);
-        });
+        }, ()=>fin());   // permiso/conexión denegada → no bloquear el arranque
         setTimeout(fin, 4000);   // si la red tarda, no bloquear el arranque
       });
+      // Firebase no entregó datos (liga vacía, sin permiso o sin red) → recupera el respaldo local de esta liga
+      if(state.players.length===0 && (state.days||[]).length===0){
+        try{ const raw=localStorage.getItem(lsBackupKey()); if(raw) mergeState(raw); }catch(e){}
+      }
     } else if(_backend==='wstorage'){
       try{ const r=await window.storage.get(KEY); if(r&&r.value) mergeState(r.value); }catch(e){}
     } else if(_backend==='local'){
@@ -857,6 +865,7 @@ const App = (() => {
     clearTimeout(saveTimer);
     saveTimer=setTimeout(()=>{
       if(_backend==='fb' && _fbRef){
+        writeLocalBackup();   // respaldo local SIEMPRE (sobrevive aunque Firebase rechace por permisos/conexión)
         const cur=buildShards(state), updates={};
         for(const k in cur){ if(_sig(_shardCache[k])!==_sig(cur[k])) updates[k]=cur[k]; }   // nuevos/cambiados
         for(const k in _shardCache){ if(!(k in cur)) updates[k]=null; }                     // borrados
