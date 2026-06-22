@@ -687,7 +687,7 @@ const App = (() => {
   function buildShards(st){
     const out={};
     out['meta']  = st._leagueMeta || {name:'Liga', schema:2};
-    out['rules'] = { rayaValue:(st.rayaValue!=null?st.rayaValue:20), activeBets: st.activeBets || _defActiveBets(), maxWeekday:(st.maxWeekday||6), maxWeekend:(st.maxWeekend||5) };
+    out['rules'] = { rayaValue:(st.rayaValue!=null?st.rayaValue:20), activeBets: st.activeBets || _defActiveBets(), maxWeekday:(st.maxWeekday||6), maxWeekend:(st.maxWeekend||5), rayaPairs:(st.rayaPairs||{}), rayaReq:(st.rayaReq||{}) };
     const players={}; (st.players||[]).forEach(p=>{ if(p&&p.id){ const o=Object.assign({},p); delete o.id; players[p.id]=o; } }); out['players']=players;
     const courses={}; (st.courses||[]).forEach(c=>{ if(c&&c.id){ const o=Object.assign({},c); delete o.id; courses[c.id]=o; } }); out['courses']=courses;
     out['units']      = st.units||[];
@@ -735,6 +735,7 @@ const App = (() => {
     g.rayaValue = (rules.rayaValue!=null?rules.rayaValue:20);
     g.activeBets = rules.activeBets || _defActiveBets();
     g.maxWeekday = rules.maxWeekday||6; g.maxWeekend = rules.maxWeekend||5;
+    g.rayaPairs = rules.rayaPairs || {}; g.rayaReq = rules.rayaReq || {};
     g.players  = sh['players']?Object.keys(sh['players']).map(id=>Object.assign({},sh['players'][id],{id})):[];
     g.courses  = sh['courses']?Object.keys(sh['courses']).map(id=>Object.assign({},sh['courses'][id],{id})):[];
     g.units    = _arr(sh['units']);
@@ -833,6 +834,8 @@ const App = (() => {
     if(typeof state.maxWeekend!=='number') state.maxWeekend=5;
     state.ventMeta = state.ventMeta || {};
     state.ventReq = state.ventReq || {};
+    state.rayaPairs = state.rayaPairs || {};   // valor de raya por pareja (override del general)
+    state.rayaReq = state.rayaReq || {};       // solicitudes de cambio de raya entre dos jugadores
     if(!state._leagueMeta) state._leagueMeta={name:leagueName(ACTIVE_LEAGUE)||'Campestre León — Viernes', schema:2};
     if(!state._leagueMeta.name) state._leagueMeta.name=leagueName(ACTIVE_LEAGUE)||'Liga';
     state.days.forEach(dd=>{
@@ -1029,6 +1032,13 @@ const App = (() => {
   let _cdCache=new Map(), _dsCache=new Map();
   function clearStatCache(){ _cdCache.clear(); _dsCache.clear(); }
   function computeDay(d){ if(!d) return null; if(_cdCache.has(d.id)) return _cdCache.get(d.id); const out=_computeDayRaw(d); _cdCache.set(d.id,out); return out; }
+  // ---- Valor de raya por pareja (override del valor general, solo entre esos dos) ----
+  function pkRaya(a,b){ return [a,b].sort().join('|'); }
+  function pairRaya(a,b){ const v=(state.rayaPairs||{})[pkRaya(a,b)]; return (v!=null && v>0)?v:state.rayaValue; }
+  function rayaPairList(){ const m=state.rayaPairs||{}; return Object.keys(m).map(k=>{ const ab=k.split('|'); return {a:ab[0],b:ab[1],v:m[k],key:k}; }).filter(x=>player(x.a)&&player(x.b)); }
+  function anyRayaPair(){ return Object.keys(state.rayaPairs||{}).length>0; }
+  // pesos de un día vs internos (invitados no acumulan), usando el valor por pareja
+  function internalPesos(res,pid){ if(!res||!res.pm) return 0; const row=res.pm[pid]||{}; let s=0; Object.keys(row).forEach(o=>{ const op=player(o); if(op&&!op.guest) s+=row[o]*pairRaya(pid,o); }); return s; }
   function _computeDayRaw(d){
     if(!d) return null;
     const players=dayPlayers(d).filter(Boolean);
@@ -1082,7 +1092,9 @@ const App = (() => {
     });
 
     players.forEach(p=>{ R[p].total += R[p].hoyos+R[p].unidades+R[p].medal+R[p].oyes+R[p].castig; });
-    const rows=players.map(p=>({id:p,...R[p],pesos:R[p].total*state.rayaValue})).sort((x,y)=>y.pesos-x.pesos);
+    // pesos = suma pareja por pareja de (rayas netas vs ese rival × valor de raya acordado con ese rival).
+    // Es simétrico (PM[a][b]=-PM[b][a], mismo valor) → el día sigue cuadrando en cero.
+    const rows=players.map(p=>{ const row=PM[p]||{}; let pesos=0; Object.keys(row).forEach(o=>{ pesos+=row[o]*pairRaya(p,o); }); return {id:p,...R[p],pesos}; }).sort((x,y)=>y.pesos-x.pesos);
     const sum=rows.reduce((s,r)=>s+r.pesos,0);
     return {rows,drinks,sum,nPlayers:players.length,pm:PM};
   }
@@ -1174,7 +1186,7 @@ const App = (() => {
     // ---- Leaderboard ----
     html+=`<div class="lb">
       <div class="lb-head"><div class="c1">POS</div><div class="c2">JUGADOR</div><div class="c3">PESOS</div><div class="c4">RAYAS</div></div>
-      <div class="lb-sub">HOY · ${courseOf(d).name.toUpperCase()} · ${holesLabel(d).toUpperCase()} · RAYA $${state.rayaValue}</div>`;
+      <div class="lb-sub">HOY · ${courseOf(d).name.toUpperCase()} · ${holesLabel(d).toUpperCase()} · RAYA $${state.rayaValue}${anyRayaPair()?' · PAREJAS CON OTRO VALOR':''}</div>`;
     const nHoles=playOrder(d).length;
     res.rows.forEach((r,i)=>{ const p=player(r.id); const th=dayThru(d,r.id);
       const thru = fin ? '' : (th>=nHoles ? ' <span class="thru done">✓ terminó</span>' : ` <span class="thru">thru ${th}</span>`);
@@ -1249,7 +1261,7 @@ const App = (() => {
     state.players.forEach(p=>{ totals[p.id]=0; st[p.id]={rounds:0,gross:0,putts:0,prounds:0,bird:0,eag:0,diffs:[]}; });
     let nDays=0;
     state.days.forEach(d=>{
-      const res=computeDay(d); if(res){ nDays++; res.rows.forEach(r=>{ if(totals[r.id]==null)totals[r.id]=0; totals[r.id]+=internalRayas(res,r.id)*state.rayaValue; }); }
+      const res=computeDay(d); if(res){ nDays++; res.rows.forEach(r=>{ if(totals[r.id]==null)totals[r.id]=0; totals[r.id]+=internalPesos(res,r.id); }); }
       dayPlayers(d).forEach(pid=>{
         if(!st[pid]) return;
         const sc=ensureScore(d,pid); const done=sc.gross.filter(x=>x>0).length;
@@ -1302,7 +1314,7 @@ const App = (() => {
       const row=res.pm[pid]||{};
       Object.keys(row).forEach(q=>{ bal[q]=(bal[q]||0)+row[q]; });
     });
-    return Object.keys(bal).map(q=>{ const p=player(q); return {id:q,name:pname(q),rayas:bal[q],pesos:bal[q]*state.rayaValue}; })
+    return Object.keys(bal).map(q=>{ const p=player(q); return {id:q,name:pname(q),rayas:bal[q],pesos:bal[q]*pairRaya(pid,q)}; })
       .filter(x=>x.rayas!==0)
       .sort((a,b)=>b.pesos-a.pesos);
   }
@@ -1372,8 +1384,7 @@ const App = (() => {
       (d.cancels||[]).forEach(cc=>{ const a=A[cc.pid]; if(!a) return; if(cc.type==='noshow')a.noshows++; else a.cancels++; });
       st.ids.forEach(id=>{ if(!A[id]) return; const s=st.S[id]; if(s.played===0) return; const a=A[id];
         // saldo de temporada: SOLO vs internos (lo jugado vs invitados no se acumula)
-        const pmRow=(st.res.pm||{})[id]||{}; let inet=0; Object.keys(pmRow).forEach(o=>{ const op=player(o); if(op && !op.guest) inet+=pmRow[o]; });
-        const ipesos=inet*state.rayaValue;
+        const pmRow=(st.res.pm||{})[id]||{}; let ipesos=0; Object.keys(pmRow).forEach(o=>{ const op=player(o); if(op && !op.guest) ipesos+=pmRow[o]*pairRaya(id,o); });
         a.pesos+=ipesos;a.birdies+=s.birdies;a.eagles+=s.eagles;a.aces+=s.aces;a.oyesWon+=s.oyesWon;a.calacas+=s.calacas;a.sandies+=s.sandies;a.castigos+=s.castigos;a.days++;
         Object.keys(s.castById||{}).forEach(k=>a.castById[k]=(a.castById[k]||0)+s.castById[k]);
         if(a.bestDay===null||ipesos>a.bestDay)a.bestDay=ipesos; if(a.worstDay===null||ipesos<a.worstDay)a.worstDay=ipesos;
@@ -1719,7 +1730,7 @@ const App = (() => {
       if(ok){ const na=ga-da, nb=gb-db; if(na<nb)mA++; else if(nb<na)mB++; } });
 
     const sub=(hA-hB)+(uA-uB)+(oA-oB)+(mA-mB);
-    const net=h2h(d,cmpA,cmpB).net, pesos=net*state.rayaValue;
+    const net=h2h(d,cmpA,cmpB).net, pesos=net*pairRaya(cmpA,cmpB);
     const dbl=isDoubled(d,cmpA,cmpB);
     const col=net>0?'var(--good)':net<0?'var(--clay)':'var(--ink)';
     html+=`<div class="card">
@@ -2130,7 +2141,7 @@ const App = (() => {
     let oA=0,oB=0; const sg=d.salidas.some(g=>(g||[]).includes(cmpA)&&(g||[]).includes(cmpB));
     if(sg) holesOf(d).forEach((h,i)=>{ if(h.par!==3)return; const pa=scA.oyes[i]||0, pb=scB.oyes[i]||0; if(pa&&pb){ if(pa<pb)oA++; else if(pb<pa)oB++; } });
     let mA=0,mB=0; [[0,9],[9,18],[0,18]].forEach(([s,e])=>{ let ga=0,gb=0,da=0,db=0,ok=true; for(let i=s;i<e;i++){ if(!scA.gross[i]||!scB.gross[i])ok=false; ga+=scA.gross[i];gb+=scB.gross[i];da+=allocA[i];db+=allocB[i]; } if(ok){ const na=ga-da, nb=gb-db; if(na<nb)mA++; else if(nb<na)mB++; } });
-    const net=h2h(d,cmpA,cmpB).net, pesos=net*state.rayaValue;
+    const net=h2h(d,cmpA,cmpB).net, pesos=net*pairRaya(cmpA,cmpB);
     exportBoard(nA+' vs '+nB, d.label||'',[
       {head:'Marcador del día', rows:[
         {l:'Hoyos', r:hA+' – '+hB},
@@ -2281,6 +2292,17 @@ const App = (() => {
     if((d.salidas||[]).some(g=>(g||[]).filter(Boolean).length)) html+=`<div class="exprow"><button class="expbtn" onclick="App.exportSalidas()">📸 Exportar salidas</button></div>`;
     box.innerHTML=html;
   }
+  // Si el día ya se sorteó, mete al jugador (regular o invitado) al grupo más chico con espacio (o crea otra salida),
+  // para que se capture igual que cualquiera. Si aún no se sortea, queda en "playing" y se acomoda al sortear.
+  function placeInGroup(d,pid){
+    if(!d || !(d.salidas||[]).some(s=>(s||[]).filter(Boolean).length)) return;
+    const cap=flightCap(d); d.salidas=d.salidas||[];
+    let target=-1, best=Infinity;
+    d.salidas.forEach((s,i)=>{ const n=(s||[]).filter(Boolean).length; if(n<cap && n<best){ best=n; target=i; } });
+    if(target<0){ d.salidas.push([]); target=d.salidas.length-1; }
+    d.salidas[target]=d.salidas[target]||[];
+    if(!d.salidas[target].includes(pid)) d.salidas[target].push(pid);
+  }
   function togglePlaying(pid){
     const d=curDay(); d.playing=d.playing||[];
     const k=d.playing.indexOf(pid);
@@ -2294,15 +2316,7 @@ const App = (() => {
       d.playing.splice(k,1);
     } else {
       d.playing.push(pid);
-      // si ya se sorteó, balancear: meter al grupo MÁS CHICO con espacio; si todos llenos, nueva salida
-      if((d.salidas||[]).some(s=>(s||[]).filter(Boolean).length)){
-        const cap=flightCap(d); d.salidas=d.salidas||[];
-        let target=-1, best=Infinity;
-        d.salidas.forEach((s,i)=>{ const n=(s||[]).filter(Boolean).length; if(n<cap && n<best){ best=n; target=i; } });
-        if(target<0){ d.salidas.push([]); target=d.salidas.length-1; }
-        d.salidas[target]=d.salidas[target]||[];
-        d.salidas[target].push(pid);
-      }
+      placeInGroup(d,pid);   // si ya se sorteó, lo acomoda en un grupo
     }
     save(); renderDay();
   }
@@ -2825,9 +2839,11 @@ const App = (() => {
     const r=res.rows.find(x=>x.id===pid); if(!r) return;
     const p=player(pid);
     const col=r.pesos>0?'var(--good)':r.pesos<0?'var(--clay)':'var(--ink)';
+    const pmRow=(res.pm||{})[pid]||{}; const hasPairOverride=Object.keys(pmRow).some(o=>(state.rayaPairs||{})[pkRaya(pid,o)]!=null);
+    const valLine = hasPairOverride ? `${r.total>0?'+':''}${r.total} rayas · valor por pareja` : `${r.total>0?'+':''}${r.total} rayas × $${state.rayaValue}`;
     let h=`<h3>${p?p.name:''}</h3>
       <div style="font-family:'Hanken Grotesk',sans-serif;font-weight:800;font-size:34px;color:${col}">${r.pesos>0?'+':''}$${r.pesos.toLocaleString('es-MX')}</div>
-      <div class="hint" style="margin-top:2px">${r.total>0?'+':''}${r.total} rayas × $${state.rayaValue}</div>
+      <div class="hint" style="margin-top:2px">${valLine}</div>
       <div class="card" style="margin-top:10px">
         <div class="cr2">Hoyos (todos vs todos) <b>${sgn(r.hoyos)}</b></div>
         <div class="cr2">Unidades <b>${sgn(r.unidades)}</b></div>
@@ -2904,6 +2920,7 @@ const App = (() => {
       <div class="card"><div class="row" style="justify-content:space-between">
         <div><h3 style="margin:0">Soniditos</h3><div class="hint" style="margin:2px 0 0">Celebración de birdies, eagles…</div></div>
         <button class="sw ${state.sound?'on':''}" onclick="App.toggleSound()"><span></span></button></div></div>
+      <div class="cfg-sect">Valor de la raya</div>${cfgRayaPairsHtml()}
       <div class="cfg-sect">Salidas</div>${cfgMaxGroupHtml()}
       <div class="cfg-sect">App</div>
       <div class="card" style="display:flex;gap:10px;align-items:center">
@@ -2930,7 +2947,9 @@ const App = (() => {
     // valor de raya
     html+=`<div class="card"><h3>Valor de la raya</h3>
       <div class="row"><span style="font-size:22px;font-weight:700">$</span>
-      <input class="txt" type="number" inputmode="numeric" value="${state.rayaValue}" onchange="App.setRaya(this.value)" style="max-width:120px"></div></div>`;
+      <input class="txt" type="number" inputmode="numeric" value="${state.rayaValue}" onchange="App.setRaya(this.value)" style="max-width:120px"></div>
+      <div class="hint" style="margin-top:6px">Valor general para todas las parejas (salvo acuerdos abajo).</div></div>`;
+    html+=cfgRayaPairsHtml();
 
     // máximo por grupo (config del club)
     html+=cfgMaxGroupHtml();
@@ -3010,8 +3029,81 @@ const App = (() => {
   }
 
   // setters varios
-  function setRaya(v){ state.rayaValue=Math.max(1,parseInt(v)||20); save(); }
+  function setRaya(v){ state.rayaValue=Math.max(1,parseInt(v)||20); save(); renderCfg(); }
   function setRayaSilent(){}
+
+  // ---- Valor de raya por pareja: solicitud entre dos jugadores (la acepta el otro) o ajuste directo del admin ----
+  function setRayaPair(a,b,v){   // ajuste directo (admin) o al aprobar
+    v=Math.max(1,parseInt(v)||0); if(!v) return;
+    state.rayaPairs=state.rayaPairs||{}; const k=pkRaya(a,b);
+    if(v===state.rayaValue) delete state.rayaPairs[k]; else state.rayaPairs[k]=v;   // igual al general = sin override
+    save(); }
+  function removeRayaPair(key){
+    const ab=(key||'').split('|');
+    if(!isAdmin() && !(myPid() && (myPid()===ab[0]||myPid()===ab[1]))){ toast('Sin permiso'); return; }
+    delete (state.rayaPairs||{})[key]; save(); renderCfg(); toast('Acuerdo quitado'); }
+  function submitRayaPair(){
+    const v=Math.max(1,parseInt((document.getElementById('rp_val')||{}).value)||0);
+    if(!v){ toast('Pon un valor'); return; }
+    if(isAdmin()){
+      const a=(document.getElementById('rp_a')||{}).value, b=(document.getElementById('rp_b')||{}).value;
+      if(!a||!b||a===b){ toast('Elige dos jugadores distintos'); return; }
+      setRayaPair(a,b,v); renderCfg(); toast(`Raya ${pname(a)}–${pname(b)}: $${v}`); return;
+    }
+    const me=myPid(); if(!me){ toast('Inicia sesión'); loginModal(); return; }
+    const b=(document.getElementById('rp_opp')||{}).value; if(!b||b===me){ toast('Elige jugador'); return; }
+    state.rayaReq=state.rayaReq||{}; const id=uid();
+    state.rayaReq[id]={a:me,b,value:v,requestedBy:me,status:'pending',ts:Date.now()};
+    save(); renderCfg(); toast(`Solicitud enviada a ${pname(b)} (debe aceptarla)`); }
+  function rayaReqCounterparty(r){ return r.requestedBy===r.a ? r.b : r.a; }
+  function approveRayaReq(id){
+    const r=(state.rayaReq||{})[id]; if(!r) return;
+    if(!isAdmin() && myPid()!==rayaReqCounterparty(r)){ toast('Solo el otro jugador la acepta'); return; }
+    setRayaPair(r.a,r.b,r.value); delete state.rayaReq[id]; save(); renderCfg(); toast(`Raya ${pname(r.a)}–${pname(r.b)}: $${r.value}`); }
+  function rejectRayaReq(id){
+    const r=(state.rayaReq||{})[id]; if(!r) return;
+    if(!isAdmin() && myPid()!==rayaReqCounterparty(r) && myPid()!==r.requestedBy){ toast('Sin permiso'); return; }
+    delete state.rayaReq[id]; save(); renderCfg(); toast('Solicitud descartada'); }
+  // Tarjeta de Ajustes para el valor por pareja (sirve a admin y regular)
+  function cfgRayaPairsHtml(){
+    const me=myPid(), admin=isAdmin();
+    let h=`<div class="card"><h3>Raya entre parejas</h3>
+      <div class="hint">Dos jugadores pueden acordar un valor distinto al general (hoy $${state.rayaValue}). Solo cambia las cuentas entre esos dos.</div>`;
+    const reqs=Object.keys(state.rayaReq||{}).map(id=>Object.assign({id},state.rayaReq[id])).filter(r=>r.status==='pending');
+    const toApprove=reqs.filter(r=> admin || (me && (me===r.a||me===r.b) && me!==r.requestedBy));
+    if(toApprove.length){
+      h+=`<div style="margin-top:10px"><b style="font-size:12px">Por aceptar</b>`;
+      toApprove.forEach(r=>h+=`<div class="vrow"><div><div class="who">${pname(r.a)} – ${pname(r.b)}</div><div class="desc">$${r.value} · pidió ${pname(r.requestedBy)}</div></div>
+        <div class="row" style="gap:6px"><button class="flag on" onclick="App.approveRayaReq('${r.id}')">Aceptar</button><button class="flag" onclick="App.rejectRayaReq('${r.id}')">No</button></div></div>`);
+      h+=`</div>`;
+    }
+    if(me && !admin){ const mine=reqs.filter(r=>r.requestedBy===me);
+      if(mine.length) h+=`<div class="hint" style="margin-top:6px">⏳ Esperando respuesta: ${mine.map(r=>pname(rayaReqCounterparty(r))+' $'+r.value).join(' · ')}</div>`; }
+    if(admin){
+      h+=`<div class="row" style="gap:6px;margin-top:10px">
+        <select id="rp_a" class="txt">${state.players.map(p=>`<option value="${p.id}">${p.name}${p.guest?' (inv)':''}</option>`).join('')}</select>
+        <select id="rp_b" class="txt">${state.players.map((p,i)=>`<option value="${p.id}" ${i===1?'selected':''}>${p.name}${p.guest?' (inv)':''}</option>`).join('')}</select></div>
+        <div class="row" style="gap:6px;margin-top:6px;align-items:center"><span style="font-size:20px;font-weight:700">$</span>
+        <input id="rp_val" class="txt" type="number" inputmode="numeric" placeholder="${state.rayaValue}" style="max-width:120px">
+        <button class="btn sm" onclick="App.submitRayaPair()">Fijar</button></div>`;
+    } else if(me){
+      const others=[...state.players].filter(p=>p.id!==me).sort((a,b)=>(a.guest?1:0)-(b.guest?1:0)||a.name.localeCompare(b.name));
+      h+=`<div class="row" style="gap:6px;margin-top:10px;align-items:center">
+        <select id="rp_opp" class="txt" style="flex:1">${others.map(p=>`<option value="${p.id}">${p.name}${p.guest?' (inv)':''}</option>`).join('')}</select>
+        <span style="font-size:20px;font-weight:700">$</span>
+        <input id="rp_val" class="txt" type="number" inputmode="numeric" placeholder="${state.rayaValue}" style="max-width:96px">
+        <button class="btn sm" onclick="App.submitRayaPair()">Pedir</button></div>
+      <div class="hint" style="margin-top:6px">El otro jugador debe aceptar la solicitud para que aplique.</div>`;
+    }
+    const list=rayaPairList();
+    if(list.length){
+      h+=`<div style="margin-top:12px"><b style="font-size:12px">Acuerdos activos</b>`;
+      list.forEach(x=>{ const canDel=admin||(me&&(me===x.a||me===x.b));
+        h+=`<div class="vrow"><div><div class="who">${pname(x.a)} – ${pname(x.b)}</div><div class="desc">$${x.v} <span style="color:var(--muted-2)">(general $${state.rayaValue})</span></div></div>${canDel?`<button class="flag" onclick="App.removeRayaPair('${x.key}')">Quitar</button>`:''}</div>`; });
+      h+=`</div>`;
+    }
+    h+=`</div>`; return h;
+  }
   function delPlayer(id){
     confirmModal('¿Eliminar jugador? Se quita de ventajas.','Eliminar',()=>{
       state.players=state.players.filter(p=>p.id!==id);
@@ -3124,7 +3216,7 @@ const App = (() => {
     if(!name){ toast('Pon un nombre'); return; }
     const apEl=document.getElementById('m_apodo'); const apodo=apEl?apEl.value.trim():'';
     const p={id:uid(),name,apodo,guest:!!guest,fav:!guest}; state.players.push(p);
-    if(guest){ const d=curDay(); if(d){ d.playing=d.playing||[]; if(!d.playing.includes(p.id)) d.playing.push(p.id); } }
+    if(guest){ const d=curDay(); if(d){ d.playing=d.playing||[]; if(!d.playing.includes(p.id)) d.playing.push(p.id); placeInGroup(d,p.id); } }   // entra a un grupo: se captura igual que todos
     save(); closeModal();
     if(guest){ toast('Invitado agregado · ponle ventajas'); go('vent'); ventFocus=p.id; renderVent(); }
     else render();
@@ -3368,7 +3460,7 @@ const App = (() => {
     pickScore,score,putt,setOyes,quick,toggleUnit,toggleCast,navHole,gotoPending,gotoPlayerPending,setScoreGroup,setStart,setHoles,setCourse,
     setVentFocus,stepV,openBet,openH2H,setLiqTab,setScoreTab,setCmp,setVentPick,
     setDblPlayer,toggleDbl,closeDay,historyModal,exportImage,exportHigh,exportProfile,exportSalidas,exportSeasonTable,exportCompare,exportScorecard,toggleSound,
-    setRaya,addPlayerModal,createPlayer,editPlayerModal,savePlayer,delPlayer,toggleFav,
+    setRaya,submitRayaPair,approveRayaReq,rejectRayaReq,removeRayaPair,addPlayerModal,createPlayer,editPlayerModal,savePlayer,delPlayer,toggleFav,
     courseModal,setHole,setCfgCourse,addCourse,renameCourse,deleteCourse,unitModal,createUnit,delUnit,castModal,createCast,delCast,toggleCastTipo,
     addPlayerModal,exportData,renderCfg,renderVent,renderDay,closeModal,confirmYes,renderHigh,setHighTab,openProfile,rulesModal };
 })();
