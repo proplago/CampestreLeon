@@ -326,6 +326,9 @@
   .notif-e{font-size:16px;line-height:1}
   .notif-t{flex:1;min-width:0;font-weight:600}
   .notif-go{color:var(--fairway);font-weight:700;font-size:12px;white-space:nowrap}
+  /* Hora de salida editable por grupo (puede variar) */
+  .timeinp{font-family:'Hanken Grotesk',sans-serif;font-size:13px;font-weight:700;color:var(--fairway);background:#eef5ef;border:1px solid var(--line-3);border-radius:8px;padding:2px 4px;width:56px;text-align:center}
+  .timeinp::placeholder{color:var(--muted-2);font-weight:500}
   .startsel{font-size:11px;color:var(--muted);display:flex;align-items:center;gap:6px}
   .coursesel{appearance:none;-webkit-appearance:none;font-size:13.5px;font-weight:700;color:var(--fairway);background:#fff;border:1.5px solid var(--line-3);border-radius:999px;padding:6px 26px 6px 13px;max-width:62%;
     background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='11' height='11' viewBox='0 0 24 24' fill='none' stroke='%230a6a3a' stroke-width='2.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 10px center}
@@ -2229,7 +2232,7 @@ const App = (() => {
       const gColors=['var(--fairway)','var(--purple)','var(--clay)'];
       html+=`<div class="card"><h3>Salidas</h3><div class="hint">${courseOf(d).name} · ${holesLabel(d)}</div>`;
       (d.salidas||[]).forEach((g,s)=>{ const ids=(g||[]).filter(Boolean); if(!ids.length) return;
-        html+=`<div style="margin-top:12px"><div style="font-family:'Newsreader',serif;font-weight:600;font-size:15px;color:${gColors[s%gColors.length]};margin-bottom:6px">Grupo ${s+1}${(d.salidaTimes&&d.salidaTimes[s])?' · '+d.salidaTimes[s]:''} · <span style="color:var(--muted);font-weight:500">${ids.length}/${cap}</span></div><div class="assign">`;
+        html+=`<div style="margin-top:12px"><div style="font-family:'Newsreader',serif;font-weight:600;font-size:15px;color:${gColors[s%gColors.length]};margin-bottom:6px">Grupo ${s+1} · <input class="timeinp" value="${(d.salidaTimes&&d.salidaTimes[s])||''}" placeholder="hora" onchange="App.setSalidaTime(${s},this.value)"> · <span style="color:var(--muted);font-weight:500">${ids.length}/${cap}</span></div><div class="assign">`;
         ids.forEach(id=>html+=`<span class="chip ${id===me?'on':''}">${pname(id)}${id===me?' (tú)':''}</span>`);
         html+=`</div></div>`;
       });
@@ -2299,7 +2302,7 @@ const App = (() => {
     for(let s=0;s<nShow;s++){
       const ids=(d.salidas[s]||[]).filter(id=>d.playing.includes(id));
       const next=(s+1)%nShow;
-      html+=`<div style="margin-top:14px"><div style="font-family:'Newsreader',serif;font-weight:600;font-size:15px;color:${gColors[s%gColors.length]};margin-bottom:8px">Grupo ${s+1}${(d.salidaTimes&&d.salidaTimes[s])?' · '+d.salidaTimes[s]:''} · <span style="color:var(--muted);font-weight:500">${ids.length}/${cap}</span></div><div class="assign">`;
+      html+=`<div style="margin-top:14px"><div style="font-family:'Newsreader',serif;font-weight:600;font-size:15px;color:${gColors[s%gColors.length]};margin-bottom:8px">Grupo ${s+1} · <input class="timeinp" value="${(d.salidaTimes&&d.salidaTimes[s])||''}" placeholder="hora" onchange="App.setSalidaTime(${s},this.value)"> · <span style="color:var(--muted);font-weight:500">${ids.length}/${cap}</span></div><div class="assign">`;
       if(ids.length===0) html+=`<span class="hint" style="margin:0">—</span>`;
       ids.forEach(id=>{ const p=player(id);
         html+=`<button class="chip ${s===1?'s2':''} on" onclick="App.moveGroup('${id}',${next})">${p?pname(p.id):'—'}${nShow>1?' ↔':''}</button>`;
@@ -2422,6 +2425,14 @@ const App = (() => {
     groups.sort((a,b)=>a.length-b.length);          // el grupo con MÁS jugadores siempre va al final
     d.salidas=groups;
     save(); renderDay(); toast(n>1?('Grupos sorteados ('+n+')'):'Grupo sorteado');
+  }
+  // Hora de salida por grupo (puede variar). Editable por cualquiera, es solo informativa (no afecta el cálculo).
+  function setSalidaTime(gi,v){
+    const d=curDay(); if(!d) return;
+    if(!Array.isArray(d.salidaTimes)) d.salidaTimes=[];
+    while(d.salidaTimes.length<=gi) d.salidaTimes.push('');
+    d.salidaTimes[gi]=(v||'').trim();
+    save(); renderDay();
   }
 
   // ---- Tarjeta por grupo (cómo vamos) ----
@@ -3505,7 +3516,7 @@ const App = (() => {
   }
   async function init(){ try{ if(document.fonts&&document.fonts.load){ document.fonts.load("600 40px Newsreader"); document.fonts.load("700 16px 'Hanken Grotesk'"); } }catch(e){} loadDevUser(); await load(); if(!state.currentDayId && state.days[0]) state.currentDayId=state.days[0].id; render(); initPullRefresh(); if(!_devUser) loginModal(); }
   return { init,loginModal,doLogin,approveVent,rejectVent,createLeague,renameLeague,switchLeague,addMember,removeMember,setMaxGroup,go,switchDay,daysModal,editDayModal,saveDayEdit,delDay,newDayModal,createDay,
-    toggleAssign:null,togglePlaying,cancelPlayer,moveGroup,confirmMove,sorteo,addGuestModal,
+    toggleAssign:null,togglePlaying,cancelPlayer,moveGroup,confirmMove,sorteo,setSalidaTime,addGuestModal,
     pickScore,score,putt,setOyes,quick,toggleUnit,toggleCast,navHole,gotoPending,gotoPlayerPending,setScoreGroup,setStart,setHoles,setCourse,
     setVentFocus,pickVent,openBet,openH2H,setLiqTab,setScoreTab,setCmp,setVentPick,
     setDblPlayer,toggleDbl,closeDay,historyModal,exportImage,exportHigh,exportProfile,exportSalidas,exportSeasonTable,exportCompare,exportScorecard,toggleSound,
