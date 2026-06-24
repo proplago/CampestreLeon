@@ -3454,8 +3454,17 @@ const App = (() => {
   }
   function signInGoogle(){
     if(!authAvailable()){ toast('Falta habilitar Google en Firebase'); return; }
-    closeModal();
-    try{ firebase.auth().signInWithRedirect(new firebase.auth.GoogleAuthProvider()); }catch(e){ toast('No se pudo iniciar Google'); }
+    const prov=new firebase.auth.GoogleAuthProvider();
+    // Popup evita el error "missing initial state" de signInWithRedirect (storage partitioning,
+    // porque el authDomain es distinto al dominio de la app). Si el popup se bloquea, cae a redirect.
+    firebase.auth().signInWithPopup(prov).catch(function(err){
+      const code=err&&err.code;
+      if(code==='auth/popup-blocked' || code==='auth/operation-not-supported-in-this-environment'){
+        try{ firebase.auth().signInWithRedirect(prov); }catch(e){ toast('No se pudo abrir Google'); }
+      } else if(code && code!=='auth/popup-closed-by-user' && code!=='auth/cancelled-popup-request'){
+        toast('Google: '+(err.message||code));
+      }
+    });
   }
   function signOutAuth(){ try{ if(authAvailable()) firebase.auth().signOut(); }catch(e){} _authUser=null; _authPending=false; _devUser=null; try{localStorage.removeItem(userKey());}catch(e){} render(); loginModal(); }
 
