@@ -3464,7 +3464,9 @@ const App = (() => {
     _authPending=false;
     return firebase.database().ref('users/'+u.uid).once('value').then(function(snap){
       const ud=snap.val()||null;
-      if(ud && ud.super===true){ _devUser={playerId:(ud.playerId||(state.players[0]&&state.players[0].id)||null), role:'super', uid:u.uid, email:u.email, real:true}; return; }
+      if(ud && ud.super===true){   // súper en TODAS las ligas; su jugador es por-liga (Fernando en cada una es otro id de roster)
+        const lg=(ud.leagues&&ud.leagues[ACTIVE_LEAGUE])||{};
+        _devUser={playerId:(lg.playerId||ud.playerId||(state.players[0]&&state.players[0].id)||null), role:'super', uid:u.uid, email:u.email, real:true}; return; }
       if(ud && ud.leagues){
         const lids=Object.keys(ud.leagues);
         const lid = ud.leagues[ACTIVE_LEAGUE]?ACTIVE_LEAGUE:lids[0];
@@ -3644,7 +3646,8 @@ const App = (() => {
   }
   function setSuperPlayer(pid){
     if(!isSuper()||!pid) return;
-    if(authAvailable() && _devUser&&_devUser.uid){ try{ firebase.database().ref('users/'+_devUser.uid+'/playerId').set(pid); }catch(e){} }
+    // por-liga: cuál jugador eres tú en ESTA liga (en otra liga puede ser otro id de roster)
+    if(authAvailable() && _devUser&&_devUser.uid){ try{ firebase.database().ref('users/'+_devUser.uid+'/leagues/'+ACTIVE_LEAGUE+'/playerId').set(pid); }catch(e){} }
     if(_devUser) _devUser.playerId=pid; render(); toast('Tu jugador: '+pname(pid));
   }
   function assignAuthUser(uid){
