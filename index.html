@@ -647,6 +647,20 @@ const App = (() => {
     {id:'calaca', name:'Calaca (10+)',     auto:'calaca', tipo:'trago', emoji:'💀'},
     {id:'pomo',   name:'Pomo (paloma)',    auto:null,     tipo:'trago', emoji:'🍾'},
   ]);
+  // Reglas de la casa POR LIGA (editables por el admin). Una regla por entrada; " — " separa el término (negritas) de la descripción.
+  const defaultHouseRules = () => ([
+    'Paloma — 🍾 Pomo.',
+    'Pinkys — 🍺 Chevezz.',
+    'Calaca — 🍺 Chevezz.',
+    'Salir de green — 🍺 Chevezz.',
+    'Si mides y no da — 📏 En el green, si la bola está a menos de la longitud de tu putt (antes del grip), es "dada". Si la mides y no cumple, pagas 🍺 Chevezz. Si la mides después de levantarla, se entiende que la vas a jugar. Si es dada y la putteas y fallas, cuenta el golpe.',
+    'Oyeses — 🩸 son sangrientos.',
+    'Si no llegas a tu tee time — ⏰ tu score en los hoyos no jugados será un golpe más que el jugador con más golpes de cualquier foursome.',
+    'Cobro de bebidas desde el hoyo 16 — 🍻 una penalización del 16 en adelante se cobra en el 19 (clubhouse).',
+    'Hole in one — 🎯 cada miembro del chat aporta 💵 150 USD y tú organizas la 🍽️ comida.',
+    'Caddie — 🤫 no opinan ni intervienen en las jugadas de nadie.',
+    '🍺 Chevezz = una bebida sencilla o de valor similar.',
+  ]);
 
   let state = {
     rayaValue:20,
@@ -708,6 +722,7 @@ const App = (() => {
     const courses={}; (st.courses||[]).forEach(c=>{ if(c&&c.id){ const o=Object.assign({},c); delete o.id; courses[c.id]=o; } }); out['courses']=courses;
     out['units']      = st.units||[];
     out['castigos']   = st.castigos||[];
+    out['houseRules'] = st.houseRules||[];
     out['ventHistory']= st.ventHistory||[];
     out['dblHistory'] = st.dblHistory||[];
     out['order']      = (st.days||[]).map(d=>d.id);
@@ -729,7 +744,7 @@ const App = (() => {
   }
   function flattenTree(root){
     const out={}; if(!root||typeof root!=='object') return out;
-    ['meta','rules','players','courses','units','castigos','ventHistory','dblHistory','order'].forEach(k=>{ if(root[k]!==undefined) out[k]=root[k]; });
+    ['meta','rules','players','courses','units','castigos','houseRules','ventHistory','dblHistory','order'].forEach(k=>{ if(root[k]!==undefined) out[k]=root[k]; });
     const vn=root.ventajas||{}; Object.keys(vn).forEach(g=>{ const rr=vn[g]||{}; Object.keys(rr).forEach(r=>{ out['ventajas/'+g+'/'+r]=rr[r]; }); });
     const vq=root.ventReq||{}; Object.keys(vq).forEach(id=>{ out['ventReq/'+id]=vq[id]; });
     const dn=root.days||{};
@@ -756,6 +771,7 @@ const App = (() => {
     g.courses  = sh['courses']?Object.keys(sh['courses']).map(id=>Object.assign({},sh['courses'][id],{id})):[];
     g.units    = _arr(sh['units']);
     g.castigos = _arr(sh['castigos']);
+    if(sh['houseRules']!==undefined) g.houseRules = _arr(sh['houseRules']);
     g.ventHistory = _arr(sh['ventHistory']);
     g.dblHistory  = _arr(sh['dblHistory']);
     // ventajas → mapa plano + ventMeta (locked/setBy)
@@ -856,6 +872,7 @@ const App = (() => {
     state.ventReq = state.ventReq || {};
     state.rayaPairs = state.rayaPairs || {};   // valor de raya por pareja (override del general)
     state.rayaReq = state.rayaReq || {};       // solicitudes de cambio de raya entre dos jugadores
+    if(!Array.isArray(state.houseRules)) state.houseRules = defaultHouseRules();   // reglas de la casa por liga
     if(!state._leagueMeta) state._leagueMeta={name:leagueName(ACTIVE_LEAGUE)||'Campestre León — Viernes', schema:2};
     if(!state._leagueMeta.name) state._leagueMeta.name=leagueName(ACTIVE_LEAGUE)||'Liga';
     state.days.forEach(dd=>{
@@ -2991,7 +3008,7 @@ const App = (() => {
       <div class="cfg-sect">Reglas de la casa</div>
       <div class="card"><div class="row" style="justify-content:space-between"><h3>📜 Reglas del grupo</h3>
         <button class="btn outline sm" onclick="App.rulesModal()">Ver reglas</button></div>
-        <div class="hint">Las reglas oficiales de los viernes.</div></div>
+        <div class="hint">Las reglas de la casa de tu grupo.</div></div>
       <div class="card"><div class="row" style="justify-content:space-between">
         <div><h3 style="margin:0">Soniditos</h3><div class="hint" style="margin:2px 0 0">Celebración de birdies, eagles…</div></div>
         <button class="sw ${state.sound?'on':''}" onclick="App.toggleSound()"><span></span></button></div></div>
@@ -3018,7 +3035,7 @@ const App = (() => {
     // reglas del grupo (texto completo en modal)
     html+=`<div class="card"><div class="row" style="justify-content:space-between"><h3>📜 Reglas del grupo</h3>
       <button class="btn outline sm" onclick="App.rulesModal()">Ver reglas</button></div>
-      <div class="hint">Paloma, pinkys, calaca, oyeses sangrientos, hole-in-one… las reglas oficiales de los viernes.</div></div>`;
+      <div class="hint">Las reglas de la casa de tu grupo${isAdmin()?' · puedes editarlas':''}.</div></div>`;
 
     // valor de raya
     html+=`<div class="card"><h3>Valor de la raya</h3>
@@ -3379,23 +3396,32 @@ const App = (() => {
     a.download='rayas-campestre-'+new Date().toISOString().slice(0,10)+'.json'; a.click();
   }
 
+  const _esc = s => String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  function houseRules(){ return (Array.isArray(state.houseRules)&&state.houseRules.length)?state.houseRules:defaultHouseRules(); }
   function rulesModal(){
-    modal(`<h3>📜 Reglas del grupo</h3>
-      <div class="hint" style="margin-bottom:10px">Golf de los viernes · 2:20 · Campestre León</div>
-      <ol class="ruleslist">
-        <li><b>Paloma</b> — 🍾 Pomo.</li>
-        <li><b>Pinkys</b> — 🍺 Chevezz.</li>
-        <li><b>Calaca</b> — 🍺 Chevezz.</li>
-        <li><b>Salir de green</b> — 🍺 Chevezz.</li>
-        <li><b>Si mides y no da</b> — 📏 En el green, si la bola está a menos de la longitud de tu putt (antes del grip), es “dada”. Si la mides y no cumple, pagas 🍺 Chevezz. Si la mides después de levantarla, se entiende que la vas a jugar. Si es dada y la putteas y fallas, cuenta el golpe.</li>
-        <li><b>Oyeses</b> — 🩸 son sangrientos.</li>
-        <li><b>Si no llegas a tu tee time</b> — ⏰ tu score en los hoyos no jugados será un golpe más que el jugador con más golpes de cualquier foursome.</li>
-        <li><b>Cobro de bebidas desde el hoyo 16</b> — 🍻 una penalización del 16 en adelante se cobra en el 19 (clubhouse).</li>
-        <li><b>Hole in one</b> — 🎯 cada miembro del chat aporta 💵 150 USD y tú organizas la 🍽️ comida.</li>
-        <li><b>Caddie</b> — 🤫 no opinan ni intervienen en las jugadas de nadie.</li>
-      </ol>
-      <div class="hint">🍺 <b>Chevezz</b> = una bebida sencilla o de valor similar.</div>
-      <button class="btn block" style="margin-top:12px" onclick="App.closeModal()">Cerrar</button>`);
+    const items=houseRules().map(function(r){ const i=String(r).indexOf(' — ');
+      return i>0 ? '<li><b>'+_esc(r.slice(0,i))+'</b> — '+_esc(r.slice(i+3))+'</li>' : '<li>'+_esc(r)+'</li>'; }).join('');
+    let h=`<h3>📜 Reglas del grupo</h3>
+      <div class="hint" style="margin-bottom:10px">${_esc(leagueName(ACTIVE_LEAGUE))}</div>
+      <ol class="ruleslist">${items}</ol>`;
+    if(isAdmin()) h+=`<button class="btn outline block" style="margin-top:10px" onclick="App.editRulesModal()">✏️ Editar reglas</button>`;
+    h+=`<button class="btn block" style="margin-top:8px" onclick="App.closeModal()">Cerrar</button>`;
+    modal(h);
+  }
+  function editRulesModal(){
+    if(!isAdmin()){ toast('Solo el admin edita las reglas'); return; }
+    modal(`<h3>Editar reglas · ${_esc(leagueName(ACTIVE_LEAGUE))}</h3>
+      <div class="hint" style="margin-bottom:8px">Una regla por línea. Si pones " — " (guión con espacios), lo de antes sale en <b>negritas</b>. Los emojis sí funcionan.</div>
+      <textarea id="rules_txt" class="txt" style="min-height:240px;resize:vertical;font-family:inherit;line-height:1.5;width:100%">${_esc(houseRules().join('\n'))}</textarea>
+      <button class="btn block" style="margin-top:10px" onclick="App.saveRules()">Guardar</button>
+      <button class="btn outline block" style="margin-top:8px" onclick="App.rulesModal()">Cancelar</button>`);
+  }
+  function saveRules(){
+    if(!isAdmin()){ toast('Solo el admin edita las reglas'); return; }
+    const el=document.getElementById('rules_txt'); if(!el) return;
+    const lines=el.value.split('\n').map(s=>s.trim()).filter(Boolean);
+    state.houseRules = lines.length ? lines : defaultHouseRules();
+    save(); toast('Reglas actualizadas'); rulesModal(); if(curView==='cfg') renderCfg();
   }
 
   // ---------- util ----------
@@ -3665,7 +3691,7 @@ const App = (() => {
     setDblPlayer,toggleDbl,closeDay,historyModal,exportImage,exportHigh,exportProfile,exportSalidas,exportSeasonTable,exportCompare,exportScorecard,toggleSound,
     setRaya,submitRayaPair,approveRayaReq,rejectRayaReq,removeRayaPair,addPlayerModal,createPlayer,editPlayerModal,savePlayer,delPlayer,toggleFav,
     courseModal,setHole,setCfgCourse,addCourse,renameCourse,deleteCourse,unitModal,createUnit,delUnit,castModal,createCast,delCast,toggleCastTipo,
-    addPlayerModal,exportData,renderCfg,renderVent,renderDay,closeModal,confirmYes,renderHigh,setHighTab,openProfile,rulesModal };
+    addPlayerModal,exportData,renderCfg,renderVent,renderDay,closeModal,confirmYes,renderHigh,setHighTab,openProfile,rulesModal,editRulesModal,saveRules };
 })();
 App.init();
 </script>
