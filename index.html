@@ -3480,21 +3480,15 @@ const App = (() => {
       // ¿ya es miembro de la liga ACTIVA?
       const lgA=ud && ud.leagues && ud.leagues[ACTIVE_LEAGUE];
       if(lgA && lgA.playerId){ _devUser={playerId:lgA.playerId, role:(lgA.role||'regular'), uid:u.uid, email:u.email, real:true}; return; }
-      // NO es miembro de esta liga. ¿Trae código de invitación válido? → alta (crea su jugador)
-      const lm=state._leagueMeta||{};
-      if(_joinCode && lm.joinCode && _joinCode===lm.joinCode){
-        _authPending=true; _canSelfRegister=true;
-        try{ firebase.database().ref('users/'+u.uid).update({email:u.email||'', name:u.displayName||''}); }catch(e){}
-        return;
+      // NO es miembro de esta liga.
+      // Si es miembro de OTRA liga y no trae intención de unirse a esta (sin código en el link) → entra a la suya.
+      if(!_joinCode && ud && ud.leagues){
+        const mine=Object.keys(ud.leagues).filter(function(l){ return ud.leagues[l]&&ud.leagues[l].playerId; });
+        if(mine.length && mine.indexOf(ACTIVE_LEAGUE)<0){ const lid=mine[0]; try{localStorage.setItem('cl_active_league',lid);}catch(e){} location.reload(); return; }
       }
-      // ¿es miembro de OTRA liga (sin intención de unirse a esta)? → entra a esa
-      if(ud && ud.leagues){ const lids=Object.keys(ud.leagues); const lid=lids[0]; const m=ud.leagues[lid]||{};
-        if(m.playerId){
-          if(lid!==ACTIVE_LEAGUE){ try{localStorage.setItem('cl_active_league',lid);}catch(e){} location.reload(); return; }
-          _devUser={playerId:m.playerId, role:(m.role||'regular'), uid:u.uid, email:u.email, real:true}; return; } }
-      // sin nada → pendiente; deja su perfil mínimo para que el admin lo asigne (caso Campestre: liga ya poblada)
-      _authPending=true;
-      _authDiag = ud ? ('perfil existe pero super='+JSON.stringify(ud.super)+', sin liga "'+ACTIVE_LEAGUE+'"') : ('no existe /users/'+u.uid);
+      // Ofrecer ALTA: se da de alta (nombre/apellido/apodo) con el código de la liga; el código se valida al enviar.
+      _authPending=true; _canSelfRegister=true;
+      _authDiag = ud ? 'no estás en esta liga' : 'cuenta nueva';
       try{ firebase.database().ref('users/'+u.uid).update({email:u.email||'', name:u.displayName||''}); }catch(e){}
     };
     const tryRead=function(retries){
@@ -3525,31 +3519,40 @@ const App = (() => {
   }
   function signOutAuth(){ try{ if(authAvailable()) firebase.auth().signOut(); }catch(e){} _authUser=null; _authPending=false; _canSelfRegister=false; _devUser=null; try{localStorage.removeItem(userKey());}catch(e){} render(); loginModal(); }
 
-  // Alta del jugador al entrar con código válido: crea su jugador (nombre, apellido, apodo) y liga su cuenta.
+  // Alta del jugador: pide el código de la liga + nombre/apellido/apodo; crea su jugador y liga su cuenta.
   function joinRegisterModal(){
     const em=(_authUser&&_authUser.email)||'';
-    modal(`<h3>Date de alta · ${_esc(leagueName(ACTIVE_LEAGUE))}</h3>
-      <div class="hint" style="margin-bottom:8px">Entraste como <b>${_esc(em)}</b>. Regístrate para unirte a la liga.</div>
-      <label class="fl">Nombre</label><input id="jr_nombre" class="txt" placeholder="Nombre">
+    modal(`<h3>Únete a ${_esc(leagueName(ACTIVE_LEAGUE))}</h3>
+      <div class="hint" style="margin-bottom:8px">Entraste como <b>${_esc(em)}</b>. Pon el código que te pasaron y tus datos.</div>
+      <label class="fl">Código de la liga</label><input id="jr_code" class="txt" placeholder="el código que te compartieron" value="${_esc(_joinCode||'')}" style="text-transform:uppercase">
+      <label class="fl" style="margin-top:8px">Nombre</label><input id="jr_nombre" class="txt" placeholder="Nombre">
       <label class="fl" style="margin-top:8px">Apellido</label><input id="jr_ape" class="txt" placeholder="Apellido">
       <label class="fl" style="margin-top:8px">Apodo (opcional)</label><input id="jr_apodo" class="txt" placeholder="como te dicen en el 19">
       <button class="btn block" style="margin-top:14px" onclick="App.joinRegister()">Unirme a la liga</button>
-      <button class="btn outline block" style="margin-top:8px" onclick="App.signOutAuth()">Cancelar / salir</button>`);
+      <div class="hint" style="text-align:center;margin-top:8px">¿Ya estabas en esta liga? No te registres: pídele al admin que te ligue a tu jugador (conservas tus ventajas).</div>
+      <button class="btn outline block" style="margin-top:8px" onclick="App.signOutAuth()">Salir</button>`);
   }
   function joinRegister(){
     if(!_authUser){ toast('Inicia sesión primero'); return; }
-    const nombre=(document.getElementById('jr_nombre')||{}).value||'';
-    const ape=(document.getElementById('jr_ape')||{}).value||'';
+    const code=((document.getElementById('jr_code')||{}).value||'').trim().toUpperCase();
+    const nombre=((document.getElementById('jr_nombre')||{}).value||'').trim();
+    const ape=((document.getElementById('jr_ape')||{}).value||'').trim();
     const apodo=((document.getElementById('jr_apodo')||{}).value||'').trim();
-    const name=(nombre.trim()+' '+ape.trim()).trim();
+    const name=(nombre+' '+ape).trim();
+    if(!code){ toast('Pon el código de la liga'); return; }
     if(!name){ toast('Pon tu nombre y apellido'); return; }
-    const p={id:uid(), name:name, apodo:apodo, guest:false, fav:true};
-    state.players.push(p);
-    _devUser={playerId:p.id, role:'regular', uid:_authUser.uid, email:_authUser.email, real:true};
-    _authPending=false; _canSelfRegister=false;
-    // liga la cuenta a su jugador nuevo (con el código para que las reglas estrictas lo validen)
-    if(authAvailable()){ try{ firebase.database().ref('users/'+_authUser.uid+'/leagues/'+ACTIVE_LEAGUE).set({role:'regular', playerId:p.id, code:_joinCode||''}); }catch(e){} }
-    save(); closeModal(); cleanUrl(); render(); toast('¡Bienvenido, '+pname(p.id)+'!');
+    // verifica el código contra el real de la liga (ya autenticado)
+    firebase.database().ref('leagues/'+ACTIVE_LEAGUE+'/meta/joinCode').once('value').then(function(cs){
+      const real=String(cs.val()||(state._leagueMeta&&state._leagueMeta.joinCode)||'').toUpperCase();
+      if(!real){ toast('Esta liga aún no tiene código (que el admin lo genere)'); return; }
+      if(code!==real){ toast('Código incorrecto'); return; }
+      const p={id:uid(), name:name, apodo:apodo, guest:false, fav:true};
+      state.players.push(p);
+      _devUser={playerId:p.id, role:'regular', uid:_authUser.uid, email:_authUser.email, real:true};
+      _authPending=false; _canSelfRegister=false;
+      try{ firebase.database().ref('users/'+_authUser.uid+'/leagues/'+ACTIVE_LEAGUE).set({role:'regular', playerId:p.id, code:code}); }catch(e){}
+      save(); closeModal(); cleanUrl(); render(); toast('¡Bienvenido, '+pname(p.id)+'!');
+    }).catch(function(){ toast('No pude verificar el código (revisa tu conexión)'); });
   }
   // Tarjeta de Ajustes: código/link para invitar a la liga (admin/super)
   function cfgInviteHtml(){
