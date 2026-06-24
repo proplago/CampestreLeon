@@ -3010,6 +3010,7 @@ const App = (() => {
     if(!isAdmin()){ return renderCfgRegular(box); }
     let html='';
     html+=cfgLeaguesHtml();   // Liga + miembros/invitaciones (super: gestión completa; admin: invitar regulares)
+    html+=cfgAuthUsersHtml(); // Cuentas Google → jugadores (solo súper)
 
     // ===================== REGLAS DE LA CASA =====================
     html+=`<div class="cfg-sect">Reglas de la casa</div>`;
@@ -3575,6 +3576,69 @@ const App = (() => {
     return h;
   }
 
+  // ---- Asignación de cuentas Google → jugadores del roster (solo súper). Incremento 2 del login. ----
+  // Ligar uid→playerId NO toca las ventajas (van por playerId): la persona conserva todo su historial.
+  let _authUsersCache=null;
+  function fetchAuthUsers(){
+    if(!authAvailable()){ _authUsersCache={}; return; }
+    firebase.database().ref('users').once('value')
+      .then(function(snap){ _authUsersCache=snap.val()||{}; if(curView==='cfg') renderCfg(); })
+      .catch(function(){ _authUsersCache={}; if(curView==='cfg') renderCfg(); });
+  }
+  function refreshAuthUsers(){ _authUsersCache=null; renderCfg(); }
+  function cfgAuthUsersHtml(){
+    if(!isSuper() || !authAvailable()) return '';
+    const ps=[...state.players].sort((a,b)=>(a.guest?1:0)-(b.guest?1:0)||a.name.localeCompare(b.name));
+    const myUid=_devUser&&_devUser.uid;
+    let h=`<div class="cfg-sect">Cuentas (Google)</div>`;
+    h+=`<div class="card"><h3>Tu jugador</h3>
+      <div class="hint">Cuál jugador del roster eres tú (para tus ventajas y comparativa).</div>
+      <select class="txt" style="margin-top:6px" onchange="App.setSuperPlayer(this.value)">${ps.map(p=>`<option value="${p.id}" ${p.id===myPid()?'selected':''}>${p.name}${p.guest?' (inv)':''}</option>`).join('')}</select></div>`;
+    if(_authUsersCache===null){ fetchAuthUsers(); h+=`<div class="card"><div class="hint">Cargando cuentas…</div></div>`; return h; }
+    const users=_authUsersCache||{};
+    const uids=Object.keys(users).filter(function(u){ return u!==myUid; });
+    h+=`<div class="card"><div class="row" style="justify-content:space-between"><h3>Ligar cuentas a jugadores</h3>
+        <button class="btn outline sm" onclick="App.refreshAuthUsers()">↻ Actualizar</button></div>
+      <div class="hint">Quien entró con Google aparece aquí. Lígalo a su jugador del roster (<b>conserva todas sus ventajas</b>) y dale rol.</div>`;
+    if(!uids.length){ h+=`<div class="hint" style="margin-top:8px">Nadie más ha entrado con Google todavía.</div></div>`; return h; }
+    uids.forEach(function(uid){ const u=users[uid]||{};
+      const lg=(u.leagues&&u.leagues[ACTIVE_LEAGUE])||null, assigned=!!lg;
+      const curPid=lg?lg.playerId:'', curRole=lg?(lg.role||'regular'):'regular';
+      h+=`<div class="card" style="margin-top:8px;border:1px solid var(--line);box-shadow:none">
+        <div style="font-weight:700;font-size:13px">${u.email||u.name||uid.slice(0,10)} ${assigned?`<span class="tag">${curRole==='admin'?'admin':'jugador'} · ${pname(curPid)}</span>`:'<span style="color:var(--clay);font-size:11px;font-weight:600">pendiente</span>'}</div>
+        <div class="row" style="gap:6px;margin-top:6px">
+          <select class="txt" id="au_pid_${uid}" style="flex:1">${ps.map(p=>`<option value="${p.id}" ${p.id===curPid?'selected':''}>${p.name}${p.guest?' (inv)':''}</option>`).join('')}</select>
+          <select class="txt" id="au_role_${uid}" style="max-width:118px"><option value="regular" ${curRole==='regular'?'selected':''}>Jugador</option><option value="admin" ${curRole==='admin'?'selected':''}>Admin</option></select></div>
+        <div class="row" style="gap:6px;margin-top:6px">
+          <button class="btn sm" onclick="App.assignAuthUser('${uid}')">${assigned?'Actualizar':'Asignar'}</button>
+          ${assigned?`<button class="btn sm outline" onclick="App.unassignAuthUser('${uid}')">Quitar</button>`:''}</div></div>`;
+    });
+    h+=`</div>`;
+    return h;
+  }
+  function setSuperPlayer(pid){
+    if(!isSuper()||!pid) return;
+    if(authAvailable() && _devUser&&_devUser.uid){ try{ firebase.database().ref('users/'+_devUser.uid+'/playerId').set(pid); }catch(e){} }
+    if(_devUser) _devUser.playerId=pid; render(); toast('Tu jugador: '+pname(pid));
+  }
+  function assignAuthUser(uid){
+    if(!isSuper()){ toast('Solo el súper asigna'); return; }
+    const pid=(document.getElementById('au_pid_'+uid)||{}).value;
+    const role=(document.getElementById('au_role_'+uid)||{}).value||'regular';
+    if(!pid){ toast('Elige jugador'); return; }
+    firebase.database().ref('users/'+uid+'/leagues/'+ACTIVE_LEAGUE).set({role:role, playerId:pid})
+      .then(function(){ toast('Ligado a '+pname(pid)); _authUsersCache=null; renderCfg(); })
+      .catch(function(e){ toast('Error: '+((e&&e.message)||e)); });
+  }
+  function unassignAuthUser(uid){
+    if(!isSuper()){ toast('Solo el súper'); return; }
+    confirmModal('¿Quitar esta cuenta de la liga? La próxima vez que entre quedará pendiente otra vez (no pierde ventajas).','Quitar',function(){
+      firebase.database().ref('users/'+uid+'/leagues/'+ACTIVE_LEAGUE).remove()
+        .then(function(){ toast('Quitado'); _authUsersCache=null; renderCfg(); })
+        .catch(function(){ toast('Error'); });
+    });
+  }
+
   // Pull-to-refresh: jala hacia abajo desde arriba para recargar (pensado para la app instalada en el teléfono).
   function initPullRefresh(){
     if(window.__ptrInit) return; window.__ptrInit=true;
@@ -3594,7 +3658,7 @@ const App = (() => {
     window.addEventListener('touchcancel',()=>{ pulling=false; hide(); },{passive:true});
   }
   async function init(){ try{ if(document.fonts&&document.fonts.load){ document.fonts.load("600 40px Newsreader"); document.fonts.load("700 16px 'Hanken Grotesk'"); } }catch(e){} loadDevUser(); await load(); if(!state.currentDayId && state.days[0]) state.currentDayId=state.days[0].id; render(); initPullRefresh(); startAuth(); if(!_devUser) loginModal(); }   // muestra la entrada al instante; si hay sesión de Google, se cierra sola al resolver
-  return { init,loginModal,doLogin,signInGoogle,signOutAuth,approveVent,rejectVent,createLeague,renameLeague,switchLeague,addMember,removeMember,setMaxGroup,go,switchDay,daysModal,editDayModal,saveDayEdit,delDay,newDayModal,createDay,
+  return { init,loginModal,doLogin,signInGoogle,signOutAuth,refreshAuthUsers,setSuperPlayer,assignAuthUser,unassignAuthUser,approveVent,rejectVent,createLeague,renameLeague,switchLeague,addMember,removeMember,setMaxGroup,go,switchDay,daysModal,editDayModal,saveDayEdit,delDay,newDayModal,createDay,
     toggleAssign:null,togglePlaying,cancelPlayer,moveGroup,confirmMove,sorteo,setSalidaTime,addGuestModal,
     pickScore,score,putt,setOyes,quick,toggleUnit,toggleCast,navHole,gotoPending,gotoPlayerPending,setScoreGroup,setStart,setHoles,setCourse,
     setVentFocus,pickVent,openBet,openH2H,setLiqTab,setScoreTab,setCmp,setVentPick,
