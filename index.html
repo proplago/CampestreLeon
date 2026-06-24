@@ -3472,7 +3472,7 @@ const App = (() => {
   }
   function resolveAuthIdentity(u){
     _authPending=false; _authDiag='';
-    return firebase.database().ref('users/'+u.uid).once('value').then(function(snap){
+    const handle=function(snap){
       const ud=snap.val()||null;
       if(ud && ud.super===true){   // súper en TODAS las ligas; su jugador es por-liga (Fernando en cada una es otro id de roster)
         const lg=(ud.leagues&&ud.leagues[ACTIVE_LEAGUE])||{};
@@ -3496,7 +3496,18 @@ const App = (() => {
       _authPending=true;
       _authDiag = ud ? ('perfil existe pero super='+JSON.stringify(ud.super)+', sin liga "'+ACTIVE_LEAGUE+'"') : ('no existe /users/'+u.uid);
       try{ firebase.database().ref('users/'+u.uid).update({email:u.email||'', name:u.displayName||''}); }catch(e){}
-    }).catch(function(err){ _authPending=true; _authDiag='no pude leer /users/'+u.uid+' → '+((err&&err.code)||(err&&err.message)||'?'); });
+    };
+    const tryRead=function(retries){
+      return firebase.database().ref('users/'+u.uid).once('value').then(handle).catch(function(err){
+        const code=String((err&&err.code)||(err&&err.message)||'?');
+        if(retries>0 && /permission|denied/i.test(code)){   // carrera: la conexión aún no autentica → reintenta
+          return new Promise(function(res){ setTimeout(res,700); }).then(function(){ return tryRead(retries-1); });
+        }
+        _authPending=true; _authDiag='no pude leer /users/'+u.uid+' → '+code;
+      });
+    };
+    // fuerza tener el token de auth antes de leer (evita el permission_denied por carrera), y reintenta si hace falta
+    return (u.getIdToken?u.getIdToken().catch(function(){}):Promise.resolve()).then(function(){ return tryRead(3); });
   }
   function signInGoogle(){
     if(!authAvailable()){ toast('Falta habilitar Google en Firebase'); return; }
