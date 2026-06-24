@@ -3300,7 +3300,8 @@ const App = (() => {
 
   function addPlayerModal(){
     modal(`<h3>Agregar jugador</h3>
-      <label class="fl">Nombre</label><input id="m_name" class="txt" placeholder="Nombre y apellido" autofocus>
+      <label class="fl">Nombre</label><input id="m_nombre" class="txt" placeholder="Nombre" autofocus>
+      <label class="fl" style="margin-top:10px">Apellido</label><input id="m_ape" class="txt" placeholder="Apellido">
       <label class="fl" style="margin-top:10px">Apodo (opcional)</label><input id="m_apodo" class="txt" placeholder="como le dicen en el 19">
       <button class="btn block" style="margin-top:14px" onclick="App.createPlayer(false)">Agregar</button>`);
   }
@@ -3312,7 +3313,14 @@ const App = (() => {
   }
   function createPlayer(guest){
     if(!isAdmin()){ toast('Solo el admin agrega jugadores'); return; }
-    const name=document.getElementById('m_name').value.trim();
+    let name;
+    const oneEl=document.getElementById('m_name');           // modal de invitado: un solo campo
+    if(oneEl){ name=oneEl.value.trim(); }
+    else{                                                     // modal de jugador: Nombre + Apellido
+      const nom=(document.getElementById('m_nombre')||{}).value?.trim()||'';
+      const ape=(document.getElementById('m_ape')||{}).value?.trim()||'';
+      name=[nom,ape].filter(Boolean).join(' ');
+    }
     if(!name){ toast('Pon un nombre'); return; }
     const apEl=document.getElementById('m_apodo'); const apodo=apEl?apEl.value.trim():'';
     const p={id:uid(),name,apodo,guest:!!guest,fav:!guest}; state.players.push(p);
