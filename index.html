@@ -685,6 +685,11 @@ const App = (() => {
   // Cuando entre el auth, se resolverá desde /users/{uid}.
   let ACTIVE_LEAGUE='campestre-viernes';
   try{ const _a=localStorage.getItem('cl_active_league'); if(_a) ACTIVE_LEAGUE=_a; }catch(e){}
+  // Invitación por link: ?liga=<id>&code=<código> — fija la liga destino y guarda el código para el alta.
+  let _joinCode=null;
+  try{ const _p=new URLSearchParams(location.search); const _jl=_p.get('liga');
+    if(_jl){ ACTIVE_LEAGUE=_jl; try{localStorage.setItem('cl_active_league',_jl);}catch(e){} }
+    _joinCode=_p.get('code')||null; }catch(e){}
   let _backend='memory', _fbRef=null, _shardCache={}, _loadedOnce=false;
   function fbConfigured(){ return !!(FIREBASE_CONFIG && FIREBASE_CONFIG.databaseURL && FIREBASE_CONFIG.databaseURL.trim()); }
   function lsOk(){ try{ localStorage.setItem('__t','1'); localStorage.removeItem('__t'); return true; }catch(e){ return false; } }
@@ -3027,6 +3032,7 @@ const App = (() => {
     if(!isAdmin()){ return renderCfgRegular(box); }
     let html='';
     html+=cfgLeaguesHtml();   // Liga + miembros/invitaciones (super: gestión completa; admin: invitar regulares)
+    html+=cfgInviteHtml();    // Código/link para invitar a la liga (admin/super)
     html+=cfgAuthUsersHtml(); // Cuentas Google → jugadores (solo súper)
 
     // ===================== REGLAS DE LA CASA =====================
@@ -3446,9 +3452,13 @@ const App = (() => {
   function curUserLabel(){ if(!_devUser) return 'Sin sesión'; const rl=_devUser.role==='super'?'Súper admin':_devUser.role==='admin'?'Admin':'Regular'; return (pname(_devUser.playerId)||'?')+' · '+rl; }
   // ===================== AUTH REAL (Google) — fase login =====================
   // Coexiste con el "modo prueba": si hay sesión de Google y /users/{uid} resuelve, manda la identidad real.
-  let _authUser=null, _authPending=false;
+  let _authUser=null, _authPending=false, _canSelfRegister=false;
+  function genJoinCode(){ const a='ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; let s=''; for(let i=0;i<6;i++) s+=a[Math.floor(Math.random()*a.length)]; return s; }
+  function ensureJoinCode(){ state._leagueMeta=state._leagueMeta||{}; if(!state._leagueMeta.joinCode){ state._leagueMeta.joinCode=genJoinCode(); save(); } return state._leagueMeta.joinCode; }
+  function inviteLink(){ return location.origin+location.pathname+'?liga='+encodeURIComponent(ACTIVE_LEAGUE)+'&code='+encodeURIComponent(ensureJoinCode()); }
   function authAvailable(){ return _backend==='fb' && typeof firebase!=='undefined' && !!firebase.auth; }
   function isRealAuth(){ return !!(_devUser&&_devUser.real); }
+  function cleanUrl(){ try{ if(location.search) history.replaceState({},'',location.pathname); }catch(e){} }
   function startAuth(){
     if(!authAvailable()) return;
     try{
@@ -3456,7 +3466,7 @@ const App = (() => {
       firebase.auth().onAuthStateChanged(function(u){
         _authUser=u||null;
         if(!u){ _authPending=false; if(_devUser&&_devUser.real){ _devUser=null; } render(); if(!_devUser) loginModal(); return; }
-        resolveAuthIdentity(u).then(function(){ if(isRealAuth()) closeModal(); render(); if(_authPending){ loginModal(); } });
+        resolveAuthIdentity(u).then(function(){ if(isRealAuth()){ closeModal(); cleanUrl(); } render(); if(_authPending){ _canSelfRegister?joinRegisterModal():loginModal(); } });
       });
     }catch(e){}
   }
@@ -3467,16 +3477,22 @@ const App = (() => {
       if(ud && ud.super===true){   // súper en TODAS las ligas; su jugador es por-liga (Fernando en cada una es otro id de roster)
         const lg=(ud.leagues&&ud.leagues[ACTIVE_LEAGUE])||{};
         _devUser={playerId:(lg.playerId||ud.playerId||(state.players[0]&&state.players[0].id)||null), role:'super', uid:u.uid, email:u.email, real:true}; return; }
-      if(ud && ud.leagues){
-        const lids=Object.keys(ud.leagues);
-        const lid = ud.leagues[ACTIVE_LEAGUE]?ACTIVE_LEAGUE:lids[0];
-        const m=ud.leagues[lid]||{};
+      // ¿ya es miembro de la liga ACTIVA?
+      const lgA=ud && ud.leagues && ud.leagues[ACTIVE_LEAGUE];
+      if(lgA && lgA.playerId){ _devUser={playerId:lgA.playerId, role:(lgA.role||'regular'), uid:u.uid, email:u.email, real:true}; return; }
+      // NO es miembro de esta liga. ¿Trae código de invitación válido? → alta (crea su jugador)
+      const lm=state._leagueMeta||{};
+      if(_joinCode && lm.joinCode && _joinCode===lm.joinCode){
+        _authPending=true; _canSelfRegister=true;
+        try{ firebase.database().ref('users/'+u.uid).update({email:u.email||'', name:u.displayName||''}); }catch(e){}
+        return;
+      }
+      // ¿es miembro de OTRA liga (sin intención de unirse a esta)? → entra a esa
+      if(ud && ud.leagues){ const lids=Object.keys(ud.leagues); const lid=lids[0]; const m=ud.leagues[lid]||{};
         if(m.playerId){
           if(lid!==ACTIVE_LEAGUE){ try{localStorage.setItem('cl_active_league',lid);}catch(e){} location.reload(); return; }
-          _devUser={playerId:m.playerId, role:(m.role||'regular'), uid:u.uid, email:u.email, real:true}; return;
-        }
-      }
-      // sin asignación → pendiente; deja su perfil mínimo para que el admin lo asigne
+          _devUser={playerId:m.playerId, role:(m.role||'regular'), uid:u.uid, email:u.email, real:true}; return; } }
+      // sin nada → pendiente; deja su perfil mínimo para que el admin lo asigne (caso Campestre: liga ya poblada)
       _authPending=true;
       try{ firebase.database().ref('users/'+u.uid).update({email:u.email||'', name:u.displayName||''}); }catch(e){}
     }).catch(function(){ _authPending=true; });
@@ -3495,7 +3511,57 @@ const App = (() => {
       }
     });
   }
-  function signOutAuth(){ try{ if(authAvailable()) firebase.auth().signOut(); }catch(e){} _authUser=null; _authPending=false; _devUser=null; try{localStorage.removeItem(userKey());}catch(e){} render(); loginModal(); }
+  function signOutAuth(){ try{ if(authAvailable()) firebase.auth().signOut(); }catch(e){} _authUser=null; _authPending=false; _canSelfRegister=false; _devUser=null; try{localStorage.removeItem(userKey());}catch(e){} render(); loginModal(); }
+
+  // Alta del jugador al entrar con código válido: crea su jugador (nombre, apellido, apodo) y liga su cuenta.
+  function joinRegisterModal(){
+    const em=(_authUser&&_authUser.email)||'';
+    modal(`<h3>Date de alta · ${_esc(leagueName(ACTIVE_LEAGUE))}</h3>
+      <div class="hint" style="margin-bottom:8px">Entraste como <b>${_esc(em)}</b>. Regístrate para unirte a la liga.</div>
+      <label class="fl">Nombre</label><input id="jr_nombre" class="txt" placeholder="Nombre">
+      <label class="fl" style="margin-top:8px">Apellido</label><input id="jr_ape" class="txt" placeholder="Apellido">
+      <label class="fl" style="margin-top:8px">Apodo (opcional)</label><input id="jr_apodo" class="txt" placeholder="como te dicen en el 19">
+      <button class="btn block" style="margin-top:14px" onclick="App.joinRegister()">Unirme a la liga</button>
+      <button class="btn outline block" style="margin-top:8px" onclick="App.signOutAuth()">Cancelar / salir</button>`);
+  }
+  function joinRegister(){
+    if(!_authUser){ toast('Inicia sesión primero'); return; }
+    const nombre=(document.getElementById('jr_nombre')||{}).value||'';
+    const ape=(document.getElementById('jr_ape')||{}).value||'';
+    const apodo=((document.getElementById('jr_apodo')||{}).value||'').trim();
+    const name=(nombre.trim()+' '+ape.trim()).trim();
+    if(!name){ toast('Pon tu nombre y apellido'); return; }
+    const p={id:uid(), name:name, apodo:apodo, guest:false, fav:true};
+    state.players.push(p);
+    _devUser={playerId:p.id, role:'regular', uid:_authUser.uid, email:_authUser.email, real:true};
+    _authPending=false; _canSelfRegister=false;
+    // liga la cuenta a su jugador nuevo (con el código para que las reglas estrictas lo validen)
+    if(authAvailable()){ try{ firebase.database().ref('users/'+_authUser.uid+'/leagues/'+ACTIVE_LEAGUE).set({role:'regular', playerId:p.id, code:_joinCode||''}); }catch(e){} }
+    save(); closeModal(); cleanUrl(); render(); toast('¡Bienvenido, '+pname(p.id)+'!');
+  }
+  // Tarjeta de Ajustes: código/link para invitar a la liga (admin/super)
+  function cfgInviteHtml(){
+    if(!isAdmin() || !authAvailable()) return '';
+    const code=ensureJoinCode();
+    let h=`<div class="cfg-sect">Invitar a la liga</div>
+      <div class="card"><h3>Código de la liga</h3>
+        <div class="hint">Compártelo por WhatsApp. Quien entre con este link se <b>da de alta</b> (nombre, apellido, apodo) y se une a <b>${_esc(leagueName(ACTIVE_LEAGUE))}</b>.</div>
+        <div style="font-family:'Hanken Grotesk',sans-serif;font-weight:800;font-size:30px;letter-spacing:.14em;color:var(--fairway);text-align:center;margin:10px 0">${_esc(code)}</div>
+        <div class="row" style="gap:8px">
+          <button class="btn sm" onclick="App.shareInvite()">📲 Compartir</button>
+          <button class="btn sm outline" onclick="App.copyInvite()">Copiar link</button>
+          <button class="btn sm outline" onclick="App.regenJoinCode()">↻ Nuevo</button></div>
+        <input id="inv_link" class="txt" style="margin-top:8px;font-size:12px" value="${_esc(inviteLink())}" readonly onclick="this.select()"></div>`;
+    return h;
+  }
+  function shareInvite(){ const txt='Únete a '+leagueName(ACTIVE_LEAGUE)+' 🏌️\n'+inviteLink();
+    if(navigator.share){ navigator.share({title:leagueName(ACTIVE_LEAGUE), text:txt}).catch(function(){}); }
+    else { try{ window.open('https://wa.me/?text='+encodeURIComponent(txt),'_blank'); }catch(e){} } }
+  function copyInvite(){ const el=document.getElementById('inv_link'); if(!el) return; el.select();
+    try{ navigator.clipboard.writeText(el.value); toast('Link copiado'); }catch(e){ try{ document.execCommand('copy'); toast('Link copiado'); }catch(e2){} } }
+  function regenJoinCode(){ if(!isAdmin()) return;
+    confirmModal('¿Generar un código nuevo? El anterior dejará de funcionar.','Nuevo código',function(){
+      state._leagueMeta=state._leagueMeta||{}; state._leagueMeta.joinCode=genJoinCode(); save(); renderCfg(); toast('Código nuevo'); }); }
 
   function updateIdBar(){ const b=document.getElementById('idbar'); if(!b) return;
     let left;
@@ -3555,7 +3621,8 @@ const App = (() => {
     updateBrand(); renderCfg(); toast('Nombre del grupo: '+name); }
   function switchLeague(id){ if(!isSuper()){ toast('Solo el súper admin cambia de liga'); return; }
     if(id===ACTIVE_LEAGUE) return; try{ localStorage.setItem('cl_active_league', id); }catch(e){}
-    toast('Cambiando a '+leagueName(id)+'…'); setTimeout(()=>location.reload(), 450); }
+    // navega a URL limpia (sin ?liga/&code) para que el cambio de liga no lo pise un link de invitación
+    toast('Cambiando a '+leagueName(id)+'…'); setTimeout(()=>{ location.href=location.origin+location.pathname; }, 450); }
   function loadMembers(lid){ try{ const m=JSON.parse(localStorage.getItem('cl_members_'+lid)||'[]'); return Array.isArray(m)?m:[]; }catch(e){ return []; } }
   function saveMembers(lid,m){ try{ localStorage.setItem('cl_members_'+lid, JSON.stringify(m)); }catch(e){} }
   function addMember(){ if(!isAdmin()){ toast('Sin permiso'); return; }
@@ -3687,7 +3754,7 @@ const App = (() => {
     window.addEventListener('touchcancel',()=>{ pulling=false; hide(); },{passive:true});
   }
   async function init(){ try{ if(document.fonts&&document.fonts.load){ document.fonts.load("600 40px Newsreader"); document.fonts.load("700 16px 'Hanken Grotesk'"); } }catch(e){} loadDevUser(); await load(); if(!state.currentDayId && state.days[0]) state.currentDayId=state.days[0].id; render(); initPullRefresh(); startAuth(); if(!_devUser) loginModal(); }   // muestra la entrada al instante; si hay sesión de Google, se cierra sola al resolver
-  return { init,loginModal,doLogin,signInGoogle,signOutAuth,refreshAuthUsers,setSuperPlayer,assignAuthUser,unassignAuthUser,approveVent,rejectVent,createLeague,renameLeague,switchLeague,addMember,removeMember,setMaxGroup,go,switchDay,daysModal,editDayModal,saveDayEdit,delDay,newDayModal,createDay,
+  return { init,loginModal,doLogin,signInGoogle,signOutAuth,joinRegister,shareInvite,copyInvite,regenJoinCode,refreshAuthUsers,setSuperPlayer,assignAuthUser,unassignAuthUser,approveVent,rejectVent,createLeague,renameLeague,switchLeague,addMember,removeMember,setMaxGroup,go,switchDay,daysModal,editDayModal,saveDayEdit,delDay,newDayModal,createDay,
     toggleAssign:null,togglePlaying,cancelPlayer,moveGroup,confirmMove,sorteo,setSalidaTime,addGuestModal,
     pickScore,score,putt,setOyes,quick,toggleUnit,toggleCast,navHole,gotoPending,gotoPlayerPending,setScoreGroup,setStart,setHoles,setCourse,
     setVentFocus,pickVent,openBet,openH2H,setLiqTab,setScoreTab,setCmp,setVentPick,
