@@ -3452,7 +3452,7 @@ const App = (() => {
   function curUserLabel(){ if(!_devUser) return 'Sin sesión'; const rl=_devUser.role==='super'?'Súper admin':_devUser.role==='admin'?'Admin':'Regular'; return (pname(_devUser.playerId)||'?')+' · '+rl; }
   // ===================== AUTH REAL (Google) — fase login =====================
   // Coexiste con el "modo prueba": si hay sesión de Google y /users/{uid} resuelve, manda la identidad real.
-  let _authUser=null, _authPending=false, _canSelfRegister=false;
+  let _authUser=null, _authPending=false, _canSelfRegister=false, _authDiag='';
   function genJoinCode(){ const a='ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; let s=''; for(let i=0;i<6;i++) s+=a[Math.floor(Math.random()*a.length)]; return s; }
   function ensureJoinCode(){ state._leagueMeta=state._leagueMeta||{}; if(!state._leagueMeta.joinCode){ state._leagueMeta.joinCode=genJoinCode(); save(); } return state._leagueMeta.joinCode; }
   function inviteLink(){ return location.origin+location.pathname+'?liga='+encodeURIComponent(ACTIVE_LEAGUE)+'&code='+encodeURIComponent(ensureJoinCode()); }
@@ -3471,7 +3471,7 @@ const App = (() => {
     }catch(e){}
   }
   function resolveAuthIdentity(u){
-    _authPending=false;
+    _authPending=false; _authDiag='';
     return firebase.database().ref('users/'+u.uid).once('value').then(function(snap){
       const ud=snap.val()||null;
       if(ud && ud.super===true){   // súper en TODAS las ligas; su jugador es por-liga (Fernando en cada una es otro id de roster)
@@ -3494,8 +3494,9 @@ const App = (() => {
           _devUser={playerId:m.playerId, role:(m.role||'regular'), uid:u.uid, email:u.email, real:true}; return; } }
       // sin nada → pendiente; deja su perfil mínimo para que el admin lo asigne (caso Campestre: liga ya poblada)
       _authPending=true;
+      _authDiag = ud ? ('perfil existe pero super='+JSON.stringify(ud.super)+', sin liga "'+ACTIVE_LEAGUE+'"') : ('no existe /users/'+u.uid);
       try{ firebase.database().ref('users/'+u.uid).update({email:u.email||'', name:u.displayName||''}); }catch(e){}
-    }).catch(function(){ _authPending=true; });
+    }).catch(function(err){ _authPending=true; _authDiag='no pude leer /users/'+u.uid+' → '+((err&&err.code)||(err&&err.message)||'?'); });
   }
   function signInGoogle(){
     if(!authAvailable()){ toast('Falta habilitar Google en Firebase'); return; }
@@ -3574,8 +3575,15 @@ const App = (() => {
     const signedIn = isRealAuth() || _authPending;
     let top='';
     if(signedIn){
-      top=`<div class="hint" style="margin-bottom:8px">Sesión de Google: <b>${(_authUser&&_authUser.email)||''}</b>${_authPending?' · <span style="color:var(--clay)">pendiente de que el admin te asigne</span>':''}</div>
-        <button class="btn outline block" onclick="App.signOutAuth()">Cerrar sesión de Google</button>
+      top=`<div class="hint" style="margin-bottom:8px">Sesión de Google: <b>${_esc((_authUser&&_authUser.email)||'')}</b>${_authPending?' · <span style="color:var(--clay)">pendiente de que el admin te asigne</span>':''}</div>`;
+      if(_authPending && _authUser){
+        top+=`<div class="card" style="background:#fff8ee;border:1px solid #f0e0bf;box-shadow:none;font-size:11.5px">
+          <div><b>Tu UID:</b> <span style="font-family:monospace;word-break:break-all">${_esc(_authUser.uid)}</span></div>
+          <div style="margin-top:4px"><b>Liga activa:</b> ${_esc(ACTIVE_LEAGUE)}</div>
+          <div style="margin-top:4px;color:var(--clay)"><b>Diagnóstico:</b> ${_esc(_authDiag||'—')}</div>
+          <div class="hint" style="margin-top:6px">Súper: crea <code>users/${_esc(_authUser.uid)}/super</code> = <b>true</b> (booleano) en Realtime Database, y recarga.</div></div>`;
+      }
+      top+=`<button class="btn outline block" style="margin-top:8px" onclick="App.signOutAuth()">Cerrar sesión de Google</button>
         <div class="hint" style="margin:12px 0 4px;text-align:center">— o usa el modo prueba (temporal) —</div>`;
     } else if(authAvailable()){
       top=`<button class="btn block" onclick="App.signInGoogle()">Entrar con Google</button>
