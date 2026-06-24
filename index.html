@@ -877,7 +877,8 @@ const App = (() => {
     state.ventReq = state.ventReq || {};
     state.rayaPairs = state.rayaPairs || {};   // valor de raya por pareja (override del general)
     state.rayaReq = state.rayaReq || {};       // solicitudes de cambio de raya entre dos jugadores
-    if(!Array.isArray(state.houseRules)) state.houseRules = defaultHouseRules();   // reglas de la casa por liga
+    // reglas de la casa por liga: solo la liga original trae las de Campestre; cualquier liga nueva nace EN BLANCO
+    if(!Array.isArray(state.houseRules)) state.houseRules = (ACTIVE_LEAGUE==='campestre-viernes') ? defaultHouseRules() : [];
     if(!state._leagueMeta) state._leagueMeta={name:leagueName(ACTIVE_LEAGUE)||'Campestre León — Viernes', schema:2};
     if(!state._leagueMeta.name) state._leagueMeta.name=leagueName(ACTIVE_LEAGUE)||'Liga';
     state.days.forEach(dd=>{
@@ -3403,13 +3404,18 @@ const App = (() => {
   }
 
   const _esc = s => String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-  function houseRules(){ return (Array.isArray(state.houseRules)&&state.houseRules.length)?state.houseRules:defaultHouseRules(); }
+  function houseRules(){ return Array.isArray(state.houseRules)?state.houseRules:[]; }   // sin reglas = vacío (NO hereda el default)
   function rulesModal(){
-    const items=houseRules().map(function(r){ const i=String(r).indexOf(' — ');
-      return i>0 ? '<li><b>'+_esc(r.slice(0,i))+'</b> — '+_esc(r.slice(i+3))+'</li>' : '<li>'+_esc(r)+'</li>'; }).join('');
+    const rules=houseRules();
     let h=`<h3>📜 Reglas del grupo</h3>
-      <div class="hint" style="margin-bottom:10px">${_esc(leagueName(ACTIVE_LEAGUE))}</div>
-      <ol class="ruleslist">${items}</ol>`;
+      <div class="hint" style="margin-bottom:10px">${_esc(leagueName(ACTIVE_LEAGUE))}</div>`;
+    if(rules.length){
+      const items=rules.map(function(r){ const i=String(r).indexOf(' — ');
+        return i>0 ? '<li><b>'+_esc(r.slice(0,i))+'</b> — '+_esc(r.slice(i+3))+'</li>' : '<li>'+_esc(r)+'</li>'; }).join('');
+      h+=`<ol class="ruleslist">${items}</ol>`;
+    } else {
+      h+=`<div class="hint" style="margin-bottom:6px">Esta liga aún no tiene reglas.${isAdmin()?' Agrégalas con el botón de abajo.':' El admin las puede agregar.'}</div>`;
+    }
     if(isAdmin()) h+=`<button class="btn outline block" style="margin-top:10px" onclick="App.editRulesModal()">✏️ Editar reglas</button>`;
     h+=`<button class="btn block" style="margin-top:8px" onclick="App.closeModal()">Cerrar</button>`;
     modal(h);
@@ -3426,7 +3432,7 @@ const App = (() => {
     if(!isAdmin()){ toast('Solo el admin edita las reglas'); return; }
     const el=document.getElementById('rules_txt'); if(!el) return;
     const lines=el.value.split('\n').map(s=>s.trim()).filter(Boolean);
-    state.houseRules = lines.length ? lines : defaultHouseRules();
+    state.houseRules = lines;   // se permite dejarlas vacías
     save(); toast('Reglas actualizadas'); rulesModal(); if(curView==='cfg') renderCfg();
   }
 
