@@ -596,8 +596,22 @@
 
 <script>
 const App = (() => {
+  const APP_VERSION = '2026-06-25-01';   // ⬆️ SUBIR en cada deploy: la app se auto-recarga cuando detecta una versión distinta
   const KEY = 'rayas-campestre-v2';
   const uid = () => Math.random().toString(36).slice(2,9);
+  // Auto-actualización: revisa el index.html en vivo (sin caché); si la versión cambió, recarga a la versión fresca.
+  async function checkForUpdate(){
+    try{
+      const res = await fetch(location.pathname + '?_v=' + Date.now(), { cache:'no-store' });
+      if(!res.ok) return;
+      const txt = await res.text();
+      const m = txt.match(/APP_VERSION\s*=\s*'([^']+)'/);
+      if(m && m[1] && m[1] !== APP_VERSION){
+        try{ localStorage.setItem('cl_reloaded_to', m[1]); }catch(e){}
+        location.replace(location.pathname + '?v=' + encodeURIComponent(m[1]));   // recarga con cache-bust → baja el código nuevo
+      }
+    }catch(e){}
+  }
 
   // ============================================================================
   //  CONFIGURACIÓN FIREBASE  ·  para que el grupo vea los mismos datos en vivo
@@ -3762,7 +3776,10 @@ const App = (() => {
     window.addEventListener('touchend',end,{passive:true});
     window.addEventListener('touchcancel',()=>{ pulling=false; hide(); },{passive:true});
   }
-  async function init(){ try{ if(document.fonts&&document.fonts.load){ document.fonts.load("600 40px Newsreader"); document.fonts.load("700 16px 'Hanken Grotesk'"); } }catch(e){} loadDevUser(); await load(); if(!state.currentDayId && state.days[0]) state.currentDayId=state.days[0].id; render(); initPullRefresh(); startAuth(); if(!_devUser) loginModal(); }   // muestra la entrada al instante; si hay sesión de Google, se cierra sola al resolver
+  async function init(){ try{ if(document.fonts&&document.fonts.load){ document.fonts.load("600 40px Newsreader"); document.fonts.load("700 16px 'Hanken Grotesk'"); } }catch(e){} loadDevUser(); await load(); if(!state.currentDayId && state.days[0]) state.currentDayId=state.days[0].id; render(); initPullRefresh(); startAuth(); if(!_devUser) loginModal();
+    checkForUpdate();   // ¿hay versión nueva? recarga sola
+    document.addEventListener('visibilitychange', ()=>{ if(!document.hidden) checkForUpdate(); });   // y cada vez que vuelves a la app
+  }   // muestra la entrada al instante; si hay sesión de Google, se cierra sola al resolver
   return { init,loginModal,doLogin,signInGoogle,signOutAuth,joinRegister,shareInvite,copyInvite,regenJoinCode,createMyPlayer,approveVent,rejectVent,createLeague,renameLeague,switchLeague,setMaxGroup,go,switchDay,daysModal,editDayModal,saveDayEdit,delDay,newDayModal,createDay,
     toggleAssign:null,togglePlaying,cancelPlayer,moveGroup,confirmMove,sorteo,setSalidaTime,addGuestModal,
     pickScore,score,putt,setOyes,quick,toggleUnit,toggleCast,navHole,gotoPending,gotoPlayerPending,setScoreGroup,setStart,setHoles,setCourse,
