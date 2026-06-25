@@ -831,8 +831,7 @@ const App = (() => {
     } else if(_backend==='local'){
       try{ const raw=localStorage.getItem(KEY); if(raw) mergeState(raw); }catch(e){}
     }
-    // Solo la liga original arranca con el roster de Campestre. Cualquier liga nueva nace vacía.
-    if(state.players.length===0 && ACTIVE_LEAGUE==='campestre-viernes') seed();
+    // Toda liga nace VACÍA: los jugadores entran solos al registrarse con Google (sin seed ni alta manual).
     migrate();
     _loadedOnce=true;
   }
@@ -3084,10 +3083,9 @@ const App = (() => {
     // ===================== GRUPO =====================
     html+=`<div class="cfg-sect">Grupo</div>`;
 
-    // jugadores
-    html+=`<div class="card"><div class="row" style="justify-content:space-between"><h3>Jugadores (${state.players.length})</h3>
-      <button class="btn outline sm" onclick="App.addPlayerModal()">+ Agregar</button></div>
-      <div class="hint">⭐ = favorito (sale arriba al convocar). Los invitados entran sin estrella para no llenar la lista.</div><div class="plist">`;
+    // jugadores (el roster se llena solo cuando cada quien entra con Google; aquí solo se administra)
+    html+=`<div class="card"><h3>Jugadores (${state.players.length})</h3>
+      <div class="hint">Cada quien aparece al entrar con Google por el link de la liga. ⭐ = favorito (sale arriba al convocar).</div><div class="plist">`;
     [...state.players].sort((a,b)=>(b.fav?1:0)-(a.fav?1:0)||a.name.localeCompare(b.name)).forEach(p=>{
       html+=`<div class="prow"><div class="avatar ${p.guest?'g':''}">${(p.apodo||p.name).slice(0,1).toUpperCase()}</div>
         <div class="grow"><div class="nm">${p.name}${(p.apodo||'').trim()?` <span class="apod">"${p.apodo.trim()}"</span>`:''}</div>${p.guest?'<div class="tag">Invitado</div>':''}</div>
@@ -3298,13 +3296,6 @@ const App = (() => {
     });
   }
 
-  function addPlayerModal(){
-    modal(`<h3>Agregar jugador</h3>
-      <label class="fl">Nombre</label><input id="m_nombre" class="txt" placeholder="Nombre" autofocus>
-      <label class="fl" style="margin-top:10px">Apellido</label><input id="m_ape" class="txt" placeholder="Apellido">
-      <label class="fl" style="margin-top:10px">Apodo (opcional)</label><input id="m_apodo" class="txt" placeholder="como le dicen en el 19">
-      <button class="btn block" style="margin-top:14px" onclick="App.createPlayer(false)">Agregar</button>`);
-  }
   function addGuestModal(){
     modal(`<h3>Agregar invitado</h3>
       <label class="fl">Nombre del invitado</label><input id="m_name" class="txt" placeholder="Invitado">
@@ -3533,39 +3524,33 @@ const App = (() => {
   }
   function signOutAuth(){ try{ if(authAvailable()) firebase.auth().signOut(); }catch(e){} _authUser=null; _authPending=false; _canSelfRegister=false; _devUser=null; try{localStorage.removeItem(userKey());}catch(e){} render(); loginModal(); }
 
-  // Alta del jugador: pide el código de la liga + nombre/apellido/apodo; crea su jugador y liga su cuenta.
+  // Alta del jugador: login con Google (vía link de la liga) = se crea su jugador y se liga, en un paso. Sin código.
   function joinRegisterModal(){
     const em=(_authUser&&_authUser.email)||'';
+    const dn=((_authUser&&_authUser.displayName)||'').trim();   // nombre del perfil de Google
+    const sp=dn.indexOf(' '); const nom=sp>0?dn.slice(0,sp):dn; const ape=sp>0?dn.slice(sp+1):'';
     modal(`<h3>Únete a ${_esc(leagueName(ACTIVE_LEAGUE))}</h3>
-      <div class="hint" style="margin-bottom:8px">Entraste como <b>${_esc(em)}</b>. Pon el código que te pasaron y tus datos.</div>
-      <label class="fl">Código de la liga</label><input id="jr_code" class="txt" placeholder="el código que te compartieron" value="${_esc(_joinCode||'')}" style="text-transform:uppercase">
-      <label class="fl" style="margin-top:8px">Nombre</label><input id="jr_nombre" class="txt" placeholder="Nombre">
-      <label class="fl" style="margin-top:8px">Apellido</label><input id="jr_ape" class="txt" placeholder="Apellido">
+      <div class="hint" style="margin-bottom:8px">Entraste como <b>${_esc(em)}</b>. Confirma tu nombre para entrar.</div>
+      <label class="fl">Nombre</label><input id="jr_nombre" class="txt" value="${_esc(nom)}" placeholder="Nombre">
+      <label class="fl" style="margin-top:8px">Apellido</label><input id="jr_ape" class="txt" value="${_esc(ape)}" placeholder="Apellido">
       <label class="fl" style="margin-top:8px">Apodo (opcional)</label><input id="jr_apodo" class="txt" placeholder="como te dicen en el 19">
-      <button class="btn block" style="margin-top:14px" onclick="App.joinRegister()">Unirme a la liga</button>
+      <button class="btn block" style="margin-top:14px" onclick="App.joinRegister()">Entrar a la liga</button>
       <button class="btn outline block" style="margin-top:8px" onclick="App.signOutAuth()">Salir</button>`);
   }
   function joinRegister(){
     if(!_authUser){ toast('Inicia sesión primero'); return; }
-    const code=((document.getElementById('jr_code')||{}).value||'').trim().toUpperCase();
     const nombre=((document.getElementById('jr_nombre')||{}).value||'').trim();
     const ape=((document.getElementById('jr_ape')||{}).value||'').trim();
     const apodo=((document.getElementById('jr_apodo')||{}).value||'').trim();
     const name=(nombre+' '+ape).trim();
-    if(!code){ toast('Pon el código de la liga'); return; }
-    if(!name){ toast('Pon tu nombre y apellido'); return; }
-    // verifica el código contra el real de la liga (ya autenticado)
-    firebase.database().ref('leagues/'+ACTIVE_LEAGUE+'/meta/joinCode').once('value').then(function(cs){
-      const real=String(cs.val()||(state._leagueMeta&&state._leagueMeta.joinCode)||'').toUpperCase();
-      if(!real){ toast('Esta liga aún no tiene código (que el admin lo genere)'); return; }
-      if(code!==real){ toast('Código incorrecto'); return; }
-      const p={id:uid(), name:name, apodo:apodo, guest:false, fav:true};
-      state.players.push(p);
-      _devUser={playerId:p.id, role:'regular', uid:_authUser.uid, email:_authUser.email, real:true};
-      _authPending=false; _canSelfRegister=false;
-      try{ firebase.database().ref('users/'+_authUser.uid+'/leagues/'+ACTIVE_LEAGUE).set({role:'regular', playerId:p.id, code:code}); }catch(e){}
-      save(); closeModal(); cleanUrl(); render(); toast('¡Bienvenido, '+pname(p.id)+'!');
-    }).catch(function(){ toast('No pude verificar el código (revisa tu conexión)'); });
+    if(!name){ toast('Pon tu nombre'); return; }
+    // El link de la liga (?liga=...) ya define a qué liga entra; aquí se crea el jugador y se liga la cuenta.
+    const p={id:uid(), name:name, apodo:apodo, guest:false, fav:true};
+    state.players.push(p);
+    _devUser={playerId:p.id, role:'regular', uid:_authUser.uid, email:_authUser.email, real:true};
+    _authPending=false; _canSelfRegister=false;
+    try{ firebase.database().ref('users/'+_authUser.uid+'/leagues/'+ACTIVE_LEAGUE).set({role:'regular', playerId:p.id}); }catch(e){}
+    save(); closeModal(); cleanUrl(); render(); toast('¡Bienvenido, '+pname(p.id)+'!');
   }
   // Tarjeta de Ajustes: código/link para invitar a la liga (admin/super)
   function cfgInviteHtml(){
@@ -3795,9 +3780,9 @@ const App = (() => {
     pickScore,score,putt,setOyes,quick,toggleUnit,toggleCast,navHole,gotoPending,gotoPlayerPending,setScoreGroup,setStart,setHoles,setCourse,
     setVentFocus,pickVent,openBet,openH2H,setLiqTab,setScoreTab,setCmp,setVentPick,
     setDblPlayer,toggleDbl,closeDay,historyModal,exportImage,exportHigh,exportProfile,exportSalidas,exportSeasonTable,exportCompare,exportScorecard,toggleSound,
-    setRaya,submitRayaPair,approveRayaReq,rejectRayaReq,removeRayaPair,addPlayerModal,createPlayer,editPlayerModal,savePlayer,delPlayer,toggleFav,
+    setRaya,submitRayaPair,approveRayaReq,rejectRayaReq,removeRayaPair,createPlayer,editPlayerModal,savePlayer,delPlayer,toggleFav,
     courseModal,setHole,setCfgCourse,addCourse,renameCourse,deleteCourse,unitModal,createUnit,delUnit,castModal,createCast,delCast,toggleCastTipo,
-    addPlayerModal,exportData,renderCfg,renderVent,renderDay,closeModal,confirmYes,renderHigh,setHighTab,openProfile,rulesModal,editRulesModal,saveRules };
+    exportData,renderCfg,renderVent,renderDay,closeModal,confirmYes,renderHigh,setHighTab,openProfile,rulesModal,editRulesModal,saveRules };
 })();
 App.init();
 </script>
