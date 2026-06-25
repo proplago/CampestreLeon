@@ -3685,10 +3685,11 @@ const App = (() => {
     let h=`<div class="cfg-sect">Cuentas (Google)</div>`;
     if(sup){
       h+=`<div class="card"><h3>Tu jugador</h3>
-        <div class="hint">Si juegas esta liga, elígete. Si solo la administras, deja <b>"Solo administro"</b>: no apareces en convocatoria, rayas ni standings.</div>
+        <div class="hint">Si juegas esta liga, elígete (o créate). Si solo la administras, deja <b>"Solo administro"</b>: no apareces en convocatoria, rayas ni standings.</div>
         <select class="txt" style="margin-top:6px" onchange="App.setSuperPlayer(this.value)">
           <option value="" ${!myPid()?'selected':''}>— Solo administro (no juego aquí) —</option>
-          ${ps.map(p=>`<option value="${p.id}" ${p.id===myPid()?'selected':''}>${p.name}${p.guest?' (inv)':''}</option>`).join('')}</select></div>`;
+          ${ps.map(p=>`<option value="${p.id}" ${p.id===myPid()?'selected':''}>${p.name}${p.guest?' (inv)':''}</option>`).join('')}</select>
+        ${!myPid()?`<button class="btn outline sm block" style="margin-top:8px" onclick="App.createMyPlayer()">+ Créate tu jugador en esta liga</button>`:''}</div>`;
     }
     if(_authUsersCache===null){ fetchAuthUsers(); h+=`<div class="card"><div class="hint">Cargando cuentas…</div></div>`; return h; }
     const users=_authUsersCache||{};
@@ -3726,6 +3727,13 @@ const App = (() => {
     if(authAvailable() && _devUser&&_devUser.uid){ const ref=firebase.database().ref('users/'+_devUser.uid+'/leagues/'+ACTIVE_LEAGUE+'/playerId'); try{ none?ref.remove():ref.set(pid); }catch(e){} }
     if(_devUser) _devUser.playerId=none?null:pid;
     render(); toast(none?'Modo operador: administras sin jugar aquí':'Tu jugador: '+pname(pid));
+  }
+  function createMyPlayer(){   // el súper se crea su propio jugador en esta liga (cuando sí juega aquí)
+    if(!isSuper()){ toast('Solo el súper'); return; }
+    const dn=((_authUser&&_authUser.displayName)||'').trim() || (_devUser&&_devUser.email) || 'Yo';
+    const p={id:uid(), name:dn, apodo:'', guest:false, fav:true};
+    state.players.push(p); save();
+    setSuperPlayer(p.id);   // liga al súper con su jugador nuevo en esta liga (escribe playerId + render)
   }
   function assignAuthUser(uid){
     if(!isSuper()){ toast('Solo el súper'); return; }
@@ -3775,7 +3783,7 @@ const App = (() => {
     window.addEventListener('touchcancel',()=>{ pulling=false; hide(); },{passive:true});
   }
   async function init(){ try{ if(document.fonts&&document.fonts.load){ document.fonts.load("600 40px Newsreader"); document.fonts.load("700 16px 'Hanken Grotesk'"); } }catch(e){} loadDevUser(); await load(); if(!state.currentDayId && state.days[0]) state.currentDayId=state.days[0].id; render(); initPullRefresh(); startAuth(); if(!_devUser) loginModal(); }   // muestra la entrada al instante; si hay sesión de Google, se cierra sola al resolver
-  return { init,loginModal,doLogin,signInGoogle,signOutAuth,joinRegister,shareInvite,copyInvite,regenJoinCode,refreshAuthUsers,setSuperPlayer,assignAuthUser,unassignAuthUser,removeAuthUser,approveVent,rejectVent,createLeague,renameLeague,switchLeague,setMaxGroup,go,switchDay,daysModal,editDayModal,saveDayEdit,delDay,newDayModal,createDay,
+  return { init,loginModal,doLogin,signInGoogle,signOutAuth,joinRegister,shareInvite,copyInvite,regenJoinCode,refreshAuthUsers,setSuperPlayer,createMyPlayer,assignAuthUser,unassignAuthUser,removeAuthUser,approveVent,rejectVent,createLeague,renameLeague,switchLeague,setMaxGroup,go,switchDay,daysModal,editDayModal,saveDayEdit,delDay,newDayModal,createDay,
     toggleAssign:null,togglePlaying,cancelPlayer,moveGroup,confirmMove,sorteo,setSalidaTime,addGuestModal,
     pickScore,score,putt,setOyes,quick,toggleUnit,toggleCast,navHole,gotoPending,gotoPlayerPending,setScoreGroup,setStart,setHoles,setCourse,
     setVentFocus,pickVent,openBet,openH2H,setLiqTab,setScoreTab,setCmp,setVentPick,
