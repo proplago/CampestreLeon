@@ -691,6 +691,20 @@ const App = (() => {
     if(_jl){ ACTIVE_LEAGUE=_jl; try{localStorage.setItem('cl_active_league',_jl);}catch(e){} }
     _joinCode=_p.get('code')||null; }catch(e){}
   let _backend='memory', _fbRef=null, _shardCache={}, _loadedOnce=false;
+  let _users={};   // identidad GLOBAL por cuenta: users/{uid} = {name, email, super, leagues}. El jugador de cada liga solo referencia el uid.
+  function hydratePlayers(){   // copia nombre/correo del perfil global al jugador en memoria (la app sigue usando p.name; en la base no se duplica)
+    let ch=false;
+    (state.players||[]).forEach(function(p){ if(!p || !p.uid) return; const u=_users[p.uid];
+      if(u && u.name){   // hidrata desde la identidad global
+        if(p.name!==u.name){ p.name=u.name; ch=true; }
+        if(u.email!=null && p.email!==u.email){ p.email=u.email; ch=true; }
+      } else if(p.name && authAvailable()){   // migración: jugador en formato viejo (nombre en el jugador) → súbelo al perfil global
+        _users[p.uid]=Object.assign({}, _users[p.uid], {name:p.name, email:(p.email||'')});
+        try{ firebase.database().ref('users/'+p.uid).update({name:p.name, email:(p.email||'')}); }catch(e){}
+      } });
+    if(ch) clearStatCache();
+    return ch;
+  }
   function fbConfigured(){ return !!(FIREBASE_CONFIG && FIREBASE_CONFIG.databaseURL && FIREBASE_CONFIG.databaseURL.trim()); }
   function lsOk(){ try{ localStorage.setItem('__t','1'); localStorage.removeItem('__t'); return true; }catch(e){ return false; } }
   // Respaldo local por-liga: se escribe SIEMPRE (también en modo Firebase) para que un refresh
@@ -723,7 +737,7 @@ const App = (() => {
     const out={};
     out['meta']  = st._leagueMeta || {name:'Liga', schema:2};
     out['rules'] = { rayaValue:(st.rayaValue!=null?st.rayaValue:20), activeBets: st.activeBets || _defActiveBets(), maxWeekday:(st.maxWeekday||6), maxWeekend:(st.maxWeekend||5), rayaPairs:(st.rayaPairs||{}), rayaReq:(st.rayaReq||{}) };
-    const players={}; (st.players||[]).forEach(p=>{ if(p&&p.id){ const o=Object.assign({},p); delete o.id; players[p.id]=o; } }); out['players']=players;
+    const players={}; (st.players||[]).forEach(p=>{ if(p&&p.id){ const o=Object.assign({},p); delete o.id; if(o.uid){ delete o.name; delete o.email; } players[p.id]=o; } }); out['players']=players;   // con cuenta: nombre/correo viven en users/{uid}, no se duplican aquí
     const courses={}; (st.courses||[]).forEach(c=>{ if(c&&c.id){ const o=Object.assign({},c); delete o.id; courses[c.id]=o; } }); out['courses']=courses;
     out['units']      = st.units||[];
     out['castigos']   = st.castigos||[];
@@ -817,11 +831,13 @@ const App = (() => {
           if(!done){
             const ns=rebuildFromShards(flattenTree(root)); if(ns) state=Object.assign(state,ns);
             _shardCache=flattenTree(root);   // cache = lo que REALMENTE hay en la base (migrate luego escribe su diff)
-            fin();
-          } else applyRemoteTree(root);
+            hydratePlayers(); fin();
+          } else { applyRemoteTree(root); hydratePlayers(); }
         }, ()=>fin());   // permiso/conexión denegada → no bloquear el arranque
         setTimeout(fin, 4000);   // si la red tarda, no bloquear el arranque
       });
+      // identidad global: users/{uid} = {name, email, super, leagues}. Se hidrata el nombre de cada jugador con cuenta.
+      try{ firebase.database().ref('users').on('value', function(snap){ _users=snap.val()||{}; if(hydratePlayers() && _loadedOnce) render(); }, function(){}); }catch(e){}
       // Firebase no entregó datos (liga vacía, sin permiso o sin red) → recupera el respaldo local de esta liga
       if(state.players.length===0 && (state.days||[]).length===0){
         try{ const raw=localStorage.getItem(lsBackupKey()); if(raw) mergeState(raw); }catch(e){}
@@ -3340,7 +3356,9 @@ const App = (() => {
     p.guest=document.getElementById('m_guest').checked;
     p.fav=document.getElementById('m_fav').checked;
     const roleEl=document.getElementById('m_role');
-    if(roleEl && isSuper() && p.uid){ p.role=roleEl.value; }   // el rol vive en el propio jugador
+    if(roleEl && isSuper() && p.uid){ p.role=roleEl.value; }   // el rol es por-liga: vive en el jugador
+    if(p.uid){ _users[p.uid]=Object.assign({}, _users[p.uid], {name:p.name, email:(p.email||'')});   // nombre/correo: identidad global
+      if(authAvailable()){ try{ firebase.database().ref('users/'+p.uid).update({name:p.name, email:(p.email||'')}); }catch(e){} } }
     save(); closeModal(); render();
   }
   function toggleFav(id){ const p=player(id); p.fav=!p.fav; save(); render(); }
@@ -3538,9 +3556,12 @@ const App = (() => {
     const name=(nombre+' '+ape).trim();
     if(!name){ toast('Pon tu nombre'); return; }
     // El link de la liga (?liga=...) ya define a qué liga entra; aquí se crea el jugador y se liga la cuenta.
-    const p={id:uid(), name:name, apodo:apodo, guest:false, fav:true, uid:_authUser.uid, email:(_authUser.email||''), role:'regular'};
-    state.players.push(p);   // el jugador ES la cuenta: trae uid/email/role adentro
-    _devUser={playerId:p.id, role:'regular', uid:_authUser.uid, email:_authUser.email, real:true};
+    const em=(_authUser.email||'');
+    const p={id:uid(), name:name, apodo:apodo, guest:false, fav:true, uid:_authUser.uid, email:em, role:'regular'};
+    state.players.push(p);   // en memoria con nombre; en la base, el nombre vive en users/{uid}
+    _users[_authUser.uid]=Object.assign({}, _users[_authUser.uid], {name:name, email:em});
+    try{ firebase.database().ref('users/'+_authUser.uid).update({name:name, email:em}); firebase.database().ref('users/'+_authUser.uid+'/leagues/'+ACTIVE_LEAGUE).set(true); }catch(e){}
+    _devUser={playerId:p.id, role:'regular', uid:_authUser.uid, email:em, real:true};
     _authPending=false; _canSelfRegister=false;
     save(); closeModal(); cleanUrl(); render(); toast('¡Bienvenido, '+pname(p.id)+'!');
   }
@@ -3678,8 +3699,11 @@ const App = (() => {
     if(!isSuper()){ toast('Solo el súper'); return; }
     if(myPid()){ toast('Ya tienes jugador en esta liga'); return; }
     const dn=((_authUser&&_authUser.displayName)||'').trim() || (_devUser&&_devUser.email) || 'Yo';
-    const p={id:uid(), name:dn, apodo:'', guest:false, fav:true, uid:(_devUser&&_devUser.uid)||null, email:(_devUser&&_devUser.email)||'', role:'regular'};
+    const myuid=(_devUser&&_devUser.uid)||null, em=(_devUser&&_devUser.email)||'';
+    const p={id:uid(), name:dn, apodo:'', guest:false, fav:true, uid:myuid, email:em, role:'regular'};
     state.players.push(p); if(_devUser) _devUser.playerId=p.id;
+    if(myuid){ _users[myuid]=Object.assign({}, _users[myuid], {name:dn, email:em});
+      try{ firebase.database().ref('users/'+myuid).update({name:dn, email:em}); firebase.database().ref('users/'+myuid+'/leagues/'+ACTIVE_LEAGUE).set(true); }catch(e){} }
     save(); render(); toast('Listo, ahora juegas esta liga');
   }
 
