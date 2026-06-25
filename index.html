@@ -3497,21 +3497,22 @@ const App = (() => {
   }
   function resolveAuthIdentity(u){
     _authPending=false; _authDiag='';
-    // Esquema "el jugador ES la cuenta": tu identidad = el jugador de ESTA liga cuyo uid === el tuyo.
-    // Único dato global: users/{uid}/super (se pone a mano en consola). NO hay membresía por liga.
+    // Tu identidad = el jugador de ESTA liga cuyo uid === el tuyo. Único dato global: users/{uid}/super.
     return (u.getIdToken?u.getIdToken().catch(function(){}):Promise.resolve()).then(function(){
-      return Promise.all([
-        firebase.database().ref('users/'+u.uid+'/super').once('value').then(function(s){ return s.val()===true; }).catch(function(){ return false; }),
-        firebase.database().ref('leagues/'+ACTIVE_LEAGUE+'/players').once('value').then(function(s){ return s.val()||{}; }).catch(function(){ return null; })
-      ]);
-    }).then(function(res){
-      const isSup=res[0], players=res[1];
-      if(players===null){ _authPending=true; _authDiag='no pude leer los jugadores de la liga (permiso/conexión)'; return; }
-      let myPid=null, myRole='regular';
-      Object.keys(players).forEach(function(pid){ const p=players[pid]; if(p && p.uid===u.uid){ myPid=pid; myRole=p.role||'regular'; } });
-      if(myPid){ _devUser={playerId:myPid, role:(isSup?'super':myRole), uid:u.uid, email:u.email, real:true}; }
-      else if(isSup){ _devUser={playerId:null, role:'super', uid:u.uid, email:u.email, real:true}; }   // súper sin jugador aquí = operador
-      else { _authPending=true; _canSelfRegister=true; _authDiag=Object.keys(players).length?'no estás en esta liga':'eres el primero en esta liga'; }
+      return firebase.database().ref('users/'+u.uid+'/super').once('value').then(function(s){ return s.val()===true; }).catch(function(){ return false; });
+    }).then(function(isSup){
+      // 1) busca en el estado YA cargado (fuente viva, consistente con lo que ve la app)
+      const mine=(state.players||[]).find(function(p){ return p && p.uid===u.uid; });
+      if(mine){ _devUser={playerId:mine.id, role:(isSup?'super':(mine.role||'regular')), uid:u.uid, email:u.email, real:true}; return; }
+      // 2) fallback: lee la liga directo (por si el estado aún no cargó), evita ofrecer alta por error
+      return firebase.database().ref('leagues/'+ACTIVE_LEAGUE+'/players').once('value').then(function(s){ return s.val()||{}; }).catch(function(){ return null; }).then(function(players){
+        if(players===null){ if(isSup){ _devUser={playerId:null, role:'super', uid:u.uid, email:u.email, real:true}; } else { _authPending=true; _authDiag='no pude leer la liga (permiso/conexión)'; } return; }
+        let myPid=null, myRole='regular';
+        Object.keys(players).forEach(function(pid){ const p=players[pid]; if(p && p.uid===u.uid){ myPid=pid; myRole=p.role||'regular'; } });
+        if(myPid){ _devUser={playerId:myPid, role:(isSup?'super':myRole), uid:u.uid, email:u.email, real:true}; }
+        else if(isSup){ _devUser={playerId:null, role:'super', uid:u.uid, email:u.email, real:true}; }   // súper sin jugador aquí = operador
+        else { _authPending=true; _canSelfRegister=true; _authDiag=Object.keys(players).length?'no estás en esta liga':'eres el primero en esta liga'; }
+      });
     });
   }
   function signInGoogle(){
@@ -3545,6 +3546,9 @@ const App = (() => {
   }
   function joinRegister(){
     if(!_authUser){ toast('Inicia sesión primero'); return; }
+    // Idempotente: si ya tienes jugador en esta liga (por uid), adóptalo — NO dupliques aunque salga el registro por error.
+    const mine=(state.players||[]).find(function(p){ return p && p.uid===_authUser.uid; });
+    if(mine){ _devUser={playerId:mine.id, role:(mine.role||'regular'), uid:_authUser.uid, email:(_authUser.email||''), real:true}; _authPending=false; _canSelfRegister=false; closeModal(); cleanUrl(); render(); toast('¡Bienvenido de nuevo!'); return; }
     const nombre=((document.getElementById('jr_nombre')||{}).value||'').trim();
     const ape=((document.getElementById('jr_ape')||{}).value||'').trim();
     const apodo=((document.getElementById('jr_apodo')||{}).value||'').trim();
