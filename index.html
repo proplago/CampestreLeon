@@ -821,8 +821,9 @@ const App = (() => {
   async function load(){
     detectBackend();
     if(_backend==='fb'){
+      let fbResponded=false;
       await new Promise(res=>{ let done=false; const fin=()=>{ if(!done){ done=true; res(); } };
-        _fbRef.on('value', snap=>{ const root=snap.val();
+        _fbRef.on('value', snap=>{ fbResponded=true; const root=snap.val();
           if(!done){
             const ns=rebuildFromShards(flattenTree(root)); if(ns) state=Object.assign(state,ns);
             _shardCache=flattenTree(root);   // cache = lo que REALMENTE hay en la base (migrate luego escribe su diff)
@@ -833,8 +834,9 @@ const App = (() => {
       });
       // identidad global: users/{uid} = {name, email, super, leagues}. Se hidrata el nombre de cada jugador con cuenta.
       try{ firebase.database().ref('users').on('value', function(snap){ _users=snap.val()||{}; if(hydratePlayers() && _loadedOnce) render(); }, function(){}); }catch(e){}
-      // Firebase no entregó datos (liga vacía, sin permiso o sin red) → recupera el respaldo local de esta liga
-      if(state.players.length===0 && (state.days||[]).length===0){
+      // SOLO restaura del respaldo local si Firebase NO respondió (offline/denegado). Si respondió vacío (datos borrados),
+      // se respeta el vacío — así un borrado en la consola NO revive desde el caché local.
+      if(!fbResponded && state.players.length===0 && (state.days||[]).length===0){
         try{ const raw=localStorage.getItem(lsBackupKey()); if(raw) mergeState(raw); }catch(e){}
       }
     } else if(_backend==='wstorage'){
