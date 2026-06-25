@@ -3016,6 +3016,36 @@ const App = (() => {
         <label class="fl" style="flex:1;margin:0">Fin de semana<input class="txt" type="number" inputmode="numeric" min="1" max="12" value="${state.maxWeekend||5}" onchange="App.setMaxGroup('wknd',this.value)"></label>
       </div></div>`;
   }
+  // Sección "Jugadores" del grupo (roster + correo + rol + favorito + editar/borrar). Va arriba en Ajustes.
+  function cfgPlayersHtml(){
+    let html=`<div class="cfg-sect">Grupo</div>
+      <div class="card"><h3>Jugadores (${state.players.length})</h3>
+      <div class="hint">Cada quien aparece al entrar con Google por el link de la liga. ⭐ = favorito (sale arriba al convocar).</div><div class="plist">`;
+    [...state.players].sort((a,b)=>(b.fav?1:0)-(a.fav?1:0)||a.name.localeCompare(b.name)).forEach(p=>{
+      const sub = p.guest ? 'Invitado' : (p.email ? _esc(p.email) : 'sin cuenta');
+      html+=`<div class="prow"><div class="avatar ${p.guest?'g':''}">${(p.apodo||p.name).slice(0,1).toUpperCase()}</div>
+        <div class="grow"><div class="nm">${p.name}${(p.apodo||'').trim()?` <span class="apod">"${p.apodo.trim()}"</span>`:''}${p.role==='admin'?' <span class="tag">admin</span>':''}</div>
+        <div class="desc" style="font-size:11px;color:var(--muted)">${sub}</div></div>
+        <button class="icbtn" onclick="App.toggleFav('${p.id}')">${p.fav?'⭐':'☆'}</button>
+        <button class="icbtn" onclick="App.editPlayerModal('${p.id}')">✏️</button>
+        <button class="icbtn" onclick="App.delPlayer('${p.id}')">🗑</button></div>`;
+    });
+    html+=`</div></div>`;
+    return html;
+  }
+  // Selector de ligas: muestra las ligas a las que pertenece el usuario (o todas, si es súper). Solo si hay >1.
+  function cfgMyLeaguesHtml(){
+    const uid=_devUser&&_devUser.uid;
+    let lids = isSuper() ? loadLeagues().map(l=>l.id)
+             : (uid && _users[uid] && _users[uid].leagues ? Object.keys(_users[uid].leagues).filter(l=>_users[uid].leagues[l]) : []);
+    if(lids.indexOf(ACTIVE_LEAGUE)<0) lids.unshift(ACTIVE_LEAGUE);
+    lids = lids.filter((v,i,a)=>a.indexOf(v)===i);
+    if(lids.length<=1) return '';
+    return `<div class="card"><h3>Liga</h3>
+      <div class="hint">Estás viendo <b>${_esc(leagueName(ACTIVE_LEAGUE))}</b>. Cámbiala si juegas en varias.</div>
+      <select class="txt" style="margin-top:6px" onchange="App.switchLeague(this.value)">
+        ${lids.map(l=>`<option value="${l}" ${l===ACTIVE_LEAGUE?'selected':''}>${_esc(leagueName(l))}</option>`).join('')}</select></div>`;
+  }
   // Ajustes mínimos para REGULAR: identidad, reglas (lectura), soniditos, estado de sync.
   function renderCfgRegular(box){
     const si=syncInfo();
@@ -3023,6 +3053,7 @@ const App = (() => {
       <div class="card"><div class="row" style="justify-content:space-between;align-items:center">
         <div><h3 style="margin:0">👤 ${myPid()?pname(myPid()):(isSuper()?'Administrador':'Jugador')}</h3><div class="hint" style="margin:2px 0 0">${curUserLabel()}</div></div>
         <button class="btn outline sm" onclick="App.loginModal()">Cambiar usuario</button></div></div>
+      ${cfgMyLeaguesHtml()}
       <div class="cfg-sect">Reglas de la casa</div>
       <div class="card"><div class="row" style="justify-content:space-between"><h3>📜 Reglas del grupo</h3>
         <button class="btn outline sm" onclick="App.rulesModal()">Ver reglas</button></div>
@@ -3044,9 +3075,10 @@ const App = (() => {
     const box=document.getElementById('cfgContent');
     if(!isAdmin()){ return renderCfgRegular(box); }
     let html='';
-    html+=cfgLeaguesHtml();   // Liga + miembros/invitaciones (super: gestión completa; admin: invitar regulares)
+    html+=cfgLeaguesHtml();   // Liga + selector
     html+=cfgInviteHtml();    // Código/link para invitar a la liga (admin/super)
-    html+=cfgAuthUsersHtml(); // Cuentas Google → jugadores (admin lo ve en solo-lectura; súper liga/quita)
+    html+=cfgAuthUsersHtml(); // Tu jugador (súper)
+    html+=cfgPlayersHtml();   // Jugadores del grupo — arriba, junto a la identidad
 
     // ===================== REGLAS DE LA CASA =====================
     html+=`<div class="cfg-sect">Reglas de la casa</div>`;
@@ -3090,23 +3122,6 @@ const App = (() => {
       html+=`<div class="prow"><div class="grow"><div class="nm">${c.emoji?c.emoji+' ':''}${c.name}</div>
         <div class="desc" style="font-size:11px;color:var(--muted)">${c.auto?'auto · ':''}${c.tipo==='raya'?'raya ($)':'trago'}</div></div>
         ${c.auto?`<button class="icbtn" onclick="App.toggleCastTipo('${c.id}')">↔</button>`:`<button class="icbtn" onclick="App.toggleCastTipo('${c.id}')">↔</button><button class="icbtn" onclick="App.delCast('${c.id}')">🗑</button>`}</div>`;
-    });
-    html+=`</div></div>`;
-
-    // ===================== GRUPO =====================
-    html+=`<div class="cfg-sect">Grupo</div>`;
-
-    // jugadores (unificado: roster + cuenta Google ligada — correo, rol, favorito y borrar, todo en un lugar)
-    html+=`<div class="card"><h3>Jugadores (${state.players.length})</h3>
-      <div class="hint">Cada quien aparece al entrar con Google por el link de la liga. ⭐ = favorito (sale arriba al convocar).</div><div class="plist">`;
-    [...state.players].sort((a,b)=>(b.fav?1:0)-(a.fav?1:0)||a.name.localeCompare(b.name)).forEach(p=>{
-      const sub = p.guest ? 'Invitado' : (p.email ? _esc(p.email) : 'sin cuenta');
-      html+=`<div class="prow"><div class="avatar ${p.guest?'g':''}">${(p.apodo||p.name).slice(0,1).toUpperCase()}</div>
-        <div class="grow"><div class="nm">${p.name}${(p.apodo||'').trim()?` <span class="apod">"${p.apodo.trim()}"</span>`:''}${p.role==='admin'?' <span class="tag">admin</span>':''}</div>
-        <div class="desc" style="font-size:11px;color:var(--muted)">${sub}</div></div>
-        <button class="icbtn" onclick="App.toggleFav('${p.id}')">${p.fav?'⭐':'☆'}</button>
-        <button class="icbtn" onclick="App.editPlayerModal('${p.id}')">✏️</button>
-        <button class="icbtn" onclick="App.delPlayer('${p.id}')">🗑</button></div>`;
     });
     html+=`</div></div>`;
 
@@ -3656,7 +3671,10 @@ const App = (() => {
     let L=loadLeagues(); const x=L.find(l=>l.id===ACTIVE_LEAGUE); if(x) x.name=name; else L.push({id:ACTIVE_LEAGUE,name}); saveLeagues(L);
     state._leagueMeta=state._leagueMeta||{schema:2}; state._leagueMeta.name=name; save();
     updateBrand(); renderCfg(); toast('Nombre del grupo: '+name); }
-  function switchLeague(id){ if(!isSuper()){ toast('Solo el súper admin cambia de liga'); return; }
+  function switchLeague(id){
+    const uid=_devUser&&_devUser.uid;
+    const allowed = isSuper() || (uid && _users[uid] && _users[uid].leagues && _users[uid].leagues[id]);   // súper: todas; regular: solo las suyas
+    if(!allowed){ toast('No perteneces a esa liga'); return; }
     if(id===ACTIVE_LEAGUE) return; try{ localStorage.setItem('cl_active_league', id); }catch(e){}
     // navega a URL limpia (sin ?liga/&code) para que el cambio de liga no lo pise un link de invitación
     toast('Cambiando a '+leagueName(id)+'…'); setTimeout(()=>{ location.href=location.origin+location.pathname; }, 450); }
