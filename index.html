@@ -732,7 +732,8 @@ const App = (() => {
     const out={};
     out['meta']  = st._leagueMeta || {name:'Liga', schema:2};
     out['rules'] = { rayaValue:(st.rayaValue!=null?st.rayaValue:20), activeBets: st.activeBets || _defActiveBets(), maxWeekday:(st.maxWeekday||6), maxWeekend:(st.maxWeekend||5), rayaPairs:(st.rayaPairs||{}), rayaReq:(st.rayaReq||{}) };
-    const players={}; (st.players||[]).forEach(p=>{ if(p&&p.id){ const o=Object.assign({},p); delete o.id; if(o.uid){ delete o.name; delete o.email; } players[p.id]=o; } }); out['players']=players;   // con cuenta: nombre/correo viven en users/{uid}, no se duplican aquí
+    // jugadores GRANULAR (por pid, como los scores): así dos teléfonos que registran distinto NO se pisan el roster.
+    (st.players||[]).forEach(p=>{ if(p&&p.id){ const o=Object.assign({},p); delete o.id; if(o.uid){ delete o.name; delete o.email; } out['players/'+p.id]=o; } });   // con cuenta: nombre/correo viven en users/{uid}
     const courses={}; (st.courses||[]).forEach(c=>{ if(c&&c.id){ const o=Object.assign({},c); delete o.id; courses[c.id]=o; } }); out['courses']=courses;
     out['units']      = st.units||[];
     out['castigos']   = st.castigos||[];
@@ -758,7 +759,8 @@ const App = (() => {
   }
   function flattenTree(root){
     const out={}; if(!root||typeof root!=='object') return out;
-    ['meta','rules','players','courses','units','castigos','houseRules','ventHistory','dblHistory','order'].forEach(k=>{ if(root[k]!==undefined) out[k]=root[k]; });
+    ['meta','rules','courses','units','castigos','houseRules','ventHistory','dblHistory','order'].forEach(k=>{ if(root[k]!==undefined) out[k]=root[k]; });
+    const pn=root.players||{}; Object.keys(pn).forEach(pid=>{ out['players/'+pid]=pn[pid]; });   // jugadores granular (por pid)
     const vn=root.ventajas||{}; Object.keys(vn).forEach(g=>{ const rr=vn[g]||{}; Object.keys(rr).forEach(r=>{ out['ventajas/'+g+'/'+r]=rr[r]; }); });
     const vq=root.ventReq||{}; Object.keys(vq).forEach(id=>{ out['ventReq/'+id]=vq[id]; });
     const dn=root.days||{};
@@ -771,9 +773,13 @@ const App = (() => {
     return out;
   }
   function rebuildFromShards(sh){
-    const hasPlayers = sh['players'] && typeof sh['players']==='object' && Object.keys(sh['players']).length;
+    // jugadores granular (players/{pid}) + compat con el bloque viejo ('players')
+    const playerSh={};
+    if(sh['players'] && typeof sh['players']==='object'){ Object.keys(sh['players']).forEach(pid=>{ playerSh[pid]=sh['players'][pid]; }); }
+    Object.keys(sh).forEach(k=>{ const m=k.match(/^players\/([^/]+)$/); if(m && sh[k] && typeof sh[k]==='object') playerSh[m[1]]=sh[k]; });
+    const hasPlayers = Object.keys(playerSh).length>0;
     const order = _arr(sh['order']);
-    if(!hasPlayers && !order.length) return null;   // liga vacía → deja que seed() arranque
+    if(!hasPlayers && !order.length) return null;   // liga vacía
     const g={};
     g._leagueMeta = sh['meta']||{name:'Liga',schema:2};
     const rules = sh['rules']||{};
@@ -781,7 +787,7 @@ const App = (() => {
     g.activeBets = rules.activeBets || _defActiveBets();
     g.maxWeekday = rules.maxWeekday||6; g.maxWeekend = rules.maxWeekend||5;
     g.rayaPairs = rules.rayaPairs || {}; g.rayaReq = rules.rayaReq || {};
-    g.players  = sh['players']?Object.keys(sh['players']).map(id=>Object.assign({},sh['players'][id],{id})):[];
+    g.players  = Object.keys(playerSh).map(id=>Object.assign({},playerSh[id],{id}));
     g.courses  = sh['courses']?Object.keys(sh['courses']).map(id=>Object.assign({},sh['courses'][id],{id})):[];
     g.units    = _arr(sh['units']);
     g.castigos = _arr(sh['castigos']);
