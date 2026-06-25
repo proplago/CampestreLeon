@@ -807,7 +807,10 @@ const App = (() => {
       else if((m=k.match(/^days\/([^/]+)\/scores\/([^/]+)$/))) { ensure(m[1]).scores[m[2]]=sh[k]; }
       else if((m=k.match(/^days\/([^/]+)\/doubles\/([^/]+)\/([^/]+)$/))) { if(sh[k]) (ensure(m[1]).doubles[m[2]]=ensure(m[1]).doubles[m[2]]||{})[m[3]]=true; }
     });
-    g.days = (order.length?order.map(id=>dayMap[id]):Object.keys(dayMap).map(id=>dayMap[id])).filter(Boolean);
+    // incluye TODOS los días (de sus shards granulares), aunque el blob `order` venga pisado por otro teléfono.
+    const ordered = order.filter(id=>dayMap[id]);
+    Object.keys(dayMap).forEach(id=>{ if(ordered.indexOf(id)<0) ordered.push(id); });
+    g.days = ordered.map(id=>dayMap[id]).filter(Boolean);
     return g;
   }
   // Merge 3-vías: aplica lo que cambió el peer y CONSERVA ediciones locales en vuelo
