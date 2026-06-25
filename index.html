@@ -3034,7 +3034,7 @@ const App = (() => {
     let html='';
     html+=cfgLeaguesHtml();   // Liga + miembros/invitaciones (super: gestión completa; admin: invitar regulares)
     html+=cfgInviteHtml();    // Código/link para invitar a la liga (admin/super)
-    html+=cfgAuthUsersHtml(); // Cuentas Google → jugadores (solo súper)
+    html+=cfgAuthUsersHtml(); // Cuentas Google → jugadores (admin lo ve en solo-lectura; súper liga/quita)
 
     // ===================== REGLAS DE LA CASA =====================
     html+=`<div class="cfg-sect">Reglas de la casa</div>`;
@@ -3693,31 +3693,40 @@ const App = (() => {
   }
   function refreshAuthUsers(){ _authUsersCache=null; renderCfg(); }
   function cfgAuthUsersHtml(){
-    if(!isSuper() || !authAvailable()) return '';
+    if(!isAdmin() || !authAvailable()) return '';   // admin (incluye súper). El admin ve en solo-lectura; el súper liga/quita.
+    const sup=isSuper();
     const ps=[...state.players].sort((a,b)=>(a.guest?1:0)-(b.guest?1:0)||a.name.localeCompare(b.name));
     const myUid=_devUser&&_devUser.uid;
     let h=`<div class="cfg-sect">Cuentas (Google)</div>`;
-    h+=`<div class="card"><h3>Tu jugador</h3>
-      <div class="hint">Cuál jugador del roster eres tú (para tus ventajas y comparativa).</div>
-      <select class="txt" style="margin-top:6px" onchange="App.setSuperPlayer(this.value)">${ps.map(p=>`<option value="${p.id}" ${p.id===myPid()?'selected':''}>${p.name}${p.guest?' (inv)':''}</option>`).join('')}</select></div>`;
+    if(sup){
+      h+=`<div class="card"><h3>Tu jugador</h3>
+        <div class="hint">Cuál jugador del roster eres tú (para tus ventajas y comparativa).</div>
+        <select class="txt" style="margin-top:6px" onchange="App.setSuperPlayer(this.value)">${ps.map(p=>`<option value="${p.id}" ${p.id===myPid()?'selected':''}>${p.name}${p.guest?' (inv)':''}</option>`).join('')}</select></div>`;
+    }
     if(_authUsersCache===null){ fetchAuthUsers(); h+=`<div class="card"><div class="hint">Cargando cuentas…</div></div>`; return h; }
     const users=_authUsersCache||{};
     const uids=Object.keys(users).filter(function(u){ return u!==myUid; });
-    h+=`<div class="card"><div class="row" style="justify-content:space-between"><h3>Ligar cuentas a jugadores</h3>
+    h+=`<div class="card"><div class="row" style="justify-content:space-between"><h3>Correos ligados</h3>
         <button class="btn outline sm" onclick="App.refreshAuthUsers()">↻ Actualizar</button></div>
-      <div class="hint">Quien entró con Google aparece aquí. Lígalo a su jugador del roster (<b>conserva todas sus ventajas</b>) y dale rol.</div>`;
-    if(!uids.length){ h+=`<div class="hint" style="margin-top:8px">Nadie más ha entrado con Google todavía.</div></div>`; return h; }
+      <div class="hint">${sup?'Cada quien crea su jugador al entrar con Google y queda ligado solo. Aquí ves los correos; puedes cambiar el rol o quitar una cuenta.':'Correo de Google ligado a cada jugador de la liga.'}</div>`;
+    if(!uids.length){ h+=`<div class="hint" style="margin-top:8px">Aún no hay correos ligados.</div></div>`; return h; }
     uids.forEach(function(uid){ const u=users[uid]||{};
       const lg=(u.leagues&&u.leagues[ACTIVE_LEAGUE])||null, assigned=!!lg;
       const curPid=lg?lg.playerId:'', curRole=lg?(lg.role||'regular'):'regular';
-      h+=`<div class="card" style="margin-top:8px;border:1px solid var(--line);box-shadow:none">
-        <div style="font-weight:700;font-size:13px">${u.email||u.name||uid.slice(0,10)} ${assigned?`<span class="tag">${curRole==='admin'?'admin':'jugador'} · ${pname(curPid)}</span>`:'<span style="color:var(--clay);font-size:11px;font-weight:600">pendiente</span>'}</div>
-        <div class="row" style="gap:6px;margin-top:6px">
-          <select class="txt" id="au_pid_${uid}" style="flex:1">${ps.map(p=>`<option value="${p.id}" ${p.id===curPid?'selected':''}>${p.name}${p.guest?' (inv)':''}</option>`).join('')}</select>
-          <select class="txt" id="au_role_${uid}" style="max-width:118px"><option value="regular" ${curRole==='regular'?'selected':''}>Jugador</option><option value="admin" ${curRole==='admin'?'selected':''}>Admin</option></select></div>
-        <div class="row" style="gap:6px;margin-top:6px">
-          <button class="btn sm" onclick="App.assignAuthUser('${uid}')">${assigned?'Actualizar':'Asignar'}</button>
-          ${assigned?`<button class="btn sm outline" onclick="App.unassignAuthUser('${uid}')">Quitar</button>`:''}</div></div>`;
+      const email=u.email||u.name||uid.slice(0,10);
+      if(sup && assigned){   // súper: ver correo + cambiar rol + quitar (NO re-ligar: el jugador lo fijó el auto-registro)
+        h+=`<div class="card" style="margin-top:8px;border:1px solid var(--line);box-shadow:none">
+          <div style="font-weight:700;font-size:13px">${_esc(pname(curPid))} <span class="tag">${curRole==='admin'?'admin':'jugador'}</span></div>
+          <div class="desc" style="font-size:11px;color:var(--muted);margin-top:2px">${_esc(email)}</div>
+          <div class="row" style="gap:6px;margin-top:6px">
+            <select class="txt" id="au_role_${uid}" style="flex:1"><option value="regular" ${curRole==='regular'?'selected':''}>Jugador</option><option value="admin" ${curRole==='admin'?'selected':''}>Admin</option></select>
+            <button class="btn sm" onclick="App.assignAuthUser('${uid}')">Guardar rol</button>
+            <button class="btn sm outline" onclick="App.unassignAuthUser('${uid}')">Quitar</button></div></div>`;
+      } else {   // pendiente (cualquiera) o vista de admin: solo lectura — jugador → correo (rol)
+        h+=`<div class="prow" style="margin-top:8px"><div class="grow">
+          <div class="nm" style="font-size:13px">${assigned?_esc(pname(curPid)):'<span style="color:var(--clay)">pendiente</span>'}${assigned&&curRole==='admin'?' <span class="tag">admin</span>':''}</div>
+          <div class="desc" style="font-size:11px;color:var(--muted)">${_esc(email)}</div></div></div>`;
+      }
     });
     h+=`</div>`;
     return h;
@@ -3729,12 +3738,14 @@ const App = (() => {
     if(_devUser) _devUser.playerId=pid; render(); toast('Tu jugador: '+pname(pid));
   }
   function assignAuthUser(uid){
-    if(!isSuper()){ toast('Solo el súper asigna'); return; }
-    const pid=(document.getElementById('au_pid_'+uid)||{}).value;
+    if(!isSuper()){ toast('Solo el súper'); return; }
+    const u=(_authUsersCache&&_authUsersCache[uid])||{};
+    const lg=(u.leagues&&u.leagues[ACTIVE_LEAGUE])||null;
+    const pid=lg&&lg.playerId;                                  // el jugador lo fijó el auto-registro; aquí solo se cambia el rol
+    if(!pid){ toast('Esta cuenta aún no se ha registrado'); return; }
     const role=(document.getElementById('au_role_'+uid)||{}).value||'regular';
-    if(!pid){ toast('Elige jugador'); return; }
     firebase.database().ref('users/'+uid+'/leagues/'+ACTIVE_LEAGUE).set({role:role, playerId:pid})
-      .then(function(){ toast('Ligado a '+pname(pid)); _authUsersCache=null; renderCfg(); })
+      .then(function(){ toast('Rol guardado: '+(role==='admin'?'Admin':'Jugador')); _authUsersCache=null; renderCfg(); })
       .catch(function(e){ toast('Error: '+((e&&e.message)||e)); });
   }
   function unassignAuthUser(uid){
