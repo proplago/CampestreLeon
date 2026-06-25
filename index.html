@@ -678,7 +678,7 @@ const App = (() => {
   };
   let curView='liq', curScorePlayer=null, curScoreSalida=0, liqTab='hoy', scoreTab='cap', highTab='hoy';
   let curScoreGroup=0, curHoleNav=0, cmpA=null, cmpB=null, dblPlayer=null, cfgCourseId='campestre';
-  let saveTimer=null, dirty=false;
+  let saveTimer=null, dirty=false, _saveDenied=false;
 
   // ---------- persistencia: Firebase (sync granular) → window.storage → localStorage → memoria ----------
   // Liga activa (V2). Conmutable por el súper admin (dev: se guarda en localStorage).
@@ -906,7 +906,7 @@ const App = (() => {
         for(const k in _shardCache){ if(!(k in cur)) updates[k]=null; }                     // borrados
         _shardCache=cur;
         if(Object.keys(updates).length){
-          _fbRef.update(updates).then(()=>{ dirty=false; flashSave(); }).catch(()=>{ dirty=false; });
+          _fbRef.update(updates).then(()=>{ dirty=false; flashSave(); _saveDenied=false; }).catch((e)=>{ dirty=false; const msg=String((e&&e.code)||(e&&e.message)||e); if(/permission|denied/i.test(msg)){ if(!_saveDenied) toast('⚠️ Firebase rechazó el guardado (permisos). Tu cambio quedó solo en este teléfono.'); _saveDenied=true; } });
         } else { dirty=false; }
       } else if(_backend==='wstorage'){
         window.storage.set(KEY,JSON.stringify(state)).then(()=>{ dirty=false; flashSave(); }).catch(()=>{});
@@ -3724,10 +3724,11 @@ const App = (() => {
             <select class="txt" id="au_role_${uid}" style="flex:1"><option value="regular" ${curRole==='regular'?'selected':''}>Jugador</option><option value="admin" ${curRole==='admin'?'selected':''}>Admin</option></select>
             <button class="btn sm" onclick="App.assignAuthUser('${uid}')">Guardar rol</button>
             <button class="btn sm outline" onclick="App.unassignAuthUser('${uid}')">Quitar</button></div></div>`;
-      } else {   // pendiente (cualquiera) o vista de admin: solo lectura — jugador → correo (rol)
+      } else {   // pendiente (cualquiera) o vista de admin: solo lectura — jugador → correo (rol). El súper puede borrar pendientes (junk).
         h+=`<div class="prow" style="margin-top:8px"><div class="grow">
           <div class="nm" style="font-size:13px">${assigned?_esc(pname(curPid)):'<span style="color:var(--clay)">pendiente</span>'}${assigned&&curRole==='admin'?' <span class="tag">admin</span>':''}</div>
-          <div class="desc" style="font-size:11px;color:var(--muted)">${_esc(email)}</div></div></div>`;
+          <div class="desc" style="font-size:11px;color:var(--muted)">${_esc(email)}</div></div>
+          ${sup?`<button class="icbtn" onclick="App.removeAuthUser('${uid}')" title="Borrar cuenta">🗑</button>`:''}</div>`;
       }
     });
     h+=`</div>`;
@@ -3760,6 +3761,15 @@ const App = (() => {
         .catch(function(){ toast('Error'); });
     });
   }
+  function removeAuthUser(uid){   // borra la cuenta por completo (junk/pendientes). Sus jugadores/historial NO se borran (van por playerId).
+    if(!isSuper()){ toast('Solo el súper'); return; }
+    const u=(_authUsersCache&&_authUsersCache[uid])||{}; const em=u.email||u.name||uid.slice(0,10);
+    confirmModal('¿Borrar la cuenta '+em+' por completo? Se quita de TODAS las ligas. Sus jugadores y ventajas NO se borran. Si vuelve a entrar, quedará pendiente otra vez.','Borrar cuenta',function(){
+      firebase.database().ref('users/'+uid).remove()
+        .then(function(){ toast('Cuenta borrada'); _authUsersCache=null; renderCfg(); })
+        .catch(function(e){ toast('Error: '+((e&&e.message)||e)); });
+    });
+  }
 
   // Pull-to-refresh: jala hacia abajo desde arriba para recargar (pensado para la app instalada en el teléfono).
   function initPullRefresh(){
@@ -3780,7 +3790,7 @@ const App = (() => {
     window.addEventListener('touchcancel',()=>{ pulling=false; hide(); },{passive:true});
   }
   async function init(){ try{ if(document.fonts&&document.fonts.load){ document.fonts.load("600 40px Newsreader"); document.fonts.load("700 16px 'Hanken Grotesk'"); } }catch(e){} loadDevUser(); await load(); if(!state.currentDayId && state.days[0]) state.currentDayId=state.days[0].id; render(); initPullRefresh(); startAuth(); if(!_devUser) loginModal(); }   // muestra la entrada al instante; si hay sesión de Google, se cierra sola al resolver
-  return { init,loginModal,doLogin,signInGoogle,signOutAuth,joinRegister,shareInvite,copyInvite,regenJoinCode,refreshAuthUsers,setSuperPlayer,assignAuthUser,unassignAuthUser,approveVent,rejectVent,createLeague,renameLeague,switchLeague,setMaxGroup,go,switchDay,daysModal,editDayModal,saveDayEdit,delDay,newDayModal,createDay,
+  return { init,loginModal,doLogin,signInGoogle,signOutAuth,joinRegister,shareInvite,copyInvite,regenJoinCode,refreshAuthUsers,setSuperPlayer,assignAuthUser,unassignAuthUser,removeAuthUser,approveVent,rejectVent,createLeague,renameLeague,switchLeague,setMaxGroup,go,switchDay,daysModal,editDayModal,saveDayEdit,delDay,newDayModal,createDay,
     toggleAssign:null,togglePlaying,cancelPlayer,moveGroup,confirmMove,sorteo,setSalidaTime,addGuestModal,
     pickScore,score,putt,setOyes,quick,toggleUnit,toggleCast,navHole,gotoPending,gotoPlayerPending,setScoreGroup,setStart,setHoles,setCourse,
     setVentFocus,pickVent,openBet,openH2H,setLiqTab,setScoreTab,setCmp,setVentPick,
