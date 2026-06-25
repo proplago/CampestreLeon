@@ -3009,7 +3009,7 @@ const App = (() => {
     const si=syncInfo();
     let html=`<div class="cfg-sect">Tu sesión</div>
       <div class="card"><div class="row" style="justify-content:space-between;align-items:center">
-        <div><h3 style="margin:0">👤 ${pname(myPid())||'Jugador'}</h3><div class="hint" style="margin:2px 0 0">${curUserLabel()}</div></div>
+        <div><h3 style="margin:0">👤 ${myPid()?pname(myPid()):(isSuper()?'Administrador':'Jugador')}</h3><div class="hint" style="margin:2px 0 0">${curUserLabel()}</div></div>
         <button class="btn outline sm" onclick="App.loginModal()">Cambiar usuario</button></div></div>
       <div class="cfg-sect">Reglas de la casa</div>
       <div class="card"><div class="row" style="justify-content:space-between"><h3>📜 Reglas del grupo</h3>
@@ -3488,9 +3488,9 @@ const App = (() => {
     _authPending=false; _authDiag='';
     const handle=function(snap){
       const ud=snap.val()||null;
-      if(ud && ud.super===true){   // súper en TODAS las ligas; su jugador es por-liga (Fernando en cada una es otro id de roster)
+      if(ud && ud.super===true){   // súper en TODAS las ligas; su jugador es por-liga. Sin jugador en la liga = MODO OPERADOR (playerId null): administra sin competir.
         const lg=(ud.leagues&&ud.leagues[ACTIVE_LEAGUE])||{};
-        _devUser={playerId:(lg.playerId||ud.playerId||(state.players[0]&&state.players[0].id)||null), role:'super', uid:u.uid, email:u.email, real:true}; return; }
+        _devUser={playerId:(lg.playerId||null), role:'super', uid:u.uid, email:u.email, real:true}; return; }
       // ¿ya es miembro de la liga ACTIVA?
       const lgA=ud && ud.leagues && ud.leagues[ACTIVE_LEAGUE];
       if(lgA && lgA.playerId){ _devUser={playerId:lgA.playerId, role:(lgA.role||'regular'), uid:u.uid, email:u.email, real:true}; return; }
@@ -3700,8 +3700,10 @@ const App = (() => {
     let h=`<div class="cfg-sect">Cuentas (Google)</div>`;
     if(sup){
       h+=`<div class="card"><h3>Tu jugador</h3>
-        <div class="hint">Cuál jugador del roster eres tú (para tus ventajas y comparativa).</div>
-        <select class="txt" style="margin-top:6px" onchange="App.setSuperPlayer(this.value)">${ps.map(p=>`<option value="${p.id}" ${p.id===myPid()?'selected':''}>${p.name}${p.guest?' (inv)':''}</option>`).join('')}</select></div>`;
+        <div class="hint">Si juegas esta liga, elígete. Si solo la administras, deja <b>"Solo administro"</b>: no apareces en convocatoria, rayas ni standings.</div>
+        <select class="txt" style="margin-top:6px" onchange="App.setSuperPlayer(this.value)">
+          <option value="" ${!myPid()?'selected':''}>— Solo administro (no juego aquí) —</option>
+          ${ps.map(p=>`<option value="${p.id}" ${p.id===myPid()?'selected':''}>${p.name}${p.guest?' (inv)':''}</option>`).join('')}</select></div>`;
     }
     if(_authUsersCache===null){ fetchAuthUsers(); h+=`<div class="card"><div class="hint">Cargando cuentas…</div></div>`; return h; }
     const users=_authUsersCache||{};
@@ -3732,10 +3734,12 @@ const App = (() => {
     return h;
   }
   function setSuperPlayer(pid){
-    if(!isSuper()||!pid) return;
-    // por-liga: cuál jugador eres tú en ESTA liga (en otra liga puede ser otro id de roster)
-    if(authAvailable() && _devUser&&_devUser.uid){ try{ firebase.database().ref('users/'+_devUser.uid+'/leagues/'+ACTIVE_LEAGUE+'/playerId').set(pid); }catch(e){} }
-    if(_devUser) _devUser.playerId=pid; render(); toast('Tu jugador: '+pname(pid));
+    if(!isSuper()) return;
+    const none=!pid;   // vacío = modo operador: administra la liga sin ser jugador
+    // por-liga: cuál jugador eres tú en ESTA liga (en otra liga puede ser otro id de roster, o ninguno)
+    if(authAvailable() && _devUser&&_devUser.uid){ const ref=firebase.database().ref('users/'+_devUser.uid+'/leagues/'+ACTIVE_LEAGUE+'/playerId'); try{ none?ref.remove():ref.set(pid); }catch(e){} }
+    if(_devUser) _devUser.playerId=none?null:pid;
+    render(); toast(none?'Modo operador: administras sin jugar aquí':'Tu jugador: '+pname(pid));
   }
   function assignAuthUser(uid){
     if(!isSuper()){ toast('Solo el súper'); return; }
