@@ -1,0 +1,35 @@
+{
+  "rules": {
+    "users": {
+      ".read": "auth != null",
+      "$uid": {
+        ".write": "auth != null && (auth.uid === $uid || root.child('users').child(auth.uid).child('super').val() === true)",
+        "super": {
+          ".validate": "root.child('users').child(auth.uid).child('super').val() === true"
+        }
+      }
+    },
+    "leagues": {
+      "$lid": {
+        ".read": "auth != null",
+        "players": {
+          "$pid": {
+            ".write": "auth != null && (root.child('users').child(auth.uid).child('super').val() === true || newData.child('uid').val() === auth.uid || (data.exists() && data.child('uid').val() === auth.uid))"
+          }
+        },
+        "days":        { ".write": "auth != null" },
+        "ventajas":    { ".write": "auth != null" },
+        "ventReq":     { ".write": "auth != null" },
+        "ventHistory": { ".write": "auth != null" },
+        "dblHistory":  { ".write": "auth != null" },
+        "order":       { ".write": "auth != null" },
+        "rules":       { ".write": "auth != null" },
+        "meta":        { ".write": "root.child('users').child(auth.uid).child('super').val() === true" },
+        "courses":     { ".write": "root.child('users').child(auth.uid).child('super').val() === true" },
+        "units":       { ".write": "root.child('users').child(auth.uid).child('super').val() === true" },
+        "castigos":    { ".write": "root.child('users').child(auth.uid).child('super').val() === true" },
+        "houseRules":  { ".write": "root.child('users').child(auth.uid).child('super').val() === true" }
+      }
+    }
+  }
+}
