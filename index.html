@@ -692,16 +692,11 @@ const App = (() => {
     _joinCode=_p.get('code')||null; }catch(e){}
   let _backend='memory', _fbRef=null, _shardCache={}, _loadedOnce=false;
   let _users={};   // identidad GLOBAL por cuenta: users/{uid} = {name, email, super, leagues}. El jugador de cada liga solo referencia el uid.
-  function hydratePlayers(){   // copia nombre/correo del perfil global al jugador en memoria (la app sigue usando p.name; en la base no se duplica)
+  function hydratePlayers(){   // copia nombre/correo del perfil global (users/{uid}) al jugador en memoria; la app sigue usando p.name, en la base no se duplica
     let ch=false;
-    (state.players||[]).forEach(function(p){ if(!p || !p.uid) return; const u=_users[p.uid];
-      if(u && u.name){   // hidrata desde la identidad global
-        if(p.name!==u.name){ p.name=u.name; ch=true; }
-        if(u.email!=null && p.email!==u.email){ p.email=u.email; ch=true; }
-      } else if(p.name && authAvailable()){   // migración: jugador en formato viejo (nombre en el jugador) → súbelo al perfil global
-        _users[p.uid]=Object.assign({}, _users[p.uid], {name:p.name, email:(p.email||'')});
-        try{ firebase.database().ref('users/'+p.uid).update({name:p.name, email:(p.email||'')}); }catch(e){}
-      } });
+    (state.players||[]).forEach(function(p){ if(!p || !p.uid) return; const u=_users[p.uid]; if(!u) return;
+      if(u.name && p.name!==u.name){ p.name=u.name; ch=true; }
+      if(u.email!=null && p.email!==u.email){ p.email=u.email; ch=true; } });
     if(ch) clearStatCache();
     return ch;
   }
