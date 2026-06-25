@@ -3561,7 +3561,10 @@ const App = (() => {
     const p={id:uid(), name:name, apodo:apodo, guest:false, fav:true, uid:_authUser.uid, email:em, role:'regular'};
     state.players.push(p);   // en memoria con nombre; en la base, el nombre vive en users/{uid}
     _users[_authUser.uid]=Object.assign({}, _users[_authUser.uid], {name:name, email:em});
-    try{ firebase.database().ref('users/'+_authUser.uid).update({name:name, email:em}); firebase.database().ref('users/'+_authUser.uid+'/leagues/'+ACTIVE_LEAGUE).set(true); }catch(e){}
+    // Escribe TODO directo e inmediato (no depender del save() con retraso, que se pierde si refrescan rápido):
+    try{ firebase.database().ref('users/'+_authUser.uid).update({name:name, email:em});
+      firebase.database().ref('users/'+_authUser.uid+'/leagues/'+ACTIVE_LEAGUE).set(true);
+      firebase.database().ref('leagues/'+ACTIVE_LEAGUE+'/players/'+p.id).set({apodo:apodo, fav:true, guest:false, uid:_authUser.uid, role:'regular'}); }catch(e){}
     _devUser={playerId:p.id, role:'regular', uid:_authUser.uid, email:em, real:true};
     _authPending=false; _canSelfRegister=false;
     save(); closeModal(); cleanUrl(); render(); toast('¡Bienvenido, '+pname(p.id)+'!');
@@ -3704,7 +3707,9 @@ const App = (() => {
     const p={id:uid(), name:dn, apodo:'', guest:false, fav:true, uid:myuid, email:em, role:'regular'};
     state.players.push(p); if(_devUser) _devUser.playerId=p.id;
     if(myuid){ _users[myuid]=Object.assign({}, _users[myuid], {name:dn, email:em});
-      try{ firebase.database().ref('users/'+myuid).update({name:dn, email:em}); firebase.database().ref('users/'+myuid+'/leagues/'+ACTIVE_LEAGUE).set(true); }catch(e){} }
+      try{ firebase.database().ref('users/'+myuid).update({name:dn, email:em});
+        firebase.database().ref('users/'+myuid+'/leagues/'+ACTIVE_LEAGUE).set(true);
+        firebase.database().ref('leagues/'+ACTIVE_LEAGUE+'/players/'+p.id).set({apodo:'', fav:true, guest:false, uid:myuid, role:'regular'}); }catch(e){} }
     save(); render(); toast('Listo, ahora juegas esta liga');
   }
 
