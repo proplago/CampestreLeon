@@ -3083,12 +3083,15 @@ const App = (() => {
     // ===================== GRUPO =====================
     html+=`<div class="cfg-sect">Grupo</div>`;
 
-    // jugadores (el roster se llena solo cuando cada quien entra con Google; aquí solo se administra)
+    // jugadores (unificado: roster + cuenta Google ligada — correo, rol, favorito y borrar, todo en un lugar)
     html+=`<div class="card"><h3>Jugadores (${state.players.length})</h3>
       <div class="hint">Cada quien aparece al entrar con Google por el link de la liga. ⭐ = favorito (sale arriba al convocar).</div><div class="plist">`;
     [...state.players].sort((a,b)=>(b.fav?1:0)-(a.fav?1:0)||a.name.localeCompare(b.name)).forEach(p=>{
+      const acc=_authAccByPid(p.id);
+      const sub = p.guest ? 'Invitado' : (acc ? _esc(acc.email) : 'sin cuenta ligada');
       html+=`<div class="prow"><div class="avatar ${p.guest?'g':''}">${(p.apodo||p.name).slice(0,1).toUpperCase()}</div>
-        <div class="grow"><div class="nm">${p.name}${(p.apodo||'').trim()?` <span class="apod">"${p.apodo.trim()}"</span>`:''}</div>${p.guest?'<div class="tag">Invitado</div>':''}</div>
+        <div class="grow"><div class="nm">${p.name}${(p.apodo||'').trim()?` <span class="apod">"${p.apodo.trim()}"</span>`:''}${acc&&acc.role==='admin'?' <span class="tag">admin</span>':''}</div>
+        <div class="desc" style="font-size:11px;color:var(--muted)">${sub}</div></div>
         <button class="icbtn" onclick="App.toggleFav('${p.id}')">${p.fav?'⭐':'☆'}</button>
         <button class="icbtn" onclick="App.editPlayerModal('${p.id}')">✏️</button>
         <button class="icbtn" onclick="App.delPlayer('${p.id}')">🗑</button></div>`;
@@ -3203,9 +3206,12 @@ const App = (() => {
     h+=`</div>`; return h;
   }
   function delPlayer(id){
-    confirmModal('¿Eliminar jugador? Se quita de ventajas.','Eliminar',()=>{
+    confirmModal('¿Eliminar jugador? Se quita de ventajas y se desliga su cuenta de Google.','Eliminar',()=>{
       state.players=state.players.filter(p=>p.id!==id);
       Object.keys(state.ventajas).forEach(k=>{ if(k.includes(id))delete state.ventajas[k]; });
+      // desligar la cuenta Google que apuntaba a este jugador (evita dejar "? jugador" colgado)
+      const acc=_authAccByPid(id);
+      if(acc && authAvailable()){ try{ firebase.database().ref('users/'+acc.uid+'/leagues/'+ACTIVE_LEAGUE).remove(); }catch(e){} _authUsersCache=null; }
       save(); render();
     });
   }
@@ -3321,12 +3327,14 @@ const App = (() => {
     else render();
   }
   function editPlayerModal(id){
-    const p=player(id);
+    const p=player(id); const acc=_authAccByPid(id);
     modal(`<h3>Editar jugador</h3>
-      <label class="fl">Nombre</label><input id="m_name" class="txt" value="${p.name}">
-      <label class="fl" style="margin-top:10px">Apodo (opcional)</label><input id="m_apodo" class="txt" value="${p.apodo||''}" placeholder="como le dicen en el 19">
+      <label class="fl">Nombre</label><input id="m_name" class="txt" value="${_esc(p.name)}">
+      <label class="fl" style="margin-top:10px">Apodo (opcional)</label><input id="m_apodo" class="txt" value="${_esc(p.apodo||'')}" placeholder="como le dicen en el 19">
       <label class="fl" style="margin-top:10px"><input type="checkbox" id="m_fav" ${p.fav?'checked':''}> Favorito (sale arriba al convocar)</label>
       <label class="fl" style="margin-top:6px"><input type="checkbox" id="m_guest" ${p.guest?'checked':''}> Es invitado</label>
+      ${(isSuper()&&acc)?`<label class="fl" style="margin-top:10px">Rol (cuenta: ${_esc(acc.email)})</label>
+        <select id="m_role" class="txt"><option value="regular" ${acc.role!=='admin'?'selected':''}>Jugador</option><option value="admin" ${acc.role==='admin'?'selected':''}>Admin de la liga</option></select>`:''}
       <button class="btn block" style="margin-top:14px" onclick="App.savePlayer('${id}')">Guardar</button>`);
   }
   function savePlayer(id){
@@ -3334,6 +3342,8 @@ const App = (() => {
     const ap=document.getElementById('m_apodo'); if(ap) p.apodo=ap.value.trim();
     p.guest=document.getElementById('m_guest').checked;
     p.fav=document.getElementById('m_fav').checked;
+    const roleEl=document.getElementById('m_role');
+    if(roleEl && isSuper()){ const acc=_authAccByPid(id); if(acc && authAvailable()){ try{ firebase.database().ref('users/'+acc.uid+'/leagues/'+ACTIVE_LEAGUE+'/role').set(roleEl.value); }catch(e){} _authUsersCache=null; } }
     save(); closeModal(); render();
   }
   function toggleFav(id){ const p=player(id); p.fav=!p.fav; save(); render(); }
@@ -3692,33 +3702,35 @@ const App = (() => {
         ${!myPid()?`<button class="btn outline sm block" style="margin-top:8px" onclick="App.createMyPlayer()">+ Créate tu jugador en esta liga</button>`:''}</div>`;
     }
     if(_authUsersCache===null){ fetchAuthUsers(); h+=`<div class="card"><div class="hint">Cargando cuentas…</div></div>`; return h; }
-    const users=_authUsersCache||{};
-    const uids=Object.keys(users).filter(function(u){ return u!==myUid; });
-    h+=`<div class="card"><div class="row" style="justify-content:space-between"><h3>Correos ligados</h3>
-        <button class="btn outline sm" onclick="App.refreshAuthUsers()">↻ Actualizar</button></div>
-      <div class="hint">${sup?'Cada quien crea su jugador al entrar con Google y queda ligado solo. Aquí ves los correos; puedes cambiar el rol o quitar una cuenta.':'Correo de Google ligado a cada jugador de la liga.'}</div>`;
-    if(!uids.length){ h+=`<div class="hint" style="margin-top:8px">Aún no hay correos ligados.</div></div>`; return h; }
-    uids.forEach(function(uid){ const u=users[uid]||{};
-      const lg=(u.leagues&&u.leagues[ACTIVE_LEAGUE])||null, assigned=!!lg;
-      const curPid=lg?lg.playerId:'', curRole=lg?(lg.role||'regular'):'regular';
-      const email=u.email||u.name||uid.slice(0,10);
-      if(sup && assigned){   // súper: ver correo + cambiar rol + quitar (NO re-ligar: el jugador lo fijó el auto-registro)
-        h+=`<div class="card" style="margin-top:8px;border:1px solid var(--line);box-shadow:none">
-          <div style="font-weight:700;font-size:13px">${_esc(pname(curPid))} <span class="tag">${curRole==='admin'?'admin':'jugador'}</span></div>
-          <div class="desc" style="font-size:11px;color:var(--muted);margin-top:2px">${_esc(email)}</div>
-          <div class="row" style="gap:6px;margin-top:6px">
-            <select class="txt" id="au_role_${uid}" style="flex:1"><option value="regular" ${curRole==='regular'?'selected':''}>Jugador</option><option value="admin" ${curRole==='admin'?'selected':''}>Admin</option></select>
-            <button class="btn sm" onclick="App.assignAuthUser('${uid}')">Guardar rol</button>
-            <button class="btn sm outline" onclick="App.unassignAuthUser('${uid}')">Quitar</button></div></div>`;
-      } else {   // pendiente (cualquiera) o vista de admin: solo lectura — jugador → correo (rol). El súper puede borrar pendientes (junk).
-        h+=`<div class="prow" style="margin-top:8px"><div class="grow">
-          <div class="nm" style="font-size:13px">${assigned?_esc(pname(curPid)):'<span style="color:var(--clay)">pendiente</span>'}${assigned&&curRole==='admin'?' <span class="tag">admin</span>':''}</div>
-          <div class="desc" style="font-size:11px;color:var(--muted)">${_esc(email)}</div></div>
-          ${sup?`<button class="icbtn" onclick="App.removeAuthUser('${uid}')" title="Borrar cuenta">🗑</button>`:''}</div>`;
+    // Los correos ligados se ven en la lista de "Jugadores" (abajo). Aquí solo quedan las cuentas SIN jugador (pendientes/colgadas) para limpiar.
+    if(sup){
+      const cache=_authUsersCache||{};
+      const pidset=new Set(state.players.map(function(p){ return p.id; }));
+      const orphans=Object.keys(cache).filter(function(uid){
+        if(uid===myUid) return false;
+        const lg=cache[uid]&&cache[uid].leagues&&cache[uid].leagues[ACTIVE_LEAGUE];
+        return !lg || !lg.playerId || !pidset.has(lg.playerId);   // pendiente o jugador inexistente (colgada)
+      });
+      if(orphans.length){
+        h+=`<div class="card"><div class="row" style="justify-content:space-between"><h3>Cuentas sin jugador</h3>
+            <button class="btn outline sm" onclick="App.refreshAuthUsers()">↻ Actualizar</button></div>
+          <div class="hint">Entraron con Google pero no tienen jugador en esta liga (pendientes o borrados). Bórralas para limpiar.</div>`;
+        orphans.forEach(function(uid){ const u=cache[uid]||{}; const em=u.email||u.name||uid.slice(0,10);
+          h+=`<div class="prow" style="margin-top:8px"><div class="grow"><div class="nm" style="font-size:13px;color:var(--clay)">sin jugador</div>
+            <div class="desc" style="font-size:11px;color:var(--muted)">${_esc(em)}</div></div>
+            <button class="icbtn" onclick="App.removeAuthUser('${uid}')" title="Borrar cuenta">🗑</button></div>`;
+        });
+        h+=`</div>`;
       }
-    });
-    h+=`</div>`;
+    }
     return h;
+  }
+  // Cuenta Google ligada a un jugador (por playerId) en la liga activa. null si no hay.
+  function _authAccByPid(pid){
+    const cache=_authUsersCache||{}; let r=null;
+    Object.keys(cache).forEach(function(uid){ const lg=cache[uid]&&cache[uid].leagues&&cache[uid].leagues[ACTIVE_LEAGUE];
+      if(lg&&lg.playerId===pid) r={uid:uid, email:(cache[uid].email||cache[uid].name||''), role:(lg.role||'regular')}; });
+    return r;
   }
   function setSuperPlayer(pid){
     if(!isSuper()) return;
@@ -3734,25 +3746,6 @@ const App = (() => {
     const p={id:uid(), name:dn, apodo:'', guest:false, fav:true};
     state.players.push(p); save();
     setSuperPlayer(p.id);   // liga al súper con su jugador nuevo en esta liga (escribe playerId + render)
-  }
-  function assignAuthUser(uid){
-    if(!isSuper()){ toast('Solo el súper'); return; }
-    const u=(_authUsersCache&&_authUsersCache[uid])||{};
-    const lg=(u.leagues&&u.leagues[ACTIVE_LEAGUE])||null;
-    const pid=lg&&lg.playerId;                                  // el jugador lo fijó el auto-registro; aquí solo se cambia el rol
-    if(!pid){ toast('Esta cuenta aún no se ha registrado'); return; }
-    const role=(document.getElementById('au_role_'+uid)||{}).value||'regular';
-    firebase.database().ref('users/'+uid+'/leagues/'+ACTIVE_LEAGUE).set({role:role, playerId:pid})
-      .then(function(){ toast('Rol guardado: '+(role==='admin'?'Admin':'Jugador')); _authUsersCache=null; renderCfg(); })
-      .catch(function(e){ toast('Error: '+((e&&e.message)||e)); });
-  }
-  function unassignAuthUser(uid){
-    if(!isSuper()){ toast('Solo el súper'); return; }
-    confirmModal('¿Quitar esta cuenta de la liga? La próxima vez que entre quedará pendiente otra vez (no pierde ventajas).','Quitar',function(){
-      firebase.database().ref('users/'+uid+'/leagues/'+ACTIVE_LEAGUE).remove()
-        .then(function(){ toast('Quitado'); _authUsersCache=null; renderCfg(); })
-        .catch(function(){ toast('Error'); });
-    });
   }
   function removeAuthUser(uid){   // borra la cuenta por completo (junk/pendientes). Sus jugadores/historial NO se borran (van por playerId).
     if(!isSuper()){ toast('Solo el súper'); return; }
@@ -3783,7 +3776,7 @@ const App = (() => {
     window.addEventListener('touchcancel',()=>{ pulling=false; hide(); },{passive:true});
   }
   async function init(){ try{ if(document.fonts&&document.fonts.load){ document.fonts.load("600 40px Newsreader"); document.fonts.load("700 16px 'Hanken Grotesk'"); } }catch(e){} loadDevUser(); await load(); if(!state.currentDayId && state.days[0]) state.currentDayId=state.days[0].id; render(); initPullRefresh(); startAuth(); if(!_devUser) loginModal(); }   // muestra la entrada al instante; si hay sesión de Google, se cierra sola al resolver
-  return { init,loginModal,doLogin,signInGoogle,signOutAuth,joinRegister,shareInvite,copyInvite,regenJoinCode,refreshAuthUsers,setSuperPlayer,createMyPlayer,assignAuthUser,unassignAuthUser,removeAuthUser,approveVent,rejectVent,createLeague,renameLeague,switchLeague,setMaxGroup,go,switchDay,daysModal,editDayModal,saveDayEdit,delDay,newDayModal,createDay,
+  return { init,loginModal,doLogin,signInGoogle,signOutAuth,joinRegister,shareInvite,copyInvite,regenJoinCode,refreshAuthUsers,setSuperPlayer,createMyPlayer,removeAuthUser,approveVent,rejectVent,createLeague,renameLeague,switchLeague,setMaxGroup,go,switchDay,daysModal,editDayModal,saveDayEdit,delDay,newDayModal,createDay,
     toggleAssign:null,togglePlaying,cancelPlayer,moveGroup,confirmMove,sorteo,setSalidaTime,addGuestModal,
     pickScore,score,putt,setOyes,quick,toggleUnit,toggleCast,navHole,gotoPending,gotoPlayerPending,setScoreGroup,setStart,setHoles,setCourse,
     setVentFocus,pickVent,openBet,openH2H,setLiqTab,setScoreTab,setCmp,setVentPick,
