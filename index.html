@@ -596,7 +596,7 @@
 
 <script>
 const App = (() => {
-  const APP_VERSION = '2026-06-26-06';   // ⬆️ SUBIR en cada deploy: la app se auto-recarga cuando detecta una versión distinta
+  const APP_VERSION = '2026-06-26-07';   // ⬆️ SUBIR en cada deploy: la app se auto-recarga cuando detecta una versión distinta
   const KEY = 'rayas-campestre-v2';
   const uid = () => Math.random().toString(36).slice(2,9);
   // Auto-actualización: revisa el index.html en vivo (sin caché); si la versión cambió, recarga a la versión fresca.
@@ -848,17 +848,19 @@ const App = (() => {
   }
   // (Re)engancha el sync de Firebase DESPUÉS de tener sesión. Las reglas exigen auth != null, y un listener enganchado
   // SIN sesión se cancela (permission_denied) y nunca vuelve a entregar datos → por eso no cargaban los jugadores.
-  let _fbSyncOn=false;
+  let _fbSyncOn=false, _diag={attach:0,onceKeys:null,oncePlayers:null,onceErr:null,onErrs:0,onRoots:[]};
   function attachFbSync(){
     if(_backend!=='fb' || !_fbRef) return;
+    _diag.attach++;
     // Lectura FORZADA al servidor (ya con sesión) para reconstruir el estado completo, INCLUIDOS los jugadores.
     // El `.on` inicial de load() corre sin sesión y entrega solo el caché parcial (config sin players) y no re-dispara
     // → por eso cargaba 0 jugadores. Este `.once` autenticado siempre trae el árbol completo de la liga.
     try{ _fbRef.once('value').then(function(snap){ const root=snap.val()||{};
+      _diag.onceKeys=Object.keys(root); _diag.oncePlayers=root.players?Object.keys(root.players):null;
       const ns=rebuildFromShards(flattenTree(root)); if(ns) state=Object.assign(state,ns);
       _shardCache=flattenTree(root); hydratePlayers(); clearStatCache(); if(_loadedOnce) render();
-    }).catch(function(){}); }catch(e){}
-    try{ _fbRef.off('value'); _fbRef.on('value', function(snap){ applyRemoteTree(snap.val()||{}); hydratePlayers(); if(_loadedOnce) render(); }, function(){}); }catch(e){}
+    }).catch(function(e){ _diag.onceErr=(e&&e.message)||'err'; }); }catch(e){ _diag.onceErr='throw:'+e.message; }
+    try{ _fbRef.off('value'); _fbRef.on('value', function(snap){ const rv=snap.val()||{}; _diag.onRoots.push({k:Object.keys(rv),p:rv.players?Object.keys(rv.players).length:0}); if(_diag.onRoots.length>6)_diag.onRoots.shift(); applyRemoteTree(rv); hydratePlayers(); if(_loadedOnce) render(); }, function(){ _diag.onErrs++; }); }catch(e){}
     try{ const ur=firebase.database().ref('users'); ur.off('value'); ur.on('value', function(snap){ _users=snap.val()||{}; if(hydratePlayers() && _loadedOnce) render(); }, function(){}); }catch(e){}
     try{ const mr=firebase.database().ref('leagueMembers/'+ACTIVE_LEAGUE); mr.off('value'); mr.on('value', function(snap){ _members=snap.val()||{};
       if(_devUser&&_devUser.uid&&_devUser.role!=='super'){ const r=roleOfUid(_devUser.uid); if(r!==_devUser.role) _devUser.role=r; }
@@ -3844,7 +3846,7 @@ const App = (() => {
     setRaya,submitRayaPair,approveRayaReq,rejectRayaReq,removeRayaPair,createPlayer,editPlayerModal,savePlayer,delPlayer,toggleFav,
     courseModal,setHole,setCfgCourse,addCourse,renameCourse,deleteCourse,unitModal,createUnit,delUnit,castModal,createCast,delCast,toggleCastTipo,
     exportData,renderCfg,renderVent,renderDay,closeModal,confirmYes,renderHigh,setHighTab,openProfile,rulesModal,editRulesModal,saveRules,
-    __diag:function(){ return { players:(state.players||[]).map(function(p){return {id:p.id,name:p.name,uid:(p.uid||'').slice(0,8)};}), devUser:_devUser, backend:_backend, fbPath:(_fbRef&&_fbRef.toString()), activeLeague:ACTIVE_LEAGUE, shardKeys:Object.keys(_shardCache), fbSyncOn:_fbSyncOn, loadedOnce:_loadedOnce }; } };
+    __diag:function(){ return { players:(state.players||[]).map(function(p){return {id:p.id,name:p.name,uid:(p.uid||'').slice(0,8)};}), devUser:_devUser, backend:_backend, fbPath:(_fbRef&&_fbRef.toString()), activeLeague:ACTIVE_LEAGUE, shardKeys:Object.keys(_shardCache), fbSyncOn:_fbSyncOn, loadedOnce:_loadedOnce, diag:_diag }; } };
 })();
 App.init();
 </script>
