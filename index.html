@@ -68,6 +68,7 @@
   }
   .appbar{display:flex;align-items:center;justify-content:space-between;gap:10px;padding-bottom:11px}
   .ab-brand{font-family:'Newsreader',serif;font-style:italic;font-weight:600;font-size:19px;color:var(--fairway);white-space:nowrap;display:flex;align-items:center;gap:8px;min-width:0}
+  .beta-tag{font-family:'Hanken Grotesk',system-ui,sans-serif;font-style:normal;font-weight:800;font-size:9px;letter-spacing:.09em;text-transform:uppercase;color:#9a6b00;background:#fbf1d6;border:1px solid #e6c34a;border-radius:5px;padding:2px 5px;line-height:1;flex:none;align-self:center}
   .daypill{display:inline-flex;align-items:center;gap:6px;flex:none;max-width:52%;background:#fff;border:1.5px solid var(--fairway);color:var(--fairway);border-radius:999px;padding:7px 12px;font-weight:700;font-size:13px}
   .daypill:active{background:var(--paper-2)}
   .daypill .dp-txt{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -517,7 +518,7 @@
 <header>
   <div class="appbar">
     <div class="ab-brand">
-      <span style="display:inline-flex"><svg width="24" height="24" viewBox="0 0 24 24"><path d="M3 16 C5 13 9 12 12 12 C16 12 19 13.5 21 16 C19.5 17.6 16 18.6 12 18.6 C8 18.6 4.5 17.6 3 16 Z" fill="#e6c34a" stroke="#0a6a3a" stroke-width="1.3" stroke-linejoin="round"/><ellipse cx="13.6" cy="15.1" rx="1.3" ry="0.72" fill="#0a6a3a"/><path d="M13.6 15 L13.6 4.2" stroke="#0a6a3a" stroke-width="1.3" stroke-linecap="round"/><path d="M13.6 4.4 L19.2 6.1 L13.6 7.9 Z" fill="#c1272d"/></svg></span><span id="brandName">Golf Viernes</span></div>
+      <span style="display:inline-flex"><svg width="24" height="24" viewBox="0 0 24 24"><path d="M3 16 C5 13 9 12 12 12 C16 12 19 13.5 21 16 C19.5 17.6 16 18.6 12 18.6 C8 18.6 4.5 17.6 3 16 Z" fill="#e6c34a" stroke="#0a6a3a" stroke-width="1.3" stroke-linejoin="round"/><ellipse cx="13.6" cy="15.1" rx="1.3" ry="0.72" fill="#0a6a3a"/><path d="M13.6 15 L13.6 4.2" stroke="#0a6a3a" stroke-width="1.3" stroke-linecap="round"/><path d="M13.6 4.4 L19.2 6.1 L13.6 7.9 Z" fill="#c1272d"/></svg></span><span id="brandName">Golf Viernes</span><span class="beta-tag" title="Versión en pruebas">beta</span></div>
     <button class="daypill" id="dayPill" onclick="App.daysModal()" aria-label="Día y administración">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="4.5" width="17" height="16" rx="2.5"/><path d="M3.5 9h17M8 3v3M16 3v3"/></svg>
       <span class="dp-txt">Días</span>
@@ -596,7 +597,7 @@
 
 <script>
 const App = (() => {
-  const APP_VERSION = '2026-06-26-15';   // ⬆️ SUBIR en cada deploy: la app se auto-recarga cuando detecta una versión distinta
+  const APP_VERSION = '2026-06-26-16';   // ⬆️ SUBIR en cada deploy: la app se auto-recarga cuando detecta una versión distinta
   const KEY = 'rayas-campestre-v2';
   const uid = () => Math.random().toString(36).slice(2,9);
   // Auto-actualización: revisa el index.html en vivo (sin caché); si la versión cambió, recarga a la versión fresca.
