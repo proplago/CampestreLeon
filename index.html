@@ -596,7 +596,7 @@
 
 <script>
 const App = (() => {
-  const APP_VERSION = '2026-06-26-02';   // ⬆️ SUBIR en cada deploy: la app se auto-recarga cuando detecta una versión distinta
+  const APP_VERSION = '2026-06-26-03';   // ⬆️ SUBIR en cada deploy: la app se auto-recarga cuando detecta una versión distinta
   const KEY = 'rayas-campestre-v2';
   const uid = () => Math.random().toString(36).slice(2,9);
   // Auto-actualización: revisa el index.html en vivo (sin caché); si la versión cambió, recarga a la versión fresca.
@@ -952,9 +952,15 @@ const App = (() => {
         const cur=buildShards(state), updates={};
         for(const k in cur){ if(_sig(_shardCache[k])!==_sig(cur[k])) updates[k]=cur[k]; }   // nuevos/cambiados
         for(const k in _shardCache){ if(!(k in cur)) updates[k]=null; }                     // borrados
+        // Un REGULAR no escribe el catálogo de la liga (lo rechazan las reglas, y un write atómico se caería entero por ese path).
+        if(!isAdmin()){
+          ['meta','courses','units','castigos','houseRules'].forEach(k=>{ delete updates[k]; });
+          const mp=myPid();
+          Object.keys(updates).forEach(k=>{ if(k.indexOf('players/')===0 && k.slice(8)!==mp) delete updates[k]; });   // ni jugadores ajenos
+        }
         _shardCache=cur;
         if(Object.keys(updates).length){
-          _fbRef.update(updates).then(()=>{ dirty=false; flashSave(); _saveDenied=false; }).catch((e)=>{ dirty=false; const msg=String((e&&e.code)||(e&&e.message)||e); if(/permission|denied/i.test(msg)){ if(!_saveDenied) toast('⚠️ Firebase rechazó el guardado (permisos). Tu cambio quedó solo en este teléfono.'); _saveDenied=true; } });
+          _fbRef.update(updates).then(()=>{ dirty=false; flashSave(); _saveDenied=false; }).catch((e)=>{ dirty=false; const msg=String((e&&e.code)||(e&&e.message)||e); if(/permission|denied/i.test(msg)){ const ks=Object.keys(updates).join(', '); try{console.warn('Firebase rechazó:',ks,msg);}catch(_){} if(!_saveDenied) toast('⚠️ Firebase rechazó: '+ks); _saveDenied=true; } });
         } else { dirty=false; }
       } else if(_backend==='wstorage'){
         window.storage.set(KEY,JSON.stringify(state)).then(()=>{ dirty=false; flashSave(); }).catch(()=>{});
