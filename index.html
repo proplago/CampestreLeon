@@ -597,7 +597,7 @@
 
 <script>
 const App = (() => {
-  const APP_VERSION = '2026-06-26-16';   // ⬆️ SUBIR en cada deploy: la app se auto-recarga cuando detecta una versión distinta
+  const APP_VERSION = '2026-06-26-17';   // ⬆️ SUBIR en cada deploy: la app se auto-recarga cuando detecta una versión distinta
   const KEY = 'rayas-campestre-v2';
   const uid = () => Math.random().toString(36).slice(2,9);
   // Auto-actualización: revisa el index.html en vivo (sin caché); si la versión cambió, recarga a la versión fresca.
@@ -3116,6 +3116,21 @@ const App = (() => {
     html+=`</div></div>`;
     return html;
   }
+  // Lista de integrantes (SOLO LECTURA) para que los regulares vean quién está en la liga — sin correos ni edición.
+  function cfgMembersHtml(){
+    const mine=myPid();
+    let html=`<div class="cfg-sect">Integrantes</div>
+      <div class="card"><h3>Jugadores del grupo (${state.players.length})</h3>
+      <div class="hint">Quiénes están en tu liga. La gestiona el admin.</div><div class="plist">`;
+    [...state.players].sort((a,b)=>(a.guest?1:0)-(b.guest?1:0)||(a.name||'').localeCompare(b.name||'')).forEach(p=>{
+      const tag = (p.uid&&roleOfUid(p.uid)==='admin') ? ' <span class="tag">admin</span>' : (p.guest ? ' <span class="apod">invitado</span>' : '');
+      html+=`<div class="prow"><div class="avatar ${p.guest?'g':''}">${(((p.apodo||p.name||'?').slice(0,1))||'?').toUpperCase()}</div>
+        <div class="grow"><div class="nm">${_esc(p.name||'?')}${(p.apodo||'').trim()?` <span class="apod">"${_esc(p.apodo.trim())}"</span>`:''}${tag}</div></div>
+        ${p.id===mine?'<span class="tag" style="background:var(--fairway);color:#fff;border-color:var(--fairway)">tú</span>':''}</div>`;
+    });
+    html+=`</div></div>`;
+    return html;
+  }
   // Selector de ligas: muestra las ligas a las que pertenece el usuario (o todas, si es súper). Solo si hay >1.
   function cfgMyLeaguesHtml(){
     const uid=_devUser&&_devUser.uid;
@@ -3137,6 +3152,7 @@ const App = (() => {
         <div><h3 style="margin:0">👤 ${myPid()?pname(myPid()):(isSuper()?'Administrador':'Jugador')}</h3><div class="hint" style="margin:2px 0 0">${curUserLabel()}</div></div>
         <button class="btn outline sm" onclick="App.loginModal()">Cambiar usuario</button></div></div>
       ${cfgMyLeaguesHtml()}
+      ${cfgMembersHtml()}
       <div class="cfg-sect">Reglas de la casa</div>
       <div class="card"><div class="row" style="justify-content:space-between"><h3>📜 Reglas del grupo</h3>
         <button class="btn outline sm" onclick="App.rulesModal()">Ver reglas</button></div>
