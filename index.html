@@ -596,7 +596,7 @@
 
 <script>
 const App = (() => {
-  const APP_VERSION = '2026-06-26-01';   // ⬆️ SUBIR en cada deploy: la app se auto-recarga cuando detecta una versión distinta
+  const APP_VERSION = '2026-06-26-02';   // ⬆️ SUBIR en cada deploy: la app se auto-recarga cuando detecta una versión distinta
   const KEY = 'rayas-campestre-v2';
   const uid = () => Math.random().toString(36).slice(2,9);
   // Auto-actualización: revisa el index.html en vivo (sin caché); si la versión cambió, recarga a la versión fresca.
@@ -946,6 +946,9 @@ const App = (() => {
     saveTimer=setTimeout(()=>{
       if(_backend==='fb' && _fbRef){
         writeLocalBackup();   // respaldo local SIEMPRE (sobrevive aunque Firebase rechace por permisos/conexión)
+        // Sin sesión de Google NO intentes escribir a Firebase (las reglas lo rechazan y saldría el aviso antes de loguearse).
+        const authed = (typeof firebase!=='undefined' && firebase.auth && firebase.auth().currentUser);
+        if(!authed){ dirty=false; return; }
         const cur=buildShards(state), updates={};
         for(const k in cur){ if(_sig(_shardCache[k])!==_sig(cur[k])) updates[k]=cur[k]; }   // nuevos/cambiados
         for(const k in _shardCache){ if(!(k in cur)) updates[k]=null; }                     // borrados
