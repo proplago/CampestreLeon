@@ -596,7 +596,7 @@
 
 <script>
 const App = (() => {
-  const APP_VERSION = '2026-06-26-05';   // ⬆️ SUBIR en cada deploy: la app se auto-recarga cuando detecta una versión distinta
+  const APP_VERSION = '2026-06-26-06';   // ⬆️ SUBIR en cada deploy: la app se auto-recarga cuando detecta una versión distinta
   const KEY = 'rayas-campestre-v2';
   const uid = () => Math.random().toString(36).slice(2,9);
   // Auto-actualización: revisa el index.html en vivo (sin caché); si la versión cambió, recarga a la versión fresca.
@@ -851,6 +851,13 @@ const App = (() => {
   let _fbSyncOn=false;
   function attachFbSync(){
     if(_backend!=='fb' || !_fbRef) return;
+    // Lectura FORZADA al servidor (ya con sesión) para reconstruir el estado completo, INCLUIDOS los jugadores.
+    // El `.on` inicial de load() corre sin sesión y entrega solo el caché parcial (config sin players) y no re-dispara
+    // → por eso cargaba 0 jugadores. Este `.once` autenticado siempre trae el árbol completo de la liga.
+    try{ _fbRef.once('value').then(function(snap){ const root=snap.val()||{};
+      const ns=rebuildFromShards(flattenTree(root)); if(ns) state=Object.assign(state,ns);
+      _shardCache=flattenTree(root); hydratePlayers(); clearStatCache(); if(_loadedOnce) render();
+    }).catch(function(){}); }catch(e){}
     try{ _fbRef.off('value'); _fbRef.on('value', function(snap){ applyRemoteTree(snap.val()||{}); hydratePlayers(); if(_loadedOnce) render(); }, function(){}); }catch(e){}
     try{ const ur=firebase.database().ref('users'); ur.off('value'); ur.on('value', function(snap){ _users=snap.val()||{}; if(hydratePlayers() && _loadedOnce) render(); }, function(){}); }catch(e){}
     try{ const mr=firebase.database().ref('leagueMembers/'+ACTIVE_LEAGUE); mr.off('value'); mr.on('value', function(snap){ _members=snap.val()||{};
