@@ -596,7 +596,7 @@
 
 <script>
 const App = (() => {
-  const APP_VERSION = '2026-06-26-03';   // ⬆️ SUBIR en cada deploy: la app se auto-recarga cuando detecta una versión distinta
+  const APP_VERSION = '2026-06-26-04';   // ⬆️ SUBIR en cada deploy: la app se auto-recarga cuando detecta una versión distinta
   const KEY = 'rayas-campestre-v2';
   const uid = () => Math.random().toString(36).slice(2,9);
   // Auto-actualización: revisa el index.html en vivo (sin caché); si la versión cambió, recarga a la versión fresca.
@@ -845,6 +845,18 @@ const App = (() => {
     if(!peerChanged) return;
     const ns=rebuildFromShards(merged);
     if(ns){ state=Object.assign(state,ns); _shardCache=merged; clearStatCache(); if(_loadedOnce) render(); }
+  }
+  // (Re)engancha el sync de Firebase DESPUÉS de tener sesión. Las reglas exigen auth != null, y un listener enganchado
+  // SIN sesión se cancela (permission_denied) y nunca vuelve a entregar datos → por eso no cargaban los jugadores.
+  let _fbSyncOn=false;
+  function attachFbSync(){
+    if(_backend!=='fb' || !_fbRef) return;
+    try{ _fbRef.off('value'); _fbRef.on('value', function(snap){ applyRemoteTree(snap.val()||{}); hydratePlayers(); if(_loadedOnce) render(); }, function(){}); }catch(e){}
+    try{ const ur=firebase.database().ref('users'); ur.off('value'); ur.on('value', function(snap){ _users=snap.val()||{}; if(hydratePlayers() && _loadedOnce) render(); }, function(){}); }catch(e){}
+    try{ const mr=firebase.database().ref('leagueMembers/'+ACTIVE_LEAGUE); mr.off('value'); mr.on('value', function(snap){ _members=snap.val()||{};
+      if(_devUser&&_devUser.uid&&_devUser.role!=='super'){ const r=roleOfUid(_devUser.uid); if(r!==_devUser.role) _devUser.role=r; }
+      if(_loadedOnce) render(); }, function(){}); }catch(e){}
+    _fbSyncOn=true;
   }
 
   async function load(){
@@ -3557,6 +3569,7 @@ const App = (() => {
       firebase.auth().onAuthStateChanged(function(u){
         _authUser=u||null;
         if(!u){ _authPending=false; if(_devUser&&_devUser.real){ _devUser=null; } render(); if(!_devUser) loginModal(); return; }
+        attachFbSync();   // YA hay sesión → (re)engancha el sync de la liga (el de load() pudo cancelarse por leer sin auth)
         resolveAuthIdentity(u).then(function(){ if(isRealAuth()){ closeModal(); cleanUrl(); } render(); if(_authPending){ _canSelfRegister?joinRegisterModal():loginModal(); } });
       });
     }catch(e){}
