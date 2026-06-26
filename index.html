@@ -596,7 +596,7 @@
 
 <script>
 const App = (() => {
-  const APP_VERSION = '2026-06-26-14';   // ⬆️ SUBIR en cada deploy: la app se auto-recarga cuando detecta una versión distinta
+  const APP_VERSION = '2026-06-26-15';   // ⬆️ SUBIR en cada deploy: la app se auto-recarga cuando detecta una versión distinta
   const KEY = 'rayas-campestre-v2';
   const uid = () => Math.random().toString(36).slice(2,9);
   // Auto-actualización: revisa el index.html en vivo (sin caché); si la versión cambió, recarga a la versión fresca.
@@ -751,7 +751,7 @@ const App = (() => {
   function buildShards(st){
     const out={};
     out['meta']  = st._leagueMeta || {name:'Liga', schema:2};
-    out['rules'] = { rayaValue:(st.rayaValue!=null?st.rayaValue:20), activeBets: st.activeBets || _defActiveBets(), maxWeekday:(st.maxWeekday||6), maxWeekend:(st.maxWeekend||5), rayaPairs:(st.rayaPairs||{}), rayaReq:(st.rayaReq||{}) };
+    out['rules'] = { rayaValue:(st.rayaValue!=null?st.rayaValue:20), activeBets: st.activeBets || _defActiveBets(), maxWeekday:(st.maxWeekday||6), maxWeekend:(st.maxWeekend||5), rayaPairs:(st.rayaPairs||{}), rayaReq:(st.rayaReq||{}), ventSeedOn:!!st.ventSeedOn, ventSeedConfirm:(st.ventSeedConfirm||{}) };
     // jugadores GRANULAR (por pid, como los scores): así dos teléfonos que registran distinto NO se pisan el roster.
     (st.players||[]).forEach(p=>{ if(p&&p.id){ const o=Object.assign({},p); delete o.id; delete o.role; if(o.uid){ delete o.name; delete o.email; } out['players/'+p.id]=o; } });   // rol vive en leagueMembers; nombre/correo en users/{uid}
     const courses={}; (st.courses||[]).forEach(c=>{ if(c&&c.id){ const o=Object.assign({},c); delete o.id; courses[c.id]=o; } }); out['courses']=courses;
@@ -807,6 +807,7 @@ const App = (() => {
     g.activeBets = rules.activeBets || _defActiveBets();
     g.maxWeekday = rules.maxWeekday||6; g.maxWeekend = rules.maxWeekend||5;
     g.rayaPairs = rules.rayaPairs || {}; g.rayaReq = rules.rayaReq || {};
+    g.ventSeedOn = !!rules.ventSeedOn; g.ventSeedConfirm = rules.ventSeedConfirm || {};
     g.players  = Object.keys(playerSh).map(id=>Object.assign({},playerSh[id],{id}));
     g.courses  = sh['courses']?Object.keys(sh['courses']).map(id=>Object.assign({},sh['courses'][id],{id})):[];
     g.units    = _arr(sh['units']);
@@ -942,6 +943,7 @@ const App = (() => {
     state.ventReq = state.ventReq || {};
     state.rayaPairs = state.rayaPairs || {};   // valor de raya por pareja (override del general)
     state.rayaReq = state.rayaReq || {};       // solicitudes de cambio de raya entre dos jugadores
+    state.ventSeedConfirm = state.ventSeedConfirm || {};   // coincidencias nombre→jugador confirmadas a mano para el seed de ventajas
     // reglas de la casa por liga: solo la liga original trae las de Campestre; cualquier liga nueva nace EN BLANCO
     if(!Array.isArray(state.houseRules)) state.houseRules = (ACTIVE_LEAGUE==='campestre-viernes') ? defaultHouseRules() : [];
     if(!state._leagueMeta) state._leagueMeta={name:leagueName(ACTIVE_LEAGUE)||'Campestre León — Viernes', schema:2};
@@ -2962,6 +2964,23 @@ const App = (() => {
         html+=`</div>`;
       }
     }
+    // semilla de ventajas del grupo (admin): aplicar las importadas de la app anterior, por nombre, con confirmación de dudosas
+    if(isAdmin()){
+      const sd=applyVentSeed({dry:true});
+      if(state.ventSeedOn || sd.mapped>=2){
+        html+=`<div class="card"><h3>Ventajas guardadas del grupo</h3>
+          <div class="hint">Importadas de la app anterior (${VENT_SEED.pairs.length} parejas). Se asignan por nombre, una sola vez; las que ya existan no se tocan.</div>
+          <button class="btn block" onclick="App.btnApplyVentSeed()">Aplicar ventajas guardadas (${sd.mapped} emparejados)</button>`;
+        if(sd.ambig.length){
+          html+=`<div class="hint" style="margin-top:10px;color:var(--clay)">Por confirmar (no calzó exacto):</div>`;
+          sd.ambig.forEach(x=>{ const cand=(x.cand||'').replace(/'/g,"\\'");
+            html+=`<div class="vrow"><div><div class="who">${_esc(x.name)}</div><div class="desc">¿es <b>${_esc(x.cand)}</b>?</div></div>
+              <div class="row" style="gap:6px"><button class="flag on" onclick="App.confirmVentMatch('${x.pid}','${cand}')">Sí</button><button class="flag" onclick="App.dismissVentMatch('${x.pid}')">No</button></div></div>`; });
+        }
+        if(sd.unmatched.length){ html+=`<div class="hint" style="margin-top:8px">Sin coincidencia (se llenan al registrarse, o ajústalos a mano): ${sd.unmatched.map(u=>_esc(u.name)).join(', ')}</div>`; }
+        html+=`</div>`;
+      }
+    }
     html+=`<div class="card"><div class="row" style="justify-content:space-between">
         <label class="fl" style="margin:0">${isRegular()?(dayGuestIds.length?'Tus ventajas / invitados del día':'Tus ventajas'):'Ver ventajas de'}</label>
         <button class="btn outline sm" onclick="App.historyModal()">Historial / sliding</button></div>`;
@@ -3664,6 +3683,7 @@ const App = (() => {
     _devUser={playerId:p.id, role:'regular', uid:myuid, email:em, real:true};
     _authPending=false; _canSelfRegister=false;
     save(); closeModal(); cleanUrl(); render(); toast('¡Bienvenido, '+pname(p.id)+'!');
+    try{ if(state.ventSeedOn) applyVentSeed({silent:true}); }catch(e){}   // rellena sus ventajas guardadas (por nombre) sin que las recapture
   }
   // Tarjeta de Ajustes: código/link para invitar a la liga (admin/super)
   function cfgInviteHtml(){
@@ -3735,6 +3755,48 @@ const App = (() => {
   function requestVent(a,b,from,to){ state.ventReq=state.ventReq||{}; const id=uid(); state.ventReq[id]={giver:a,receiver:b,from,to,requestedBy:myPid(),status:'pending',ts:Date.now()}; save(); }
   function approveVent(id){ const r=(state.ventReq||{})[id]; if(!r) return; setSignedV(r.giver,r.receiver,r.to); lockVent(r.giver,r.receiver,r.requestedBy); logVent(r.giver,r.receiver,r.from,r.to,'aprobado',curDay()&&curDay().id); delete state.ventReq[id]; save(); render(); toast('Ventaja aprobada'); }
   function rejectVent(id){ if(!(state.ventReq||{})[id]) return; delete state.ventReq[id]; save(); render(); toast('Solicitud rechazada'); }
+
+  // ===== Semilla de ventajas del grupo (importada de la app anterior) — se asignan por NOMBRE, con inferencia, una sola vez =====
+  const VENT_SEED={roster:[["Fernando Plascencia", "", 0], ["Guillermo Vera", "", 0], ["Jorge Fernández", "Tank", 0], ["José Luis Obregón", "Pepe", 0], ["Mario Novoa (Mayito)", "Mayito", 0], ["Mauricio Lebrija", "", 0], ["Salvador Sánchez", "Chava", 0], ["Alejandro Hernández", "Alex", 0], ["Álvaro Ruiz", "", 0], ["Andrés Isoard", "", 0], ["Checo Villarreal", "", 0], ["Daniel Andrade", "", 0], ["Daniel Villanueva", "", 0], ["Diego Andrade", "", 0], ["Poncho de la Peña", "", 1], ["Mario Rubio", "Mayelo", 0]],pairs:[["Jorge Fernández", "Fernando Plascencia", 5], ["Fernando Plascencia", "José Luis Obregón", -14], ["Mauricio Lebrija", "Fernando Plascencia", 9], ["Salvador Sánchez", "Fernando Plascencia", 4], ["Alejandro Hernández", "Fernando Plascencia", -4], ["Checo Villarreal", "Fernando Plascencia", 12], ["Daniel Andrade", "Fernando Plascencia", 3], ["Fernando Plascencia", "Diego Andrade", -7], ["Poncho de la Peña", "Fernando Plascencia", 14], ["Checo Villarreal", "Guillermo Vera", 10], ["Jorge Fernández", "Checo Villarreal", -9], ["Checo Villarreal", "José Luis Obregón", -2], ["Checo Villarreal", "Mario Novoa (Mayito)", 15], ["Checo Villarreal", "Salvador Sánchez", 3], ["Checo Villarreal", "Alejandro Hernández", 13], ["Checo Villarreal", "Álvaro Ruiz", 13], ["Checo Villarreal", "Andrés Isoard", 12], ["Checo Villarreal", "Daniel Andrade", 5], ["Checo Villarreal", "Daniel Villanueva", 6], ["Checo Villarreal", "Diego Andrade", 2], ["Guillermo Vera", "Alejandro Hernández", 5], ["Guillermo Vera", "Álvaro Ruiz", 4], ["Guillermo Vera", "Andrés Isoard", -2], ["Daniel Andrade", "Guillermo Vera", 4], ["Guillermo Vera", "Daniel Villanueva", 1], ["Guillermo Vera", "Diego Andrade", -8], ["Jorge Fernández", "Guillermo Vera", 6], ["Guillermo Vera", "Mario Novoa (Mayito)", 5], ["Mario Rubio", "Guillermo Vera", 16], ["Guillermo Vera", "Mauricio Lebrija", -8], ["Salvador Sánchez", "Guillermo Vera", 2], ["Guillermo Vera", "José Luis Obregón", -15], ["Alejandro Hernández", "Diego Andrade", -9], ["Diego Andrade", "Álvaro Ruiz", 13], ["Andrés Isoard", "Diego Andrade", -4], ["Daniel Andrade", "Diego Andrade", -3], ["Daniel Villanueva", "Diego Andrade", -10], ["Jorge Fernández", "Diego Andrade", -2], ["José Luis Obregón", "Diego Andrade", 8], ["Diego Andrade", "Mario Novoa (Mayito)", 13], ["Mario Rubio", "Diego Andrade", 9], ["Mauricio Lebrija", "Diego Andrade", -2], ["Salvador Sánchez", "Diego Andrade", -8], ["Daniel Andrade", "Mauricio Lebrija", -1], ["Mario Rubio", "Mauricio Lebrija", 9], ["Daniel Villanueva", "José Luis Obregón", -14], ["Jorge Fernández", "Daniel Villanueva", 7], ["Daniel Villanueva", "Fernando Plascencia", 3], ["Mauricio Lebrija", "José Luis Obregón", -8], ["Mauricio Lebrija", "Daniel Villanueva", 13], ["Mario Rubio", "Daniel Villanueva", 18], ["Daniel Andrade", "Daniel Villanueva", 5], ["Daniel Villanueva", "Álvaro Ruiz", -2], ["Jorge Fernández", "Mauricio Lebrija", -6], ["Daniel Andrade", "José Luis Obregón", -9], ["Mario Rubio", "José Luis Obregón", 3], ["Jorge Fernández", "José Luis Obregón", -12], ["José Luis Obregón", "Mario Novoa (Mayito)", 15], ["Salvador Sánchez", "José Luis Obregón", -7], ["Andrés Isoard", "José Luis Obregón", -11], ["Alejandro Hernández", "José Luis Obregón", -7], ["Daniel Andrade", "Álvaro Ruiz", 9], ["José Luis Obregón", "Álvaro Ruiz", 16], ["Daniel Andrade", "Andrés Isoard", 1], ["Jorge Fernández", "Daniel Andrade", -1], ["Daniel Andrade", "Mario Rubio", -15], ["Fernando Plascencia", "Álvaro Ruiz", 3], ["Andrés Isoard", "Fernando Plascencia", 5], ["Fernando Plascencia", "Mario Novoa (Mayito)", -3], ["Mario Rubio", "Fernando Plascencia", 14], ["Jorge Fernández", "Alejandro Hernández", 3], ["Jorge Fernández", "Álvaro Ruiz", 10], ["Jorge Fernández", "Andrés Isoard", -1], ["Jorge Fernández", "Mario Novoa (Mayito)", 6], ["Jorge Fernández", "Salvador Sánchez", -1], ["Mario Rubio", "Álvaro Ruiz", 19], ["Mario Rubio", "Andrés Isoard", 9], ["Checo Villarreal", "Mario Rubio", -4], ["Jorge Fernández", "Mario Rubio", -11], ["Mario Rubio", "Mario Novoa (Mayito)", 15], ["Salvador Sánchez", "Mario Rubio", -15]]};
+  function _vnorm(s){ return (s||'').toString().toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^a-z0-9 ]/g,' ').replace(/\s+/g,' ').trim(); }
+  function _vlev(a,b){ const m=a.length,n=b.length; if(!m)return n; if(!n)return m; let prev=Array.from({length:n+1},(_,i)=>i),cur=Array(n+1).fill(0);
+    for(let i=1;i<=m;i++){ cur[0]=i; for(let j=1;j<=n;j++){ cur[j]=Math.min(prev[j]+1,cur[j-1]+1,prev[j-1]+(a[i-1]===b[j-1]?0:1)); } const t=prev;prev=cur;cur=t; } return prev[n]; }
+  // empareja un jugador con un nombre del roster semilla. Devuelve {name, conf} | null. conf 'exacto'/'apodo'/'nombre' = auto; 'fuzzy' = pedir confirmación.
+  function ventSeedMatch(p){
+    const pn=_vnorm(p.name), pa=_vnorm(p.apodo); if(!pn&&!pa) return null;
+    const R=VENT_SEED.roster.map(r=>({name:r[0],n:_vnorm(r[0]),a:_vnorm(r[1])}));
+    let m=R.find(r=>r.n===pn); if(m) return {name:m.name,conf:'exacto'};
+    m=R.find(r=>r.a&&(r.a===pn||r.a===pa)); if(m) return {name:m.name,conf:'apodo'};
+    m=R.find(r=>pa&&r.n===pa); if(m) return {name:m.name,conf:'apodo'};
+    const pp=pn.split(' '), pf=pp[0], pli=(pp[pp.length-1]||'')[0]||'';
+    m=R.find(r=>{ const rp=r.n.split(' '); return pf&&rp[0]===pf && ((rp[rp.length-1]||'')[0]||'')===pli; }); if(m) return {name:m.name,conf:'nombre'};
+    const byFirst=R.filter(r=>pf&&r.n.split(' ')[0]===pf); if(byFirst.length===1) return {name:byFirst[0].name,conf:'nombre'};
+    let best=null,bd=99; R.forEach(r=>{ const d=_vlev(r.n,pn); if(d<bd){bd=d;best=r;} }); if(best&&pn.length>=4&&bd<=3) return {name:best.name,conf:'fuzzy',dist:bd};
+    return null;
+  }
+  // aplica la semilla a los jugadores actuales. opts.dry = solo simular (para el reporte) · opts.silent = sin render.
+  function applyVentSeed(opts){
+    opts=opts||{}; state.ventSeedConfirm=state.ventSeedConfirm||{};
+    const map={}, ambig=[], unmatched=[];
+    (state.players||[]).forEach(p=>{ if(!p||p.guest) return;
+      let sn=state.ventSeedConfirm[p.id];
+      if(sn==='__none__') return;
+      if(!sn){ const mm=ventSeedMatch(p); if(!mm){ unmatched.push({pid:p.id,name:p.name}); return; } if(mm.conf==='fuzzy'){ ambig.push({pid:p.id,name:p.name,cand:mm.name}); return; } sn=mm.name; }
+      if(!map[sn]) map[sn]=p.id;   // si dos jugadores calzan al mismo nombre, gana el primero
+    });
+    let applied=0;
+    VENT_SEED.pairs.forEach(function(pr){ const na=pr[0],nb=pr[1],sv=pr[2], a=map[na], b=map[nb]; if(!a||!b||a===b) return;
+      if(signedV(a,b)!==0) return;   // ya tiene ventaja → NO pisar
+      if(!opts.dry){ if(sv>=0){ state.ventajas[vkey(a,b)]=sv; delete state.ventajas[vkey(b,a)]; } else { state.ventajas[vkey(b,a)]=-sv; delete state.ventajas[vkey(a,b)]; } lockVent(a,b,'seed'); }
+      applied++;
+    });
+    if(!opts.dry && applied){ clearStatCache(); save(); if(!opts.silent) render(); }
+    return {applied, ambig, unmatched, mapped:Object.keys(map).length};
+  }
+  function btnApplyVentSeed(){ if(!isAdmin()){ toast('Solo el admin'); return; } state.ventSeedOn=true; const r=applyVentSeed({}); save();
+    toast(`✓ ${r.applied} ventajas asignadas · ${r.mapped} jugadores`+(r.ambig.length?` · ${r.ambig.length} por confirmar`:'')); renderVent(); }
+  function confirmVentMatch(pid,name){ if(!isAdmin())return; state.ventSeedConfirm=state.ventSeedConfirm||{}; state.ventSeedConfirm[pid]=name; const r=applyVentSeed({}); save(); toast(`✓ ${r.applied} ventajas nuevas`); renderVent(); }
+  function dismissVentMatch(pid){ if(!isAdmin())return; state.ventSeedConfirm=state.ventSeedConfirm||{}; state.ventSeedConfirm[pid]='__none__'; save(); renderVent(); }
 
   // ===================== LIGAS (DEV, local) =====================
   // Registro local de ligas + miembros. Persistencia real y envío de correos llegan con el Auth.
@@ -4020,7 +4082,7 @@ const App = (() => {
   function cmpPrint(){ window.print(); }
   function cmpClose(){ const o=document.getElementById('cmpOverlay'); if(o)o.remove(); }
 
-  return { init,loginModal,doLogin,signInGoogle,signOutAuth,joinRegister,shareInvite,copyInvite,regenJoinCode,createMyPlayer,approveVent,rejectVent,createLeague,renameLeague,switchLeague,setMaxGroup,go,switchDay,daysModal,editDayModal,saveDayEdit,delDay,newDayModal,createDay,
+  return { init,loginModal,doLogin,signInGoogle,signOutAuth,joinRegister,shareInvite,copyInvite,regenJoinCode,createMyPlayer,approveVent,rejectVent,btnApplyVentSeed,confirmVentMatch,dismissVentMatch,createLeague,renameLeague,switchLeague,setMaxGroup,go,switchDay,daysModal,editDayModal,saveDayEdit,delDay,newDayModal,createDay,
     toggleAssign:null,togglePlaying,cancelPlayer,moveGroup,confirmMove,sorteo,setSalidaTime,addGuestModal,
     pickScore,score,putt,setOyes,quick,toggleUnit,toggleCast,navHole,gotoPending,gotoPlayerPending,setScoreGroup,setStart,setHoles,setCourse,
     setVentFocus,pickVent,openBet,openH2H,setLiqTab,setScoreTab,setCmp,setVentPick,
