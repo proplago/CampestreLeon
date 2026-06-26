@@ -596,7 +596,7 @@
 
 <script>
 const App = (() => {
-  const APP_VERSION = '2026-06-26-08';   // ⬆️ SUBIR en cada deploy: la app se auto-recarga cuando detecta una versión distinta
+  const APP_VERSION = '2026-06-26-09';   // ⬆️ SUBIR en cada deploy: la app se auto-recarga cuando detecta una versión distinta
   const KEY = 'rayas-campestre-v2';
   const uid = () => Math.random().toString(36).slice(2,9);
   // Auto-actualización: revisa el index.html en vivo (sin caché); si la versión cambió, recarga a la versión fresca.
@@ -848,20 +848,18 @@ const App = (() => {
   }
   // (Re)engancha el sync de Firebase DESPUÉS de tener sesión. Las reglas exigen auth != null, y un listener enganchado
   // SIN sesión se cancela (permission_denied) y nunca vuelve a entregar datos → por eso no cargaban los jugadores.
-  let _fbSyncOn=false, _diag={attach:0,onErrs:0,leagueOk:0,onPlayers:null};
+  let _fbSyncOn=false;
   function attachFbSync(){
     if(_backend!=='fb' || !_fbRef) return;
-    _diag.attach++;
     // El token de auth tarda un instante en propagarse a la conexión de RTDB DESPUÉS de onAuthStateChanged.
     // Una lectura inmediata da permission_denied y RTDB CANCELA el listener (no se auto-recupera) → 0 jugadores.
     // Solución: re-enganchar con backoff cada vez que dispara el callback de error, hasta que el token llegue.
     function live(ref, onData, tries){
       tries=tries||0;
       try{ ref.off('value'); }catch(e){}
-      try{ ref.on('value', onData, function(){ _diag.onErrs++; if(tries<8) setTimeout(function(){ live(ref, onData, tries+1); }, Math.min(400+400*tries, 2500)); }); }catch(e){}
+      try{ ref.on('value', onData, function(){ if(tries<8) setTimeout(function(){ live(ref, onData, tries+1); }, Math.min(400+400*tries, 2500)); }); }catch(e){}
     }
-    live(_fbRef, function(snap){ const rv=snap.val()||{}; _diag.leagueOk++; _diag.onPlayers=rv.players?Object.keys(rv.players).length:0;
-      applyRemoteTree(rv); hydratePlayers(); if(_loadedOnce) render(); });
+    live(_fbRef, function(snap){ applyRemoteTree(snap.val()||{}); hydratePlayers(); if(_loadedOnce) render(); });
     live(firebase.database().ref('users'), function(snap){ _users=snap.val()||{}; if(hydratePlayers() && _loadedOnce) render(); });
     live(firebase.database().ref('leagueMembers/'+ACTIVE_LEAGUE), function(snap){ _members=snap.val()||{};
       if(_devUser&&_devUser.uid&&_devUser.role!=='super'){ const r=roleOfUid(_devUser.uid); if(r!==_devUser.role) _devUser.role=r; }
@@ -3846,8 +3844,7 @@ const App = (() => {
     setDblPlayer,toggleDbl,closeDay,historyModal,exportImage,exportHigh,exportProfile,exportSalidas,exportSeasonTable,exportCompare,exportScorecard,toggleSound,
     setRaya,submitRayaPair,approveRayaReq,rejectRayaReq,removeRayaPair,createPlayer,editPlayerModal,savePlayer,delPlayer,toggleFav,
     courseModal,setHole,setCfgCourse,addCourse,renameCourse,deleteCourse,unitModal,createUnit,delUnit,castModal,createCast,delCast,toggleCastTipo,
-    exportData,renderCfg,renderVent,renderDay,closeModal,confirmYes,renderHigh,setHighTab,openProfile,rulesModal,editRulesModal,saveRules,
-    __diag:function(){ return { players:(state.players||[]).map(function(p){return {id:p.id,name:p.name,uid:(p.uid||'').slice(0,8)};}), devUser:_devUser, backend:_backend, fbPath:(_fbRef&&_fbRef.toString()), activeLeague:ACTIVE_LEAGUE, shardKeys:Object.keys(_shardCache), fbSyncOn:_fbSyncOn, loadedOnce:_loadedOnce, diag:_diag }; } };
+    exportData,renderCfg,renderVent,renderDay,closeModal,confirmYes,renderHigh,setHighTab,openProfile,rulesModal,editRulesModal,saveRules };
 })();
 App.init();
 </script>
