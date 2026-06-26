@@ -596,7 +596,7 @@
 
 <script>
 const App = (() => {
-  const APP_VERSION = '2026-06-25-01';   // ⬆️ SUBIR en cada deploy: la app se auto-recarga cuando detecta una versión distinta
+  const APP_VERSION = '2026-06-26-01';   // ⬆️ SUBIR en cada deploy: la app se auto-recarga cuando detecta una versión distinta
   const KEY = 'rayas-campestre-v2';
   const uid = () => Math.random().toString(36).slice(2,9);
   // Auto-actualización: revisa el index.html en vivo (sin caché); si la versión cambió, recarga a la versión fresca.
@@ -710,6 +710,8 @@ const App = (() => {
     _joinCode=_p.get('code')||null; }catch(e){}
   let _backend='memory', _fbRef=null, _shardCache={}, _loadedOnce=false;
   let _users={};   // identidad GLOBAL por cuenta: users/{uid} = {name, email, super, leagues}. El jugador de cada liga solo referencia el uid.
+  let _members={};  // AUTORIZACIÓN por liga: leagueMembers/{ACTIVE_LEAGUE}/{uid} = {role, pid}. Las reglas leen el rol de aquí (indexado por uid).
+  function roleOfUid(uid){ const m=uid&&_members[uid]; return (m&&m.role) || 'regular'; }   // rol de un uid en la liga activa (lo lee la app; las reglas lo leen directo)
   function hydratePlayers(){   // copia nombre/correo del perfil global (users/{uid}) al jugador en memoria; la app sigue usando p.name, en la base no se duplica
     let ch=false;
     (state.players||[]).forEach(function(p){ if(!p || !p.uid) return; const u=_users[p.uid]; if(!u) return;
@@ -751,7 +753,7 @@ const App = (() => {
     out['meta']  = st._leagueMeta || {name:'Liga', schema:2};
     out['rules'] = { rayaValue:(st.rayaValue!=null?st.rayaValue:20), activeBets: st.activeBets || _defActiveBets(), maxWeekday:(st.maxWeekday||6), maxWeekend:(st.maxWeekend||5), rayaPairs:(st.rayaPairs||{}), rayaReq:(st.rayaReq||{}) };
     // jugadores GRANULAR (por pid, como los scores): así dos teléfonos que registran distinto NO se pisan el roster.
-    (st.players||[]).forEach(p=>{ if(p&&p.id){ const o=Object.assign({},p); delete o.id; if(o.uid){ delete o.name; delete o.email; } out['players/'+p.id]=o; } });   // con cuenta: nombre/correo viven en users/{uid}
+    (st.players||[]).forEach(p=>{ if(p&&p.id){ const o=Object.assign({},p); delete o.id; delete o.role; if(o.uid){ delete o.name; delete o.email; } out['players/'+p.id]=o; } });   // rol vive en leagueMembers; nombre/correo en users/{uid}
     const courses={}; (st.courses||[]).forEach(c=>{ if(c&&c.id){ const o=Object.assign({},c); delete o.id; courses[c.id]=o; } }); out['courses']=courses;
     out['units']      = st.units||[];
     out['castigos']   = st.castigos||[];
@@ -861,6 +863,10 @@ const App = (() => {
       });
       // identidad global: users/{uid} = {name, email, super, leagues}. Se hidrata el nombre de cada jugador con cuenta.
       try{ firebase.database().ref('users').on('value', function(snap){ _users=snap.val()||{}; if(hydratePlayers() && _loadedOnce) render(); }, function(){}); }catch(e){}
+      // autorización por liga: leagueMembers/{ACTIVE_LEAGUE}/{uid} = {role, pid}. La app lee el rol de aquí; las reglas también.
+      try{ firebase.database().ref('leagueMembers/'+ACTIVE_LEAGUE).on('value', function(snap){ _members=snap.val()||{};
+        if(_devUser&&_devUser.uid&&_devUser.role!=='super'){ const r=roleOfUid(_devUser.uid); if(r!==_devUser.role){ _devUser.role=r; } }   // mi propio rol pudo cambiar
+        if(_loadedOnce) render(); }, function(){}); }catch(e){}
       // SOLO restaura del respaldo local si Firebase NO respondió (offline/denegado). Si respondió vacío (datos borrados),
       // se respeta el vacío — así un borrado en la consola NO revive desde el caché local.
       if(!fbResponded && state.players.length===0 && (state.days||[]).length===0){
@@ -3051,7 +3057,7 @@ const App = (() => {
     [...state.players].sort((a,b)=>(b.fav?1:0)-(a.fav?1:0)||a.name.localeCompare(b.name)).forEach(p=>{
       const sub = p.guest ? 'Invitado' : (p.email ? _esc(p.email) : 'sin cuenta');
       html+=`<div class="prow"><div class="avatar ${p.guest?'g':''}">${(p.apodo||p.name).slice(0,1).toUpperCase()}</div>
-        <div class="grow"><div class="nm">${p.name}${(p.apodo||'').trim()?` <span class="apod">"${p.apodo.trim()}"</span>`:''}${p.role==='admin'?' <span class="tag">admin</span>':''}</div>
+        <div class="grow"><div class="nm">${p.name}${(p.apodo||'').trim()?` <span class="apod">"${p.apodo.trim()}"</span>`:''}${(p.uid&&roleOfUid(p.uid)==='admin')?' <span class="tag">admin</span>':''}</div>
         <div class="desc" style="font-size:11px;color:var(--muted)">${sub}</div></div>
         <button class="icbtn" onclick="App.toggleFav('${p.id}')">${p.fav?'⭐':'☆'}</button>
         <button class="icbtn" onclick="App.editPlayerModal('${p.id}')">✏️</button>
@@ -3260,9 +3266,12 @@ const App = (() => {
     h+=`</div>`; return h;
   }
   function delPlayer(id){
+    const target=player(id);
     confirmModal('¿Eliminar jugador? Se quita de ventajas. Si tenía cuenta Google, al volver a entrar se dará de alta de nuevo.','Eliminar',()=>{
       state.players=state.players.filter(p=>p.id!==id);
       Object.keys(state.ventajas).forEach(k=>{ if(k.includes(id))delete state.ventajas[k]; });
+      if(target && target.uid){ delete _members[target.uid];   // quita su membresía/rol
+        if(authAvailable()){ try{ firebase.database().ref('leagueMembers/'+ACTIVE_LEAGUE+'/'+target.uid).remove(); }catch(e){} } }
       if(_devUser && _devUser.playerId===id) _devUser.playerId=null;   // si me borré a mí mismo, quedo operador
       save(); render();
     });
@@ -3386,7 +3395,7 @@ const App = (() => {
       <label class="fl" style="margin-top:10px"><input type="checkbox" id="m_fav" ${p.fav?'checked':''}> Favorito (sale arriba al convocar)</label>
       <label class="fl" style="margin-top:6px"><input type="checkbox" id="m_guest" ${p.guest?'checked':''}> Es invitado</label>
       ${(isSuper()&&p.uid)?`<label class="fl" style="margin-top:10px">Rol (cuenta: ${_esc(p.email||'')})</label>
-        <select id="m_role" class="txt"><option value="regular" ${p.role!=='admin'?'selected':''}>Jugador</option><option value="admin" ${p.role==='admin'?'selected':''}>Admin de la liga</option></select>`:''}
+        <select id="m_role" class="txt"><option value="regular" ${roleOfUid(p.uid)!=='admin'?'selected':''}>Jugador</option><option value="admin" ${roleOfUid(p.uid)==='admin'?'selected':''}>Admin de la liga</option></select>`:''}
       <button class="btn block" style="margin-top:14px" onclick="App.savePlayer('${id}')">Guardar</button>`);
   }
   function savePlayer(id){
@@ -3395,7 +3404,11 @@ const App = (() => {
     p.guest=document.getElementById('m_guest').checked;
     p.fav=document.getElementById('m_fav').checked;
     const roleEl=document.getElementById('m_role');
-    if(roleEl && isSuper() && p.uid){ p.role=roleEl.value; }   // el rol es por-liga: vive en el jugador
+    if(roleEl && isSuper() && p.uid){   // el rol vive en leagueMembers (indexado por uid); solo el súper lo cambia
+      const newRole=(roleEl.value==='admin')?'admin':'regular';
+      _members[p.uid]=Object.assign({}, _members[p.uid], {role:newRole, pid:p.id});
+      if(authAvailable()){ try{ firebase.database().ref('leagueMembers/'+ACTIVE_LEAGUE+'/'+p.uid).update({role:newRole, pid:p.id}); }catch(e){} }
+    }
     if(p.uid){ _users[p.uid]=Object.assign({}, _users[p.uid], {name:p.name, email:(p.email||'')});   // nombre/correo: identidad global
       if(authAvailable()){ try{ firebase.database().ref('users/'+p.uid).update({name:p.name, email:(p.email||'')}); }catch(e){} } }
     save(); closeModal(); render();
@@ -3543,17 +3556,22 @@ const App = (() => {
     _authPending=false; _authDiag='';
     // Tu identidad = el jugador de ESTA liga cuyo uid === el tuyo. Único dato global: users/{uid}/super.
     return (u.getIdToken?u.getIdToken().catch(function(){}):Promise.resolve()).then(function(){
-      return firebase.database().ref('users/'+u.uid+'/super').once('value').then(function(s){ return s.val()===true; }).catch(function(){ return false; });
-    }).then(function(isSup){
-      // 1) busca en el estado YA cargado (fuente viva, consistente con lo que ve la app)
+      return Promise.all([
+        firebase.database().ref('users/'+u.uid+'/super').once('value').then(function(s){ return s.val()===true; }).catch(function(){ return false; }),
+        firebase.database().ref('leagueMembers/'+ACTIVE_LEAGUE+'/'+u.uid+'/role').once('value').then(function(s){ return s.val()||null; }).catch(function(){ return null; })
+      ]);
+    }).then(function(res){
+      const isSup=res[0], memberRole=res[1];
+      const roleFor=function(){ return isSup?'super':(memberRole||'regular'); };   // rol = súper global, o el de leagueMembers, o regular
+      // 1) busca en el estado YA cargado (fuente viva)
       const mine=(state.players||[]).find(function(p){ return p && p.uid===u.uid; });
-      if(mine){ _devUser={playerId:mine.id, role:(isSup?'super':(mine.role||'regular')), uid:u.uid, email:u.email, real:true}; return; }
-      // 2) fallback: lee la liga directo (por si el estado aún no cargó), evita ofrecer alta por error
+      if(mine){ _devUser={playerId:mine.id, role:roleFor(), uid:u.uid, email:u.email, real:true}; return; }
+      // 2) fallback: lee la liga directo (por si el estado aún no cargó)
       return firebase.database().ref('leagues/'+ACTIVE_LEAGUE+'/players').once('value').then(function(s){ return s.val()||{}; }).catch(function(){ return null; }).then(function(players){
         if(players===null){ if(isSup){ _devUser={playerId:null, role:'super', uid:u.uid, email:u.email, real:true}; } else { _authPending=true; _authDiag='no pude leer la liga (permiso/conexión)'; } return; }
-        let myPid=null, myRole='regular';
-        Object.keys(players).forEach(function(pid){ const p=players[pid]; if(p && p.uid===u.uid){ myPid=pid; myRole=p.role||'regular'; } });
-        if(myPid){ _devUser={playerId:myPid, role:(isSup?'super':myRole), uid:u.uid, email:u.email, real:true}; }
+        let myPid=null;
+        Object.keys(players).forEach(function(pid){ const p=players[pid]; if(p && p.uid===u.uid){ myPid=pid; } });
+        if(myPid){ _devUser={playerId:myPid, role:roleFor(), uid:u.uid, email:u.email, real:true}; }
         else if(isSup){ _devUser={playerId:null, role:'super', uid:u.uid, email:u.email, real:true}; }   // súper sin jugador aquí = operador
         else { _authPending=true; _canSelfRegister=true; _authDiag=Object.keys(players).length?'no estás en esta liga':'eres el primero en esta liga'; }
       });
@@ -3592,22 +3610,27 @@ const App = (() => {
     if(!_authUser){ toast('Inicia sesión primero'); return; }
     // Idempotente: si ya tienes jugador en esta liga (por uid), adóptalo — NO dupliques aunque salga el registro por error.
     const mine=(state.players||[]).find(function(p){ return p && p.uid===_authUser.uid; });
-    if(mine){ _devUser={playerId:mine.id, role:(mine.role||'regular'), uid:_authUser.uid, email:(_authUser.email||''), real:true}; _authPending=false; _canSelfRegister=false; closeModal(); cleanUrl(); render(); toast('¡Bienvenido de nuevo!'); return; }
+    if(mine){ _devUser={playerId:mine.id, role:(isSuper()?'super':roleOfUid(_authUser.uid)), uid:_authUser.uid, email:(_authUser.email||''), real:true}; _authPending=false; _canSelfRegister=false; closeModal(); cleanUrl(); render(); toast('¡Bienvenido de nuevo!'); return; }
     const nombre=((document.getElementById('jr_nombre')||{}).value||'').trim();
     const ape=((document.getElementById('jr_ape')||{}).value||'').trim();
     const apodo=((document.getElementById('jr_apodo')||{}).value||'').trim();
     const name=(nombre+' '+ape).trim();
     if(!name){ toast('Pon tu nombre'); return; }
     // El link de la liga (?liga=...) ya define a qué liga entra; aquí se crea el jugador y se liga la cuenta.
-    const em=(_authUser.email||'');
-    const p={id:uid(), name:name, apodo:apodo, guest:false, fav:true, uid:_authUser.uid, email:em, role:'regular'};
+    const em=(_authUser.email||''), myuid=_authUser.uid;
+    const p={id:uid(), name:name, apodo:apodo, guest:false, fav:true, uid:myuid, email:em};   // el rol vive en leagueMembers, no en el jugador
     state.players.push(p);   // en memoria con nombre; en la base, el nombre vive en users/{uid}
-    _users[_authUser.uid]=Object.assign({}, _users[_authUser.uid], {name:name, email:em});
-    // Escribe TODO directo e inmediato (no depender del save() con retraso, que se pierde si refrescan rápido):
-    try{ firebase.database().ref('users/'+_authUser.uid).update({name:name, email:em});
-      firebase.database().ref('users/'+_authUser.uid+'/leagues/'+ACTIVE_LEAGUE).set(true);
-      firebase.database().ref('leagues/'+ACTIVE_LEAGUE+'/players/'+p.id).set({apodo:apodo, fav:true, guest:false, uid:_authUser.uid, role:'regular'}); }catch(e){}
-    _devUser={playerId:p.id, role:'regular', uid:_authUser.uid, email:em, real:true};
+    _users[myuid]=Object.assign({}, _users[myuid], {name:name, email:em});
+    _members[myuid]={role:'regular', pid:p.id};
+    // ESCRITURA ATÓMICA (todo o nada): identidad + membresía + jugador. Inmediata (no depende del save() con retraso).
+    try{ firebase.database().ref().update({
+      ['users/'+myuid+'/name']: name,
+      ['users/'+myuid+'/email']: em,
+      ['users/'+myuid+'/leagues/'+ACTIVE_LEAGUE]: true,
+      ['leagueMembers/'+ACTIVE_LEAGUE+'/'+myuid]: {role:'regular', pid:p.id},
+      ['leagues/'+ACTIVE_LEAGUE+'/players/'+p.id]: {apodo:apodo, fav:true, guest:false, uid:myuid}
+    }); }catch(e){}
+    _devUser={playerId:p.id, role:'regular', uid:myuid, email:em, real:true};
     _authPending=false; _canSelfRegister=false;
     save(); closeModal(); cleanUrl(); render(); toast('¡Bienvenido, '+pname(p.id)+'!');
   }
@@ -3749,12 +3772,16 @@ const App = (() => {
     if(myPid()){ toast('Ya tienes jugador en esta liga'); return; }
     const dn=((_authUser&&_authUser.displayName)||'').trim() || (_devUser&&_devUser.email) || 'Yo';
     const myuid=(_devUser&&_devUser.uid)||null, em=(_devUser&&_devUser.email)||'';
-    const p={id:uid(), name:dn, apodo:'', guest:false, fav:true, uid:myuid, email:em, role:'regular'};
+    const p={id:uid(), name:dn, apodo:'', guest:false, fav:true, uid:myuid, email:em};   // rol del súper viene del flag global; en leagueMembers va 'admin' para mostrarlo
     state.players.push(p); if(_devUser) _devUser.playerId=p.id;
-    if(myuid){ _users[myuid]=Object.assign({}, _users[myuid], {name:dn, email:em});
-      try{ firebase.database().ref('users/'+myuid).update({name:dn, email:em});
-        firebase.database().ref('users/'+myuid+'/leagues/'+ACTIVE_LEAGUE).set(true);
-        firebase.database().ref('leagues/'+ACTIVE_LEAGUE+'/players/'+p.id).set({apodo:'', fav:true, guest:false, uid:myuid, role:'regular'}); }catch(e){} }
+    if(myuid){ _users[myuid]=Object.assign({}, _users[myuid], {name:dn, email:em}); _members[myuid]={role:'admin', pid:p.id};
+      try{ firebase.database().ref().update({
+        ['users/'+myuid+'/name']: dn,
+        ['users/'+myuid+'/email']: em,
+        ['users/'+myuid+'/leagues/'+ACTIVE_LEAGUE]: true,
+        ['leagueMembers/'+ACTIVE_LEAGUE+'/'+myuid]: {role:'admin', pid:p.id},
+        ['leagues/'+ACTIVE_LEAGUE+'/players/'+p.id]: {apodo:'', fav:true, guest:false, uid:myuid}
+      }); }catch(e){} }
     save(); render(); toast('Listo, ahora juegas esta liga');
   }
 
