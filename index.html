@@ -596,7 +596,7 @@
 
 <script>
 const App = (() => {
-  const APP_VERSION = '2026-06-26-11';   // ⬆️ SUBIR en cada deploy: la app se auto-recarga cuando detecta una versión distinta
+  const APP_VERSION = '2026-06-26-12';   // ⬆️ SUBIR en cada deploy: la app se auto-recarga cuando detecta una versión distinta
   const KEY = 'rayas-campestre-v2';
   const uid = () => Math.random().toString(36).slice(2,9);
   // Auto-actualización: revisa el index.html en vivo (sin caché); si la versión cambió, recarga a la versión fresca.
@@ -3853,6 +3853,38 @@ const App = (() => {
     while(i<deb.length&&j<cred.length){ const pay=Math.min(deb[i].v,cred[j].v); if(pay>0)tx.push({from:deb[i].id,to:cred[j].id,amt:pay}); deb[i].v-=pay; cred[j].v-=pay; if(deb[i].v===0)i++; if(cred[j].v===0)j++; }
     return tx;
   }
+  // Tarjeta hoyo-por-hoyo de una pareja (estilo caddie). El renglón "Va" = acumulado del de arriba (match+unidades+oyes,
+  // con doblar). Replica EXACTO la lógica pairwise de _computeDayRaw; el neto cierra contra la matriz (run+medal+castigos=PM).
+  function cmpCardHtml(d,a,b,ord,Hs,nine,PM){
+    const sa=ensureScore(d,a), sb=ensureScore(d,b);
+    const allocA=allocate(received(a,b),d), allocB=allocate(received(b,a),d);
+    const dbl=isDoubled(d,a,b), sg=sameGroup(d,a,b);
+    let run=0; const C=[];
+    ord.forEach(h=>{ const sec=isSecond(d,h), mult=(dbl&&sec)?2:1; let dd=0;
+      const ga=sa.gross[h]||0, gb=sb.gross[h]||0;
+      if(ga&&gb){ const na=ga-(allocA[h]||0), nb=gb-(allocB[h]||0); if(na<nb)dd+=1; else if(nb<na)dd-=1; }
+      dd += unitsOnHole(d,a,h)-unitsOnHole(d,b,h);
+      if(sg && Hs[h].par===3){ const pa=sa.oyes[h]||0,pb=sb.oyes[h]||0; if(pa&&pb){ if(pa<pb)dd+=1; else if(pb<pa)dd-=1; } }
+      run += dd*mult; C.push({h,par:Hs[h].par,ga,gb,sA:allocA[h]||0,sB:allocB[h]||0,run}); });
+    const ms=medalSeg(d,a,b,allocA,allocB), mv=s=>s?(s.winner==='a'?s.mult:(s.winner==='b'?-s.mult:0)):0;
+    const mF=mv(ms.first), mS=mv(ms.second), mT=mv(ms.total), medal=mF+mS+mT;
+    const pmv=((PM[a]&&PM[a][b])||0), castig=pmv-run-medal, pesos=pmv*pairRaya(a,b), lastRun=C.length?C[C.length-1].run:0;
+    const cls=v=>v>0?'pos':(v<0?'neg':''), segs=nine?[[0,C.length,'TOT']]:[[0,9,'OUT'],[9,18,'IN']];
+    function build(cellFn,sumFn){ let s=''; segs.forEach(seg=>{ const to=Math.min(seg[1],C.length); for(let k=seg[0];k<to;k++)s+=cellFn(C[k]); s+=`<td class="sub">${sumFn(seg[0],to,seg[2])}</td>`; }); if(!nine)s+=`<td class="sub tot">${sumFn(0,C.length,'TOT')}</td>`; return s; }
+    const hnRow=build(c=>`<td class="hn">${Hs[c.h].n}</td>`, (f,t,lbl)=>lbl);
+    const parRow=build(c=>`<td>${c.par}</td>`, (f,t)=>C.slice(f,t).reduce((s,c)=>s+c.par,0));
+    const aRow=build(c=>`<td>${c.ga||'·'}${c.sA>0?'<sup>•</sup>':''}</td>`, (f,t)=>C.slice(f,t).reduce((s,c)=>s+c.ga,0)||'');
+    const bRow=build(c=>`<td>${c.gb||'·'}${c.sB>0?'<sup>•</sup>':''}</td>`, (f,t)=>C.slice(f,t).reduce((s,c)=>s+c.gb,0)||'');
+    const vaRow=build(c=>`<td class="${cls(c.run)}">${cmpRaya(c.run)}</td>`, (f,t)=>{const r=t>0&&C[t-1]?C[t-1].run:0;return `<span class="${cls(r)}">${cmpRaya(r)}</span>`;});
+    const vA=received(a,b), vB=received(b,a);
+    const vNote=vA>0?`${_esc(cmpShortName(a))} recibe ${vA}`:(vB>0?`${_esc(cmpShortName(b))} recibe ${vB}`:'parejo');
+    const medTxt=nine?`Medal ${cmpRaya(medal)}`:`Medal ${cmpRaya(medal)} (1er9 ${cmpRaya(mF)} · 2º9 ${cmpRaya(mS)} · 18 ${cmpRaya(mT)})`;
+    return `<div class="cmp-card"><div class="cc-h"><span class="cc-t">${_esc(cmpShortName(a))} vs ${_esc(cmpShortName(b))}</span><span class="cc-m">${dbl?'dobló ✓ · ':''}${vNote}</span></div>`+
+      `<table class="cmp-card-tb"><tr class="hr"><td class="lh">H</td>${hnRow}</tr><tr class="pr"><td class="lh">Par</td>${parRow}</tr>`+
+      `<tr><td class="lh">${_esc(cmpShortName(a))}</td>${aRow}</tr><tr><td class="lh">${_esc(cmpShortName(b))}</td>${bRow}</tr>`+
+      `<tr class="var"><td class="lh">Va</td>${vaRow}</tr></table>`+
+      `<div class="cc-f">Va hoyo×hoyo <b class="${cls(lastRun)}">${cmpRaya(lastRun)}</b> · ${medTxt}${castig?` · Castigos <b class="${cls(castig)}">${cmpRaya(castig)}</b>`:''} → Neto <b class="${cls(pmv)}">${cmpRaya(pmv)} r = ${cmpMoney(pesos)}</b></div></div>`;
+  }
   function exportComprobante(){
     const d=curDay(); if(!d){ toast('No hay día activo'); return; }
     const res=computeDay(d); if(!res){ toast('Sin resultados'); return; }
@@ -3878,15 +3910,10 @@ const App = (() => {
       const pe=rowOf(a).pesos; H+=`<td class="r ${sgn(pe)}">${cmpMoney(pe)}</td></tr>`; });
     H+=`<tr class="tot"><td class="nm">Suma</td><td colspan="${N}" class="c dim">antisimétrica</td><td class="r ${res.sum===0?'pos':'neg'}">${cmpMoney(res.sum)}</td></tr></table>`;
     H+= res.sum===0?`<div class="cmp-ok">✓ Cuadra en cero — lo que unos ganan, otros lo pierden</div>`:`<div class="cmp-warn">⚠ Descuadre de ${cmpMoney(res.sum)} (capturas incompletas)</div>`;
-    // — desglose por las 6 apuestas (por pareja, perspectiva del primero)
-    H+=`<div class="cmp-sec">Desglose por apuesta (por pareja)</div>`;
-    H+=`<table class="cmp-tb"><tr><th>Pareja</th><th class="c">Hoyos</th><th class="c">Medal</th><th class="c">Unid.</th><th class="c">Oyes</th><th class="c">Castigos</th><th class="c">Doblar</th><th class="r">Neto</th><th class="r">Pesos</th></tr>`;
-    for(let i=0;i<N;i++)for(let j=i+1;j<N;j++){ const a=ids[i], b=ids[j];
-      const hh=h2h(d,a,b), p=hh.parts, neto=((PM[a]&&PM[a][b])||0), castig=neto-hh.net;
-      H+=`<tr><td>${_esc(cmpShortName(a))} vs ${_esc(cmpShortName(b))}</td>
-        <td class="c">${cmpRaya(p.hoyos)}</td><td class="c">${cmpRaya(p.medal)}</td><td class="c">${cmpRaya(p.unidades)}</td><td class="c">${cmpRaya(p.oyes)}</td><td class="c">${cmpRaya(castig)}</td>
-        <td class="c">${hh.doubled?'✓':'—'}</td><td class="r">${cmpRaya(neto)} r</td><td class="r ${sgn(neto)}">${cmpMoney(neto*pairRaya(a,b))}</td></tr>`; }
-    H+=`</table><div class="cmp-hint">Hoyos + Medal + Unidades + Oyes + Castigos = Neto (rayas). "Doblar ✓" = la 2ª vuelta contó ×2 entre esa pareja (ya reflejado en las columnas).</div>`;
+    // — tarjetas por pareja (hoyo por hoyo, estilo caddie): el renglón "Va" lleva el acumulado del de arriba
+    H+=`<div class="cmp-sec">Tarjetas por pareja · hoyo por hoyo</div><div class="cmp-hint">Como las lleva el caddie: el renglón <b>Va</b> suma hoyo por hoyo (match de hoyos + unidades + oyes) desde la perspectiva del jugador de arriba. El <b>•</b> marca el hoyo donde ese jugador recibe golpe de ventaja. Medal, doblar y castigos se suman abajo para el neto final (que cierra contra el cuadro de arriba).</div>`;
+    const ord=playOrder(d), Hs=holesOf(d), nine=isNine(d);
+    for(let i=0;i<N;i++)for(let j=i+1;j<N;j++){ H+=cmpCardHtml(d,ids[i],ids[j],ord,Hs,nine,PM); }
     // — cuentas T por jugador (esquema de mayor)
     H+=`<div class="cmp-sec">Cuentas T por jugador (esquema de mayor)</div><div class="cmp-grid">`;
     ids.forEach(a=>{ const debe=[],haber=[]; let sD=0,sH=0;
@@ -3945,7 +3972,17 @@ const App = (() => {
     '#cmpDoc .tt-ln{display:flex;justify-content:space-between;font-size:11px;padding:1px 0}'+
     '#cmpDoc .tt-saldo{display:flex;justify-content:space-between;border-top:1px solid #e4e6e1;margin-top:6px;padding-top:5px;font-weight:700;font-size:12px}'+
     '#cmpDoc .cmp-foot{margin-top:22px;text-align:center;font-size:10px;color:#9aa29a}'+
-    '@media print{body>*:not(#cmpOverlay){display:none!important}#cmpOverlay{position:static!important;background:#fff!important;overflow:visible!important}#cmpOverlay .no-print{display:none!important}#cmpDoc{margin:0;max-width:none;padding:0;border-radius:0}#cmpDoc .cmp-sec{break-after:avoid}#cmpDoc tr,#cmpDoc .tt-card{break-inside:avoid}}';
+    '#cmpDoc .cmp-card{border:1px solid #e4e6e1;border-radius:6px;padding:7px 9px;margin:8px 0;break-inside:avoid}'+
+    '#cmpDoc .cc-h{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:4px}'+
+    '#cmpDoc .cc-t{font-weight:700;font-size:13px}#cmpDoc .cc-m{font-size:10px;color:#6e776f}'+
+    '#cmpDoc table.cmp-card-tb{width:100%;border-collapse:collapse;font-size:10px;table-layout:fixed}'+
+    '#cmpDoc .cmp-card-tb td{border:1px solid #eef0ec;text-align:center;padding:2px 0;line-height:1.25;overflow:hidden}'+
+    '#cmpDoc .cmp-card-tb .lh{text-align:left;font-weight:700;color:#6e776f;width:52px;border-left:0;border-top:0;border-bottom:0;padding-left:2px}'+
+    '#cmpDoc .cmp-card-tb .hr td{background:#f1f3ef;font-weight:700}#cmpDoc .cmp-card-tb .hn{color:#6e776f}'+
+    '#cmpDoc .cmp-card-tb .pr td{color:#9aa29a}#cmpDoc .cmp-card-tb .sub{background:#f6f8f4;font-weight:700}#cmpDoc .cmp-card-tb .sub.tot{background:#e9f1ea}'+
+    '#cmpDoc .cmp-card-tb .var td{font-weight:700;border-top:1.5px solid #cfd3cd}#cmpDoc .cmp-card-tb sup{color:#b98a2e;font-size:7px}'+
+    '#cmpDoc .cc-f{font-size:11px;margin-top:5px;color:#3a423b}'+
+    '@media print{body>*:not(#cmpOverlay){display:none!important}#cmpOverlay{position:static!important;background:#fff!important;overflow:visible!important}#cmpOverlay .no-print{display:none!important}#cmpDoc{margin:0;max-width:none;padding:0;border-radius:0}#cmpDoc .cmp-sec{break-after:avoid}#cmpDoc tr,#cmpDoc .tt-card,#cmpDoc .cmp-card{break-inside:avoid}}';
     document.head.appendChild(st); }
   function cmpShow(html){ cmpStyleInject(); let o=document.getElementById('cmpOverlay'); if(o)o.remove();
     o=document.createElement('div'); o.id='cmpOverlay';
