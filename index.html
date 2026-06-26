@@ -596,7 +596,7 @@
 
 <script>
 const App = (() => {
-  const APP_VERSION = '2026-06-26-09';   // ⬆️ SUBIR en cada deploy: la app se auto-recarga cuando detecta una versión distinta
+  const APP_VERSION = '2026-06-26-10';   // ⬆️ SUBIR en cada deploy: la app se auto-recarga cuando detecta una versión distinta
   const KEY = 'rayas-campestre-v2';
   const uid = () => Math.random().toString(36).slice(2,9);
   // Auto-actualización: revisa el index.html en vivo (sin caché); si la versión cambió, recarga a la versión fresca.
@@ -1071,6 +1071,7 @@ const App = (() => {
   function ensureScore(d,pid){
     if(!d.scores[pid]) d.scores[pid]={gross:Array(18).fill(0),putts:Array(18).fill(null),oyes:{},units:{},cast:{}};
     const s=d.scores[pid]; if(!s.putts) s.putts=Array(18).fill(null); if(!s.oyes) s.oyes={};
+    if(!s.gross) s.gross=Array(18).fill(0); if(!s.units) s.units={}; if(!s.cast) s.cast={};   // normaliza scores que lleguen de otro dispositivo sin todos los campos (evita romper captura/celebración)
     return s;
   }
 
@@ -1112,8 +1113,8 @@ const App = (() => {
       if(d.doubles[a]&&!Object.keys(d.doubles[a]).length) delete d.doubles[a]; if(d.doubles[b]&&!Object.keys(d.doubles[b]).length) delete d.doubles[b]; }
     else { (d.doubles[a]=d.doubles[a]||{})[b]=true; } }
   const unitRayaOf = uid=>{ const u=state.units.find(x=>x.id===uid); return u?u.rayas:1; };
-  function validManual(sc,h,holes){ const g=sc.gross[h], par=(holes||state.courses[0].holes)[h].par;
-    return (sc.units[h]||[]).filter(uid=>{ const u=state.units.find(x=>x.id===uid); if(u&&u.reqPar) return g>0 && (g-par)<=0; return true; }); }
+  function validManual(sc,h,holes){ const g=(sc.gross||[])[h], par=(holes||state.courses[0].holes)[h].par;
+    return ((sc.units&&sc.units[h])||[]).filter(uid=>{ const u=state.units.find(x=>x.id===uid); if(u&&u.reqPar) return g>0 && (g-par)<=0; return true; }); }   // defensivo: scores sincronizados de otro disp. pueden no traer units (Firebase descarta {} vacío)
   function unitsOnHole(d,pid,h){ const sc=ensureScore(d,pid); const H=holesOf(d);
     const auto=sc.gross[h]?autoUnits(sc.gross[h],h,sc.putts[h],H):[], man=validManual(sc,h,H);
     let t=0; new Set([...auto,...man]).forEach(u=>t+=unitRayaOf(u)); return t; }
