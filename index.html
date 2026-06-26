@@ -596,7 +596,7 @@
 
 <script>
 const App = (() => {
-  const APP_VERSION = '2026-06-26-13';   // ⬆️ SUBIR en cada deploy: la app se auto-recarga cuando detecta una versión distinta
+  const APP_VERSION = '2026-06-26-14';   // ⬆️ SUBIR en cada deploy: la app se auto-recarga cuando detecta una versión distinta
   const KEY = 'rayas-campestre-v2';
   const uid = () => Math.random().toString(36).slice(2,9);
   // Auto-actualización: revisa el index.html en vivo (sin caché); si la versión cambió, recarga a la versión fresca.
@@ -2369,14 +2369,14 @@ const App = (() => {
       <div class="hint">Toca para convocar. Luego dale Sortear.</div><div class="assign">`;
     // chips rápidos: favoritos + cualquiera ya convocado (incluye invitados convocados, con su tag)
     const chips=state.players.filter(p=>p.fav||d.playing.includes(p.id))
-      .sort((a,b)=>(b.fav?1:0)-(a.fav?1:0)||a.name.localeCompare(b.name));
+      .sort((a,b)=>(b.fav?1:0)-(a.fav?1:0)||(a.name||'').localeCompare(b.name||''));
     chips.forEach(p=>{
       const on=d.playing.includes(p.id);
       html+=`<button class="chip ${on?'on':''}" onclick="App.togglePlaying('${p.id}')">${p.fav?'⭐ ':''}${pname(p.id)}${p.guest?' <small>inv</small>':''}</button>`;
     });
     html+=`</div>`;
     // dropdown para convocar a CUALQUIER otro jugador no convocado (regulares e invitados)
-    const notIn=[...state.players].filter(p=>!d.playing.includes(p.id)).sort((a,b)=>a.name.localeCompare(b.name));
+    const notIn=[...state.players].filter(p=>!d.playing.includes(p.id)).sort((a,b)=>(a.name||'').localeCompare(b.name||''));
     if(notIn.length){
       html+=`<select class="addsel" onchange="if(this.value)App.togglePlaying(this.value)">
         <option value="">＋ Agregar otro jugador…</option>
@@ -2949,7 +2949,7 @@ const App = (() => {
       if(!allowed.has(ventFocus)) ventFocus=myPid();
     }
     // regulares primero (alfabético), invitados al final
-    const sorted=[...state.players].sort((a,b)=>(a.guest?1:0)-(b.guest?1:0)||a.name.localeCompare(b.name));
+    const sorted=[...state.players].sort((a,b)=>(a.guest?1:0)-(b.guest?1:0)||(a.name||'').localeCompare(b.name||''));
 
     let html='';
     // solicitudes pendientes de ventaja (admin/super)
@@ -3084,7 +3084,7 @@ const App = (() => {
     let html=`<div class="cfg-sect">Grupo</div>
       <div class="card"><h3>Jugadores (${state.players.length})</h3>
       <div class="hint">Cada quien aparece al entrar con Google por el link de la liga. ⭐ = favorito (sale arriba al convocar).</div><div class="plist">`;
-    [...state.players].sort((a,b)=>(b.fav?1:0)-(a.fav?1:0)||a.name.localeCompare(b.name)).forEach(p=>{
+    [...state.players].sort((a,b)=>(b.fav?1:0)-(a.fav?1:0)||(a.name||'').localeCompare(b.name||'')).forEach(p=>{
       const sub = p.guest ? 'Invitado' : (p.email ? _esc(p.email) : 'sin cuenta');
       html+=`<div class="prow"><div class="avatar ${p.guest?'g':''}">${(p.apodo||p.name).slice(0,1).toUpperCase()}</div>
         <div class="grow"><div class="nm">${p.name}${(p.apodo||'').trim()?` <span class="apod">"${p.apodo.trim()}"</span>`:''}${(p.uid&&roleOfUid(p.uid)==='admin')?' <span class="tag">admin</span>':''}</div>
@@ -3278,7 +3278,7 @@ const App = (() => {
         <input id="rp_val" class="txt" type="number" inputmode="numeric" placeholder="${state.rayaValue}" style="max-width:120px">
         <button class="btn sm" onclick="App.submitRayaPair()">Fijar</button></div>`;
     } else if(me){
-      const others=[...state.players].filter(p=>p.id!==me).sort((a,b)=>(a.guest?1:0)-(b.guest?1:0)||a.name.localeCompare(b.name));
+      const others=[...state.players].filter(p=>p.id!==me).sort((a,b)=>(a.guest?1:0)-(b.guest?1:0)||(a.name||'').localeCompare(b.name||''));
       h+=`<div class="row" style="gap:6px;margin-top:10px;align-items:center">
         <select id="rp_opp" class="txt" style="flex:1">${others.map(p=>`<option value="${p.id}">${p.name}${p.guest?' (inv)':''}</option>`).join('')}</select>
         <span style="font-size:20px;font-weight:700">$</span>
@@ -3696,7 +3696,7 @@ const App = (() => {
     const right = (isRealAuth()||_authPending)?'salir':'cambiar';
     b.innerHTML='<span>'+left+'</span><span style="color:var(--fairway);font-weight:700">'+right+'</span>'; }
   function loginModal(){
-    const ps=[...state.players].sort((a,b)=>(a.guest?1:0)-(b.guest?1:0)||a.name.localeCompare(b.name));
+    const ps=[...state.players].sort((a,b)=>(a.guest?1:0)-(b.guest?1:0)||(a.name||'').localeCompare(b.name||''));
     const signedIn = isRealAuth() || _authPending;
     let top='';
     if(signedIn){
