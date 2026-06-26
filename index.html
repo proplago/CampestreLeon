@@ -596,7 +596,7 @@
 
 <script>
 const App = (() => {
-  const APP_VERSION = '2026-06-26-10';   // ⬆️ SUBIR en cada deploy: la app se auto-recarga cuando detecta una versión distinta
+  const APP_VERSION = '2026-06-26-11';   // ⬆️ SUBIR en cada deploy: la app se auto-recarga cuando detecta una versión distinta
   const KEY = 'rayas-campestre-v2';
   const uid = () => Math.random().toString(36).slice(2,9);
   // Auto-actualización: revisa el index.html en vivo (sin caché); si la versión cambió, recarga a la versión fresca.
@@ -1133,18 +1133,18 @@ const App = (() => {
     const sa=ensureScore(d,a), sb=ensureScore(d,b);
     const allocA=allocate(received(a,b),d), allocB=allocate(received(b,a),d);
     const dbl=isDoubled(d,a,b), sg=sameGroup(d,a,b);
-    let net=0, firstNet=0;
+    let net=0, firstNet=0; const P={hoyos:0,unidades:0,oyes:0,medal:0};   // desglose por apuesta (persp. de a, con doblar ya incluido); NO altera net
     for(let h=0;h<18;h++){
       const sec=isSecond(d,h), mult=(dbl&&sec)?2:1; let dd=0;
-      if(sa.gross[h]&&sb.gross[h]){ const na=sa.gross[h]-allocA[h], nb=sb.gross[h]-allocB[h]; if(na<nb)dd+=1; else if(nb<na)dd-=1; }
-      dd += unitsOnHole(d,a,h)-unitsOnHole(d,b,h);
-      if(sg && holesOf(d)[h].par===3){ const pa=sa.oyes[h]||0,pb=sb.oyes[h]||0; if(pa&&pb){ if(pa<pb)dd+=1; else if(pb<pa)dd-=1; } }
+      if(sa.gross[h]&&sb.gross[h]){ const na=sa.gross[h]-allocA[h], nb=sb.gross[h]-allocB[h]; let hh=0; if(na<nb)hh=1; else if(nb<na)hh=-1; dd+=hh; P.hoyos+=hh*mult; }
+      const uu=unitsOnHole(d,a,h)-unitsOnHole(d,b,h); dd+=uu; P.unidades+=uu*mult;
+      if(sg && holesOf(d)[h].par===3){ const pa=sa.oyes[h]||0,pb=sb.oyes[h]||0; if(pa&&pb){ let oo=0; if(pa<pb)oo=1; else if(pb<pa)oo=-1; dd+=oo; P.oyes+=oo*mult; } }
       net += dd*mult; if(!sec) firstNet += dd;
     }
     const ms=medalSeg(d,a,b,allocA,allocB);
     if(ms.first){ if(ms.first.winner==='a')firstNet+=1; else if(ms.first.winner==='b')firstNet-=1; }
-    [ms.first,ms.second,ms.total].forEach(s=>{ if(!s)return; if(s.winner==='a')net+=s.mult; else if(s.winner==='b')net-=s.mult; });
-    return {net, firstNet};
+    [ms.first,ms.second,ms.total].forEach(s=>{ if(!s)return; let mm=0; if(s.winner==='a')mm=s.mult; else if(s.winner==='b')mm=-s.mult; net+=mm; P.medal+=mm; });
+    return {net, firstNet, parts:P, doubled:dbl};
   }
 
   function compute(){ return computeDay(curDay()); }
@@ -1330,7 +1330,7 @@ const App = (() => {
       : (isAdmin()
           ? `<button class="btn block" onclick="App.closeDay()">Cerrar el día y ajustar ventajas</button>`
           : `<div class="hint" style="margin-top:6px">El admin cierra el día al terminar (ajusta las ventajas).</div>`);
-    html+=`<div class="exprow"><button class="expbtn" onclick="App.exportImage()">📸 Imagen</button></div>`;
+    html+=`<div class="exprow"><button class="expbtn" onclick="App.exportImage()">📸 Imagen</button><button class="expbtn" onclick="App.exportComprobante()">📄 Comprobante PDF</button></div>`;
 
     // desglose por concepto
     html+=desgloseHtml(res);
@@ -3838,6 +3838,122 @@ const App = (() => {
     checkForUpdate();   // ¿hay versión nueva? recarga sola
     document.addEventListener('visibilitychange', ()=>{ if(!document.hidden) checkForUpdate(); });   // y cada vez que vuelves a la app
   }   // muestra la entrada al instante; si hay sesión de Google, se cierra sola al resolver
+  // ============================================================
+  //  COMPROBANTE DE LIQUIDACIÓN (PDF vía window.print) — todos contra todos + cuentas T
+  //  Solo LEE del motor (computeDay/h2h); no toca el cálculo. La matriz es res.pm (rayas netas).
+  // ============================================================
+  function cmpMoney(n){ n=Math.round(n||0); return (n<0?'−$':'$')+Math.abs(n).toLocaleString('es-MX'); }
+  function cmpRaya(n){ n=Math.round(n||0); return (n>0?'+':'')+n; }
+  function cmpShortName(id){ const p=player(id); if(!p) return '?'; const ap=(p.apodo||'').trim(); return ap || ((pname(id)||'?').split(' ')[0]); }
+  function cmpSettle(rows){   // pagos mínimos (greedy): el mayor deudor le paga al mayor acreedor
+    const cred=[], deb=[];
+    rows.forEach(r=>{ const v=Math.round(r.pesos||0); if(v>0)cred.push({id:r.id,v}); else if(v<0)deb.push({id:r.id,v:-v}); });
+    cred.sort((x,y)=>y.v-x.v); deb.sort((x,y)=>y.v-x.v);
+    const tx=[]; let i=0,j=0;
+    while(i<deb.length&&j<cred.length){ const pay=Math.min(deb[i].v,cred[j].v); if(pay>0)tx.push({from:deb[i].id,to:cred[j].id,amt:pay}); deb[i].v-=pay; cred[j].v-=pay; if(deb[i].v===0)i++; if(cred[j].v===0)j++; }
+    return tx;
+  }
+  function exportComprobante(){
+    const d=curDay(); if(!d){ toast('No hay día activo'); return; }
+    const res=computeDay(d); if(!res){ toast('Sin resultados'); return; }
+    const PM=res.pm||{}, ids=res.rows.map(r=>r.id), N=ids.length;
+    if(N<2){ toast('Hacen falta al menos 2 jugadores'); return; }
+    const cell=(a,b)=>(((PM[a]&&PM[a][b])||0)*pairRaya(a,b));   // pesos que a le gana a b
+    const rowOf=id=>res.rows.find(r=>r.id===id)||{pesos:0,total:0};
+    const sgn=v=>v>0?'pos':(v<0?'neg':'');
+    // — encabezado
+    let H=`<div class="cmp-h"><div class="cmp-t">Comprobante de liquidación</div>
+      <div class="cmp-s">${_esc(leagueName(ACTIVE_LEAGUE))} · ${_esc(d.label||'')}${d.date?' · '+_esc(d.date):''} · ${_esc(courseOf(d).name)} · ${_esc(holesLabel(d))} · raya $${state.rayaValue} · ${N} jugadores</div></div>`;
+    // — posiciones
+    H+=`<div class="cmp-sec">Resultado del día</div><table class="cmp-tb"><tr><th>#</th><th>Jugador</th><th class="r">Rayas</th><th class="r">Pesos</th></tr>`;
+    res.rows.forEach((r,i)=>{ H+=`<tr><td>${i+1}</td><td>${_esc(pname(r.id))}</td><td class="r">${cmpRaya(r.total)}</td><td class="r ${sgn(r.pesos)}">${cmpMoney(r.pesos)}</td></tr>`; });
+    H+=`</table>`;
+    // — matriz todos contra todos (cuadro de doble entrada)
+    H+=`<div class="cmp-sec">Todos contra todos · cuadro de doble entrada</div><div class="cmp-hint">Cada celda = pesos que el jugador de la fila le gana al de la columna (espejo con signo opuesto). La suma de cada fila es su total.</div>`;
+    H+=`<table class="cmp-tb cmp-mtx"><tr><th></th>`;
+    ids.forEach(b=>{ H+=`<th class="c">${_esc(cmpShortName(b))}</th>`; });
+    H+=`<th class="r">Total</th></tr>`;
+    ids.forEach(a=>{ H+=`<tr><td class="nm">${_esc(cmpShortName(a))}</td>`;
+      ids.forEach(b=>{ if(a===b){ H+=`<td class="c dim">—</td>`; } else { const v=cell(a,b); H+=`<td class="c ${sgn(v)}">${v===0?'0':cmpMoney(v)}</td>`; } });
+      const pe=rowOf(a).pesos; H+=`<td class="r ${sgn(pe)}">${cmpMoney(pe)}</td></tr>`; });
+    H+=`<tr class="tot"><td class="nm">Suma</td><td colspan="${N}" class="c dim">antisimétrica</td><td class="r ${res.sum===0?'pos':'neg'}">${cmpMoney(res.sum)}</td></tr></table>`;
+    H+= res.sum===0?`<div class="cmp-ok">✓ Cuadra en cero — lo que unos ganan, otros lo pierden</div>`:`<div class="cmp-warn">⚠ Descuadre de ${cmpMoney(res.sum)} (capturas incompletas)</div>`;
+    // — desglose por las 6 apuestas (por pareja, perspectiva del primero)
+    H+=`<div class="cmp-sec">Desglose por apuesta (por pareja)</div>`;
+    H+=`<table class="cmp-tb"><tr><th>Pareja</th><th class="c">Hoyos</th><th class="c">Medal</th><th class="c">Unid.</th><th class="c">Oyes</th><th class="c">Castigos</th><th class="c">Doblar</th><th class="r">Neto</th><th class="r">Pesos</th></tr>`;
+    for(let i=0;i<N;i++)for(let j=i+1;j<N;j++){ const a=ids[i], b=ids[j];
+      const hh=h2h(d,a,b), p=hh.parts, neto=((PM[a]&&PM[a][b])||0), castig=neto-hh.net;
+      H+=`<tr><td>${_esc(cmpShortName(a))} vs ${_esc(cmpShortName(b))}</td>
+        <td class="c">${cmpRaya(p.hoyos)}</td><td class="c">${cmpRaya(p.medal)}</td><td class="c">${cmpRaya(p.unidades)}</td><td class="c">${cmpRaya(p.oyes)}</td><td class="c">${cmpRaya(castig)}</td>
+        <td class="c">${hh.doubled?'✓':'—'}</td><td class="r">${cmpRaya(neto)} r</td><td class="r ${sgn(neto)}">${cmpMoney(neto*pairRaya(a,b))}</td></tr>`; }
+    H+=`</table><div class="cmp-hint">Hoyos + Medal + Unidades + Oyes + Castigos = Neto (rayas). "Doblar ✓" = la 2ª vuelta contó ×2 entre esa pareja (ya reflejado en las columnas).</div>`;
+    // — cuentas T por jugador (esquema de mayor)
+    H+=`<div class="cmp-sec">Cuentas T por jugador (esquema de mayor)</div><div class="cmp-grid">`;
+    ids.forEach(a=>{ const debe=[],haber=[]; let sD=0,sH=0;
+      ids.forEach(b=>{ if(a===b)return; const v=cell(a,b); if(v>0){haber.push([b,v]);sH+=v;} else if(v<0){debe.push([b,-v]);sD+=-v;} });
+      const saldo=sH-sD;
+      let c=`<div class="tt-card"><div class="tt-nm">${_esc(pname(a))}</div><div class="tt-cols"><div class="tt-d"><div class="tt-hd">Debe (pierde)</div>`;
+      debe.forEach(x=>{ c+=`<div class="tt-ln"><span>a ${_esc(cmpShortName(x[0]))}</span><span>${cmpMoney(x[1])}</span></div>`; }); if(!debe.length)c+=`<div class="tt-ln dim">—</div>`;
+      c+=`</div><div class="tt-hh"><div class="tt-hd">Haber (gana)</div>`;
+      haber.forEach(x=>{ c+=`<div class="tt-ln"><span>de ${_esc(cmpShortName(x[0]))}</span><span>${cmpMoney(x[1])}</span></div>`; }); if(!haber.length)c+=`<div class="tt-ln dim">—</div>`;
+      c+=`</div></div><div class="tt-saldo"><span>Saldo (${saldo>0?'cobra':saldo<0?'paga':'—'})</span><span class="${sgn(saldo)}">${cmpMoney(saldo)}</span></div></div>`;
+      H+=c; });
+    H+=`</div>`;
+    // — ventajas aplicadas
+    H+=`<div class="cmp-sec">Ventajas aplicadas (golpes que se dan)</div>`;
+    const vl=[]; for(let i=0;i<N;i++)for(let j=i+1;j<N;j++){ const a=ids[i],b=ids[j], ra=received(a,b), rb=received(b,a);
+      if(ra>0)vl.push(`${_esc(cmpShortName(b))} da <b>${ra}</b> a ${_esc(cmpShortName(a))}`); if(rb>0)vl.push(`${_esc(cmpShortName(a))} da <b>${rb}</b> a ${_esc(cmpShortName(b))}`); }
+    H+= vl.length?`<div class="cmp-hint">${vl.join(' · ')}</div>`:`<div class="cmp-hint">Sin ventajas entre los jugadores del día (todos juegan parejo).</div>`;
+    // — liquidación sugerida (mínimos pagos)
+    const tx=cmpSettle(res.rows);
+    H+=`<div class="cmp-sec">Liquidación sugerida (mínimos pagos)</div>`;
+    if(tx.length){ H+=`<table class="cmp-tb"><tr><th>Paga</th><th>Recibe</th><th class="r">Monto</th></tr>`;
+      tx.forEach(t=>{ H+=`<tr><td>${_esc(pname(t.from))}</td><td>${_esc(pname(t.to))}</td><td class="r">${cmpMoney(t.amt)}</td></tr>`; }); H+=`</table>`;
+    } else H+=`<div class="cmp-hint">Nadie debe nada (todos en cero).</div>`;
+    // — balanza de comprobación
+    let tH=0,tD=0; res.rows.forEach(r=>{ if(r.pesos>0)tH+=r.pesos; else if(r.pesos<0)tD+=-r.pesos; });
+    H+=`<div class="cmp-sec">Balanza de comprobación</div><table class="cmp-tb"><tr><th>Concepto</th><th class="r">Importe</th></tr>
+      <tr><td>Suma a cobrar (Haber)</td><td class="r pos">${cmpMoney(tH)}</td></tr>
+      <tr><td>Suma a pagar (Debe)</td><td class="r neg">${cmpMoney(-tD)}</td></tr>
+      <tr class="tot"><td>Diferencia</td><td class="r ${tH-tD===0?'pos':'neg'}">${cmpMoney(tH-tD)}</td></tr></table>`;
+    H+=`<div class="cmp-foot">Generado por Rayas Campestre · ${_esc(new Date().toLocaleString('es-MX'))}</div>`;
+    cmpShow(H);
+  }
+  function cmpStyleInject(){ if(document.getElementById('cmpStyle'))return; const st=document.createElement('style'); st.id='cmpStyle';
+    st.textContent='#cmpOverlay{position:fixed;inset:0;z-index:99999;background:#e9ece8;overflow:auto;-webkit-overflow-scrolling:touch}'+
+    '#cmpOverlay .cmp-bar{position:sticky;top:0;display:flex;gap:8px;justify-content:flex-end;padding:10px 14px;background:#0a6a3a}'+
+    '#cmpOverlay .cmp-bar button{font:600 14px system-ui;padding:9px 16px;border:0;border-radius:8px;background:#fff;color:#0a6a3a;cursor:pointer}'+
+    '#cmpDoc{max-width:820px;margin:16px auto;background:#fff;color:#1b211d;padding:26px 30px;border-radius:6px;font:400 13px system-ui,-apple-system,sans-serif;line-height:1.4}'+
+    '#cmpDoc .cmp-h{border-bottom:2px solid #0a6a3a;padding-bottom:8px;margin-bottom:6px}'+
+    '#cmpDoc .cmp-t{font:700 22px Anton,system-ui,sans-serif;letter-spacing:.5px}'+
+    '#cmpDoc .cmp-s{color:#6e776f;font-size:12px;margin-top:3px}'+
+    '#cmpDoc .cmp-sec{font-weight:700;font-size:12px;color:#0a6a3a;margin:18px 0 5px;text-transform:uppercase;letter-spacing:.05em}'+
+    '#cmpDoc .cmp-hint{font-size:11px;color:#6e776f;margin:3px 0 7px}'+
+    '#cmpDoc table.cmp-tb{width:100%;border-collapse:collapse;font-size:12px;margin-top:3px}'+
+    '#cmpDoc .cmp-tb th{font-size:10px;color:#9aa29a;text-transform:uppercase;text-align:left;padding:4px 6px;border-bottom:1px solid #e4e6e1;font-weight:700}'+
+    '#cmpDoc .cmp-tb td{padding:5px 6px;border-bottom:1px solid #f1f2ef}'+
+    '#cmpDoc .cmp-tb .r{text-align:right}#cmpDoc .cmp-tb .c{text-align:center}'+
+    '#cmpDoc .pos{color:#0a6a3a;font-weight:700}#cmpDoc .neg{color:#c1272d;font-weight:700}#cmpDoc .dim{color:#c0c5be}'+
+    '#cmpDoc .cmp-mtx td.nm{font-weight:700;text-align:left}#cmpDoc tr.tot td{border-top:2px solid #cfd3cd;font-weight:700}'+
+    '#cmpDoc .cmp-ok{color:#0a6a3a;font-weight:700;margin-top:6px;font-size:12px}#cmpDoc .cmp-warn{color:#c1272d;font-weight:700;margin-top:6px;font-size:12px}'+
+    '#cmpDoc .cmp-grid{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-top:4px}'+
+    '#cmpDoc .tt-card{border:1px solid #e4e6e1;border-radius:6px;padding:8px 10px}'+
+    '#cmpDoc .tt-nm{text-align:center;font-weight:700;border-bottom:1.5px solid #cfd3cd;padding-bottom:4px;margin-bottom:5px}'+
+    '#cmpDoc .tt-cols{display:grid;grid-template-columns:1fr 1fr}'+
+    '#cmpDoc .tt-d{border-right:1.5px solid #cfd3cd;padding-right:8px}#cmpDoc .tt-hh{padding-left:8px}'+
+    '#cmpDoc .tt-hd{font-size:10px;color:#9aa29a;text-transform:uppercase;margin-bottom:3px}'+
+    '#cmpDoc .tt-ln{display:flex;justify-content:space-between;font-size:11px;padding:1px 0}'+
+    '#cmpDoc .tt-saldo{display:flex;justify-content:space-between;border-top:1px solid #e4e6e1;margin-top:6px;padding-top:5px;font-weight:700;font-size:12px}'+
+    '#cmpDoc .cmp-foot{margin-top:22px;text-align:center;font-size:10px;color:#9aa29a}'+
+    '@media print{body>*:not(#cmpOverlay){display:none!important}#cmpOverlay{position:static!important;background:#fff!important;overflow:visible!important}#cmpOverlay .no-print{display:none!important}#cmpDoc{margin:0;max-width:none;padding:0;border-radius:0}#cmpDoc .cmp-sec{break-after:avoid}#cmpDoc tr,#cmpDoc .tt-card{break-inside:avoid}}';
+    document.head.appendChild(st); }
+  function cmpShow(html){ cmpStyleInject(); let o=document.getElementById('cmpOverlay'); if(o)o.remove();
+    o=document.createElement('div'); o.id='cmpOverlay';
+    o.innerHTML='<div class="cmp-bar no-print"><button onclick="App.cmpPrint()">📄 Guardar PDF</button><button onclick="App.cmpClose()">Cerrar</button></div><div id="cmpDoc">'+html+'</div>';
+    document.body.appendChild(o); window.scrollTo(0,0); }
+  function cmpPrint(){ window.print(); }
+  function cmpClose(){ const o=document.getElementById('cmpOverlay'); if(o)o.remove(); }
+
   return { init,loginModal,doLogin,signInGoogle,signOutAuth,joinRegister,shareInvite,copyInvite,regenJoinCode,createMyPlayer,approveVent,rejectVent,createLeague,renameLeague,switchLeague,setMaxGroup,go,switchDay,daysModal,editDayModal,saveDayEdit,delDay,newDayModal,createDay,
     toggleAssign:null,togglePlaying,cancelPlayer,moveGroup,confirmMove,sorteo,setSalidaTime,addGuestModal,
     pickScore,score,putt,setOyes,quick,toggleUnit,toggleCast,navHole,gotoPending,gotoPlayerPending,setScoreGroup,setStart,setHoles,setCourse,
@@ -3845,7 +3961,8 @@ const App = (() => {
     setDblPlayer,toggleDbl,closeDay,historyModal,exportImage,exportHigh,exportProfile,exportSalidas,exportSeasonTable,exportCompare,exportScorecard,toggleSound,
     setRaya,submitRayaPair,approveRayaReq,rejectRayaReq,removeRayaPair,createPlayer,editPlayerModal,savePlayer,delPlayer,toggleFav,
     courseModal,setHole,setCfgCourse,addCourse,renameCourse,deleteCourse,unitModal,createUnit,delUnit,castModal,createCast,delCast,toggleCastTipo,
-    exportData,renderCfg,renderVent,renderDay,closeModal,confirmYes,renderHigh,setHighTab,openProfile,rulesModal,editRulesModal,saveRules };
+    exportData,renderCfg,renderVent,renderDay,closeModal,confirmYes,renderHigh,setHighTab,openProfile,rulesModal,editRulesModal,saveRules,
+    exportComprobante,cmpPrint,cmpClose };
 })();
 App.init();
 </script>
