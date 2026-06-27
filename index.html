@@ -558,7 +558,7 @@
   <section class="view" id="v-day">
     <div class="eyebrow">Día de juego</div>
     <h2 class="vtitle" id="dayTitle">Salidas</h2>
-    <p class="lead" id="dayLead">Convoca a los que juegan hoy y dale Sortear: arma grupos parejos. Más jugadores → más salidas.</p>
+    <p class="lead" id="dayLead">Convoca a los que juegan hoy y dale Sortear: arma salidas parejas. Más jugadores → más salidas.</p>
     <div id="dayContent"></div>
   </section>
 
@@ -611,7 +611,7 @@
 
 <script>
 const App = (() => {
-  const APP_VERSION = '2026-06-26-27';   // ⬆️ SUBIR en cada deploy: la app se auto-recarga cuando detecta una versión distinta
+  const APP_VERSION = '2026-06-26-28';   // ⬆️ SUBIR en cada deploy: la app se auto-recarga cuando detecta una versión distinta
   const KEY = 'rayas-campestre-v2';
   const uid = () => Math.random().toString(36).slice(2,9);
   // Auto-actualización: revisa el index.html en vivo (sin caché); si la versión cambió, recarga a la versión fresca.
@@ -714,19 +714,19 @@ const App = (() => {
   let saveTimer=null, dirty=false, _saveDenied=false;
 
   // ---------- persistencia: Firebase (sync granular) → window.storage → localStorage → memoria ----------
-  // Liga activa (V2). Conmutable por el súper admin (dev: se guarda en localStorage).
+  // Grupo activo (V2). Conmutable por el súper admin (dev: se guarda en localStorage).
   // Cuando entre el auth, se resolverá desde /users/{uid}.
   let ACTIVE_LEAGUE='campestre-viernes';
   try{ const _a=localStorage.getItem('cl_active_league'); if(_a) ACTIVE_LEAGUE=_a; }catch(e){}
-  // Invitación por link: ?liga=<id>&code=<código> — fija la liga destino y guarda el código para el alta.
+  // Invitación por link: ?liga=<id>&code=<código> — fijal grupo destino y guarda el código para el alta.
   let _joinCode=null;
   try{ const _p=new URLSearchParams(location.search); const _jl=_p.get('liga');
     if(_jl){ ACTIVE_LEAGUE=_jl; try{localStorage.setItem('cl_active_league',_jl);}catch(e){} }
     _joinCode=_p.get('code')||null; }catch(e){}
   let _backend='memory', _fbRef=null, _shardCache={}, _loadedOnce=false;
   let _users={};   // identidad GLOBAL por cuenta: users/{uid} = {name, email, super, leagues}. El jugador de cada liga solo referencia el uid.
-  let _members={};  // AUTORIZACIÓN por liga: leagueMembers/{ACTIVE_LEAGUE}/{uid} = {role, pid}. Las reglas leen el rol de aquí (indexado por uid).
-  function roleOfUid(uid){ const m=uid&&_members[uid]; return (m&&m.role) || 'regular'; }   // rol de un uid en la liga activa (lo lee la app; las reglas lo leen directo)
+  let _members={};  // AUTORIZACIÓN por grupo: leagueMembers/{ACTIVE_LEAGUE}/{uid} = {role, pid}. Las reglas leen el rol de aquí (indexado por uid).
+  function roleOfUid(uid){ const m=uid&&_members[uid]; return (m&&m.role) || 'regular'; }   // rol de un uid en el grupo activa (lo lee la app; las reglas lo leen directo)
   function hydratePlayers(){   // copia nombre/correo del perfil global (users/{uid}) al jugador en memoria; la app sigue usando p.name, en la base no se duplica
     let ch=false;
     (state.players||[]).forEach(function(p){ if(!p || !p.uid) return; const u=_users[p.uid]; if(!u) return;
@@ -765,7 +765,7 @@ const App = (() => {
   }
   function buildShards(st){
     const out={};
-    out['meta']  = st._leagueMeta || {name:'Liga', schema:2};
+    out['meta']  = st._leagueMeta || {name:'Grupo', schema:2};
     out['rules'] = { rayaValue:(st.rayaValue!=null?st.rayaValue:20), activeBets: st.activeBets || _defActiveBets(), maxWeekday:(st.maxWeekday||6), maxWeekend:(st.maxWeekend||5), rayaPairs:(st.rayaPairs||{}), rayaReq:(st.rayaReq||{}), ventSeedOn:!!st.ventSeedOn, ventSeedConfirm:(st.ventSeedConfirm||{}) };
     // jugadores GRANULAR (por pid, como los scores): así dos teléfonos que registran distinto NO se pisan el roster.
     (st.players||[]).forEach(p=>{ if(p&&p.id){ const o=Object.assign({},p); delete o.id; delete o.role; if(o.uid){ delete o.name; delete o.email; } out['players/'+p.id]=o; } });   // rol vive en leagueMembers; nombre/correo en users/{uid}
@@ -816,7 +816,7 @@ const App = (() => {
     const order = _arr(sh['order']);
     if(!hasPlayers && !order.length) return null;   // liga vacía
     const g={};
-    g._leagueMeta = sh['meta']||{name:'Liga',schema:2};
+    g._leagueMeta = sh['meta']||{name:'Grupo',schema:2};
     const rules = sh['rules']||{};
     g.rayaValue = (rules.rayaValue!=null?rules.rayaValue:20);
     g.activeBets = rules.activeBets || _defActiveBets();
@@ -899,7 +899,7 @@ const App = (() => {
       });
       // identidad global: users/{uid} = {name, email, super, leagues}. Se hidrata el nombre de cada jugador con cuenta.
       try{ firebase.database().ref('users').on('value', function(snap){ _users=snap.val()||{}; if(hydratePlayers() && _loadedOnce) render(); }, function(){}); }catch(e){}
-      // autorización por liga: leagueMembers/{ACTIVE_LEAGUE}/{uid} = {role, pid}. La app lee el rol de aquí; las reglas también.
+      // autorización por grupo: leagueMembers/{ACTIVE_LEAGUE}/{uid} = {role, pid}. La app lee el rol de aquí; las reglas también.
       try{ firebase.database().ref('leagueMembers/'+ACTIVE_LEAGUE).on('value', function(snap){ _members=snap.val()||{};
         if(_devUser&&_devUser.uid&&_devUser.role!=='super'){ const r=roleOfUid(_devUser.uid); if(r!==_devUser.role){ _devUser.role=r; } }   // mi propio rol pudo cambiar
         if(_loadedOnce) render(); }, function(){}); }catch(e){}
@@ -950,7 +950,7 @@ const App = (() => {
     state.dblHistory = state.dblHistory||[];
     state.celebrated = state.celebrated||{};
     if(typeof state.sound!=='boolean') state.sound=true;
-    // V2: metadatos de liga y reglas custom
+    // V2: metadatos del grupo y reglas custom
     state.activeBets = state.activeBets || _defActiveBets();
     if(typeof state.maxWeekday!=='number') state.maxWeekday=6;
     if(typeof state.maxWeekend!=='number') state.maxWeekend=5;
@@ -959,10 +959,10 @@ const App = (() => {
     state.rayaPairs = state.rayaPairs || {};   // valor de raya por pareja (override del general)
     state.rayaReq = state.rayaReq || {};       // solicitudes de cambio de raya entre dos jugadores
     state.ventSeedConfirm = state.ventSeedConfirm || {};   // coincidencias nombre→jugador confirmadas a mano para el seed de ventajas
-    // reglas de la casa por liga: solo la liga original trae las de Campestre; cualquier liga nueva nace EN BLANCO
+    // reglas de la casa por grupo: solo el grupo original trae las de Campestre; cualquier liga nueva nace EN BLANCO
     if(!Array.isArray(state.houseRules)) state.houseRules = (ACTIVE_LEAGUE==='campestre-viernes') ? defaultHouseRules() : [];
     if(!state._leagueMeta) state._leagueMeta={name:leagueName(ACTIVE_LEAGUE)||'Campestre León — Viernes', schema:2};
-    if(!state._leagueMeta.name) state._leagueMeta.name=leagueName(ACTIVE_LEAGUE)||'Liga';
+    if(!state._leagueMeta.name) state._leagueMeta.name=leagueName(ACTIVE_LEAGUE)||'Grupo';
     state.days.forEach(dd=>{
       if(Array.isArray(dd.start)) dd.start = dd.start[0]||1;
       if(typeof dd.start!=='number') dd.start=1;
@@ -992,7 +992,7 @@ const App = (() => {
         const cur=buildShards(state), updates={};
         for(const k in cur){ if(_sig(_shardCache[k])!==_sig(cur[k])) updates[k]=cur[k]; }   // nuevos/cambiados
         for(const k in _shardCache){ if(!(k in cur)) updates[k]=null; }                     // borrados
-        // Un REGULAR no escribe el catálogo de la liga (lo rechazan las reglas, y un write atómico se caería entero por ese path).
+        // Un REGULAR no escribe el catálogo del grupo (lo rechazan las reglas, y un write atómico se caería entero por ese path).
         if(!isAdmin()){
           ['meta','courses','units','castigos','houseRules'].forEach(k=>{ delete updates[k]; });
           const mp=myPid();
@@ -2260,7 +2260,7 @@ const App = (() => {
   }
   function exportSalidas(){
     const d=curDay(); if(!d){ toast('No hay día activo'); return; }
-    const secs=(d.salidas||[]).map((gr,i)=>({head:'Grupo '+(i+1), rows:(gr||[]).filter(Boolean).map((id,j)=>({l:(j+1)+'. '+pname(id)}))})).filter(s=>s.rows.length);
+    const secs=(d.salidas||[]).map((gr,i)=>({head:'Salida '+(i+1), rows:(gr||[]).filter(Boolean).map((id,j)=>({l:(j+1)+'. '+pname(id)}))})).filter(s=>s.rows.length);
     exportBoard('Salidas', (d.label||'')+' · '+courseOf(d).name+' · '+holesLabel(d), secs);
   }
   function exportSeasonTable(){
@@ -2277,7 +2277,7 @@ const App = (() => {
     const nC=cols.length;
     const parTot=ord.reduce((a,i)=>a+holes[i].par,0);
     const groups=d.salidas.map((g,i)=>({gi:i, ids:(g||[]).filter(Boolean)})).filter(g=>g.ids.length);
-    if(!groups.length){ toast('Sin grupos'); return; }
+    if(!groups.length){ toast('Sin salidas'); return; }
     const S=2, padX=40, nameW=210, cW=46, totW=72, rayW=72;
     const tableW=nameW+nC*cW+totW+rayW, W=padX*2+tableW, rowH=42, headH=44;
     let bodyH=130; groups.forEach(gr=>{ bodyH += 34 + headH*2 + gr.ids.length*rowH + 24; });
@@ -2292,7 +2292,7 @@ const App = (() => {
     const colX=k=>padX+nameW+k*cW+cW/2, totX=padX+nameW+nC*cW+totW/2, rayX=padX+nameW+nC*cW+totW+rayW/2;
     let y=148;
     groups.forEach(gr=>{
-      g.textAlign='left'; g.fillStyle=gr.gi===0?green:'#7a5bb0'; g.font='700 22px "Hanken Grotesk",system-ui,sans-serif'; g.fillText('Grupo '+(gr.gi+1), padX, y); y+=30;
+      g.textAlign='left'; g.fillStyle=gr.gi===0?green:'#7a5bb0'; g.font='700 22px "Hanken Grotesk",system-ui,sans-serif'; g.fillText('Salida '+(gr.gi+1), padX, y); y+=30;
       g.fillStyle=muted; g.font='700 17px "Hanken Grotesk",system-ui,sans-serif'; g.textAlign='left'; g.fillText('Hoyo', padX, y+22);
       g.textAlign='center'; cols.forEach((c,k)=>{ g.fillStyle=c.sub?goldc:muted; g.fillText(c.sub||holes[c.h].n, colX(k), y+22); }); g.fillStyle=muted; g.fillText('Tot', totX, y+22); g.fillText('Ray', rayX, y+22); y+=headH;
       g.textAlign='left'; g.fillStyle=muted; g.fillText('Par', padX, y+20);
@@ -2363,13 +2363,13 @@ const App = (() => {
     if(!captureLocked()){
       html+=`<div class="card"><div class="row" style="justify-content:space-between"><h3>Organizar salida</h3>
         <button class="btn gold sm" onclick="App.sorteo()" ${confirmados?'':'disabled'}>🎲 ${assigned.length?'Re-sortear':'Sortear'}</button></div>
-        <div class="hint">${confirmados} confirmado${confirmados===1?'':'s'} · máx ${cap}/grupo. Cuando estén listos, sortea.</div></div>`;
+        <div class="hint">${confirmados} confirmado${confirmados===1?'':'s'} · máx ${cap}/salida. Cuando estén listos, sortea.</div></div>`;
     }
     if(assigned.length){
       const gColors=['var(--fairway)','var(--purple)','var(--clay)'];
       html+=`<div class="card"><h3>Salidas</h3><div class="hint">${courseOf(d).name} · ${holesLabel(d)}</div>`;
       (d.salidas||[]).forEach((g,s)=>{ const ids=(g||[]).filter(Boolean); if(!ids.length) return;
-        html+=`<div style="margin-top:12px"><div style="font-family:'Newsreader',serif;font-weight:600;font-size:15px;color:${gColors[s%gColors.length]};margin-bottom:6px">Grupo ${s+1} · <input class="timeinp" value="${(d.salidaTimes&&d.salidaTimes[s])||''}" placeholder="hora" onchange="App.setSalidaTime(${s},this.value)"> · <span style="color:var(--muted);font-weight:500">${ids.length}/${cap}</span></div><div class="assign">`;
+        html+=`<div style="margin-top:12px"><div style="font-family:'Newsreader',serif;font-weight:600;font-size:15px;color:${gColors[s%gColors.length]};margin-bottom:6px">Salida ${s+1} · <input class="timeinp" value="${(d.salidaTimes&&d.salidaTimes[s])||''}" placeholder="hora" onchange="App.setSalidaTime(${s},this.value)"> · <span style="color:var(--muted);font-weight:500">${ids.length}/${cap}</span></div><div class="assign">`;
         ids.forEach(id=>html+=`<span class="chip ${id===me?'on':''}">${pname(id)}${id===me?' (tú)':''}</span>`);
         html+=`</div></div>`;
       });
@@ -2384,7 +2384,7 @@ const App = (() => {
     d.playing=d.playing||[];
     if(!isAdmin()){ return renderDayRegular(box, d); }
     const _t=document.getElementById('dayTitle'), _l=document.getElementById('dayLead');
-    if(_t) _t.textContent='Salidas'; if(_l) _l.textContent='Convoca a los que juegan hoy y dale Sortear: arma grupos parejos. Más jugadores → más salidas.';
+    if(_t) _t.textContent='Salidas'; if(_l) _l.textContent='Convoca a los que juegan hoy y dale Sortear: arma salidas parejas. Más jugadores → más salidas.';
 
     let html='';
     // 1. convocados
@@ -2415,7 +2415,7 @@ const App = (() => {
     d.salidas=d.salidas||[];
     const cap=flightCap(d), wknd=(dayOfWeek(d)===0||dayOfWeek(d)===6);
     const nGroups=nFlights(d, d.playing.length);
-    html+=`<div class="card"><div class="row" style="justify-content:space-between"><h3>Grupos</h3>
+    html+=`<div class="card"><div class="row" style="justify-content:space-between"><h3>Salidas</h3>
       <button class="btn gold sm" onclick="App.sorteo()" ${d.playing.length?'':'disabled'}>🎲 Sortear${nGroups>1?' ('+nGroups+')':''}</button></div>
       <div class="row" style="justify-content:space-between;align-items:center;margin:4px 0 6px">
         <span class="hint" style="margin:0">⛳ Campo</span>
@@ -2423,7 +2423,7 @@ const App = (() => {
           ${state.courses.map(c=>`<option value="${c.id}" ${c.id===(d.courseId||'campestre')?'selected':''}>${c.name}</option>`).join('')}
         </select></div>
       <div class="row" style="justify-content:space-between;margin:2px 0 4px">
-        <span class="hint" style="margin:0">Reparte parejo · máx ${cap}/grupo (${wknd?'fin de semana':'entre semana'}).</span>
+        <span class="hint" style="margin:0">Reparte parejo · máx ${cap}/salida (${wknd?'fin de semana':'entre semana'}).</span>
         <div class="startsel">hoyos
           <button class="${d.holes!==9?'on':''}" onclick="App.setHoles(18)">18</button>
           <button class="${d.holes===9?'on':''}" onclick="App.setHoles(9)">9</button></div></div>
@@ -2440,7 +2440,7 @@ const App = (() => {
     for(let s=0;s<nShow;s++){
       const ids=(d.salidas[s]||[]).filter(id=>d.playing.includes(id));
       const next=(s+1)%nShow;
-      html+=`<div style="margin-top:14px"><div style="font-family:'Newsreader',serif;font-weight:600;font-size:15px;color:${gColors[s%gColors.length]};margin-bottom:8px">Grupo ${s+1} · <input class="timeinp" value="${(d.salidaTimes&&d.salidaTimes[s])||''}" placeholder="hora" onchange="App.setSalidaTime(${s},this.value)"> · <span style="color:var(--muted);font-weight:500">${ids.length}/${cap}</span></div><div class="assign">`;
+      html+=`<div style="margin-top:14px"><div style="font-family:'Newsreader',serif;font-weight:600;font-size:15px;color:${gColors[s%gColors.length]};margin-bottom:8px">Salida ${s+1} · <input class="timeinp" value="${(d.salidaTimes&&d.salidaTimes[s])||''}" placeholder="hora" onchange="App.setSalidaTime(${s},this.value)"> · <span style="color:var(--muted);font-weight:500">${ids.length}/${cap}</span></div><div class="assign">`;
       if(ids.length===0) html+=`<span class="hint" style="margin:0">—</span>`;
       ids.forEach(id=>{ const p=player(id);
         html+=`<button class="chip ${s===1?'s2':''} on" onclick="App.moveGroup('${id}',${next})">${p?pname(p.id):'—'}${nShow>1?' ↔':''}</button>`;
@@ -2448,9 +2448,9 @@ const App = (() => {
       html+=`</div></div>`;
     }
     if(sinGrupo.length){
-      html+=`<div style="margin-top:12px"><div style="font-weight:700;font-size:13px;color:var(--muted);margin-bottom:6px">Sin grupo</div><div class="assign">`;
+      html+=`<div style="margin-top:12px"><div style="font-weight:700;font-size:13px;color:var(--muted);margin-bottom:6px">Sin salida</div><div class="assign">`;
       sinGrupo.forEach(id=>{ const p=player(id);
-        html+=`<button class="chip" onclick="App.moveGroup('${id}',0)">${p?pname(p.id):'—'} →G1</button>`;
+        html+=`<button class="chip" onclick="App.moveGroup('${id}',0)">${p?pname(p.id):'—'} →S1</button>`;
       });
       html+=`</div></div>`;
     }
@@ -2527,7 +2527,7 @@ const App = (() => {
     if(!inGroup){ doMoveGroup(pid,g,''); return; }   // colocación inicial (sin grupo) → directo, sin candado
     // ya sorteado: candado → confirmar + motivo (queda registrado)
     modal(`<h3>Mover jugador</h3>
-      <div class="hint" style="margin-bottom:10px">Vas a mover a <b>${pname(pid)}</b> a <b>Grupo ${g+1}</b>. Los grupos ya están sorteados, así que el cambio <b>quedará registrado</b>.</div>
+      <div class="hint" style="margin-bottom:10px">Vas a mover a <b>${pname(pid)}</b> a <b>Salida ${g+1}</b>. Los grupos ya están sorteados, así que el cambio <b>quedará registrado</b>.</div>
       <label class="fl">Motivo (ej. horario)</label>
       <input id="mv_motivo" class="txt" placeholder="por qué se mueve" autofocus>
       <div class="row" style="gap:8px;margin-top:14px">
@@ -2545,7 +2545,7 @@ const App = (() => {
     d.salidas.forEach(s=>{ const a=s||[]; const k=a.indexOf(pid); if(k>=0)a.splice(k,1); });
     d.salidas[g]=d.salidas[g]||[];
     const cap=flightCap(d);
-    if(d.salidas[g].length>=cap){ toast('Grupo lleno ('+cap+')'); if(fromG!=null) d.salidas[fromG].push(pid); save(); renderDay(); return; }
+    if(d.salidas[g].length>=cap){ toast('Salida llena ('+cap+')'); if(fromG!=null) d.salidas[fromG].push(pid); save(); renderDay(); return; }
     d.salidas[g].push(pid);
     if(fromG!=null && fromG!==g){ d.moves=d.moves||[]; d.moves.unshift({ts:Date.now(), pid, from:fromG+1, to:g+1, motivo:motivo||'—'}); }
     save(); renderDay();
@@ -2559,7 +2559,7 @@ const App = (() => {
     pool.forEach((pid,i)=>groups[i%n].push(pid));   // round-robin = grupos parejos, cada uno ≤ cap
     groups.sort((a,b)=>a.length-b.length);          // el grupo con MÁS jugadores siempre va al final
     d.salidas=groups;
-    save(); renderDay(); toast(n>1?('Grupos sorteados ('+n+')'):'Grupo sorteado');
+    save(); renderDay(); toast(n>1?('Salidas sorteadas ('+n+')'):'Salida sorteada');
   }
   // Hora de salida por grupo (puede variar). Editable por cualquiera, es solo informativa (no afecta el cálculo).
   function setSalidaTime(gi,v){
@@ -2593,7 +2593,7 @@ const App = (() => {
       if(onlyGroup!=null && gi!==onlyGroup) return;
       const ids=(grp||[]).filter(Boolean); if(!ids.length) return;
       html+=`<div class="card papercard" style="padding:10px 8px">
-        <div style="font-weight:700;font-size:13px;color:${gi===0?'var(--fairway)':'#5b3a8a'};margin:0 4px 8px">Grupo ${gi+1}</div>
+        <div style="font-weight:700;font-size:13px;color:${gi===0?'var(--fairway)':'#5b3a8a'};margin:0 4px 8px">Salida ${gi+1}</div>
         <div class="cardscroll"><table class="sccard">
         <tr><th class="pn">Hoyo</th>`;
       ord.forEach((i,k)=>{ html+=`<th class="${i===hlHole?'hl':''}">${holes[i].n}</th>`; if(!nine&&k===8) html+=`<th class="tt sub">OUT</th>`; });
@@ -2616,7 +2616,7 @@ const App = (() => {
       });
       html+=`</table></div></div>`;
     });
-    if(!html) return emptyState('🃏','Sin grupos','Convoca y sortea en “Salidas”.','App.go(\'day\')','Ir a Salidas');
+    if(!html) return emptyState('🃏','Sin salidas','Convoca y sortea en “Salidas”.','App.go(\'day\')','Ir a Salidas');
     return html;
   }
   function setLiqTab(t){ liqTab=t; renderLiq(); }
@@ -2637,7 +2637,7 @@ const App = (() => {
     // ---- CAPTURA HOYO POR HOYO ----
     if(!Array.isArray(d.start) && typeof d.start!=='number') d.start=1;
     const groups=(d.salidas||[]).map((g,i)=>i).filter(g=>(d.salidas[g]||[]).filter(Boolean).length>0);   // todos los grupos (no solo 2)
-    if(groups.length===0){ box.innerHTML=seg+emptyState('⛳','Sin grupos','Sortea en “Salidas”.','App.go(\'day\')','Ir a Salidas'); return; }
+    if(groups.length===0){ box.innerHTML=seg+emptyState('⛳','Sin salidas','Sortea en “Salidas”.','App.go(\'day\')','Ir a Salidas'); return; }
     if(!groups.includes(curScoreGroup)) curScoreGroup=groups[0];
     const gids=(d.salidas[curScoreGroup]||[]).filter(Boolean);
     const order = playOrder(d); const last=order.length-1;
@@ -2647,7 +2647,7 @@ const App = (() => {
     let html=seg;
     if(groups.length>1){
       html+=`<div class="gtabs">`;
-      groups.forEach(g=>html+=`<button class="${g===curScoreGroup?'on':''} ${g>0?'g2':''}" onclick="App.setScoreGroup(${g})">Grupo ${g+1}</button>`);
+      groups.forEach(g=>html+=`<button class="${g===curScoreGroup?'on':''} ${g>0?'g2':''}" onclick="App.setScoreGroup(${g})">Salida ${g+1}</button>`);
       html+=`</div>`;
     }
     html+=`<div class="holenav">
@@ -3111,7 +3111,7 @@ const App = (() => {
   // Máximo de jugadores por grupo (config del club). Editable por TODOS (si el admin no va, igual se puede fijar).
   function setMaxGroup(kind,v){ const n=Math.max(1,Math.min(12,parseInt(v)||0)); if(kind==='wknd') state.maxWeekend=n; else state.maxWeekday=n; save(); renderCfg(); if(curView==='day') renderDay(); }
   function cfgMaxGroupHtml(){
-    return `<div class="card"><h3>Máximo por grupo</h3>
+    return `<div class="card"><h3>Máximo por salida</h3>
       <div class="hint">Jugadores por salida (varía por club). Cualquiera lo puede ajustar.</div>
       <div class="row" style="gap:10px;margin-top:8px">
         <label class="fl" style="flex:1;margin:0">Entre semana<input class="txt" type="number" inputmode="numeric" min="1" max="12" value="${state.maxWeekday||6}" onchange="App.setMaxGroup('wd',this.value)"></label>
@@ -3122,7 +3122,7 @@ const App = (() => {
   function cfgPlayersHtml(){
     let html=`<div class="cfg-sect">Grupo</div>
       <div class="card"><h3>Jugadores (${state.players.length})</h3>
-      <div class="hint">Cada quien aparece al entrar con Google por el link de la liga. ⭐ = favorito (sale arriba al convocar).</div><div class="plist">`;
+      <div class="hint">Cada quien aparece al entrar con Google por el link del grupo. ⭐ = favorito (sale arriba al convocar).</div><div class="plist">`;
     [...state.players].sort((a,b)=>(b.fav?1:0)-(a.fav?1:0)||(a.name||'').localeCompare(b.name||'')).forEach(p=>{
       const sub = p.guest ? 'Invitado' : (p.email ? _esc(p.email) : 'sin cuenta');
       html+=`<div class="prow"><div class="avatar ${p.guest?'g':''}">${(p.apodo||p.name).slice(0,1).toUpperCase()}</div>
@@ -3135,12 +3135,12 @@ const App = (() => {
     html+=`</div></div>`;
     return html;
   }
-  // Lista de integrantes (SOLO LECTURA) para que los regulares vean quién está en la liga — sin correos ni edición.
+  // Lista de integrantes (SOLO LECTURA) para que los regulares vean quién está en el grupo — sin correos ni edición.
   function cfgMembersHtml(){
     const mine=myPid();
     let html=`<div class="cfg-sect">Integrantes</div>
       <div class="card"><h3>Jugadores del grupo (${state.players.length})</h3>
-      <div class="hint">Quiénes están en tu liga. La gestiona el admin.</div><div class="plist">`;
+      <div class="hint">Quiénes están en tu grupo. La gestiona el admin.</div><div class="plist">`;
     [...state.players].sort((a,b)=>(a.guest?1:0)-(b.guest?1:0)||(a.name||'').localeCompare(b.name||'')).forEach(p=>{
       const tag = (p.uid&&roleOfUid(p.uid)==='admin') ? ' <span class="tag">admin</span>' : (p.guest ? ' <span class="apod">invitado</span>' : '');
       html+=`<div class="prow"><div class="avatar ${p.guest?'g':''}">${(((p.apodo||p.name||'?').slice(0,1))||'?').toUpperCase()}</div>
@@ -3150,7 +3150,7 @@ const App = (() => {
     html+=`</div></div>`;
     return html;
   }
-  // Selector de ligas: muestra las ligas a las que pertenece el usuario (o todas, si es súper). Solo si hay >1.
+  // Selector de grupos: muestra las grupos a las que pertenece el usuario (o todas, si es súper). Solo si hay >1.
   function cfgMyLeaguesHtml(){
     const uid=_devUser&&_devUser.uid;
     let lids = isSuper() ? loadLeagues().map(l=>l.id)
@@ -3158,7 +3158,7 @@ const App = (() => {
     if(lids.indexOf(ACTIVE_LEAGUE)<0) lids.unshift(ACTIVE_LEAGUE);
     lids = lids.filter((v,i,a)=>a.indexOf(v)===i);
     if(lids.length<=1) return '';
-    return `<div class="card"><h3>Liga</h3>
+    return `<div class="card"><h3>Grupo</h3>
       <div class="hint">Estás viendo <b>${_esc(leagueName(ACTIVE_LEAGUE))}</b>. Cámbiala si juegas en varias.</div>
       <select class="txt" style="margin-top:6px" onchange="App.switchLeague(this.value)">
         ${lids.map(l=>`<option value="${l}" ${l===ACTIVE_LEAGUE?'selected':''}>${_esc(leagueName(l))}</option>`).join('')}</select></div>`;
@@ -3194,7 +3194,7 @@ const App = (() => {
     if(!isAdmin()){ return renderCfgRegular(box); }
     let html='';
     html+=cfgLeaguesHtml();   // Liga + selector
-    html+=cfgInviteHtml();    // Código/link para invitar a la liga (admin/super)
+    html+=cfgInviteHtml();    // Código/link para invitar al grupo (admin/super)
     html+=cfgAuthUsersHtml(); // Tu jugador (súper)
     html+=cfgPlayersHtml();   // Jugadores del grupo — arriba, junto a la identidad
 
@@ -3512,7 +3512,7 @@ const App = (() => {
       <label class="fl" style="margin-top:10px"><input type="checkbox" id="m_fav" ${p.fav?'checked':''}> Favorito (sale arriba al convocar)</label>
       <label class="fl" style="margin-top:6px"><input type="checkbox" id="m_guest" ${p.guest?'checked':''}> Es invitado</label>
       ${(isSuper()&&p.uid)?`<label class="fl" style="margin-top:10px">Rol (cuenta: ${_esc(p.email||'')})</label>
-        <select id="m_role" class="txt"><option value="regular" ${roleOfUid(p.uid)!=='admin'?'selected':''}>Jugador</option><option value="admin" ${roleOfUid(p.uid)==='admin'?'selected':''}>Admin de la liga</option></select>`:''}
+        <select id="m_role" class="txt"><option value="regular" ${roleOfUid(p.uid)!=='admin'?'selected':''}>Jugador</option><option value="admin" ${roleOfUid(p.uid)==='admin'?'selected':''}>Admin del grupo</option></select>`:''}
       <button class="btn block" style="margin-top:14px" onclick="App.savePlayer('${id}')">Guardar</button>`);
   }
   function savePlayer(id){
@@ -3607,7 +3607,7 @@ const App = (() => {
         return i>0 ? '<li><b>'+_esc(r.slice(0,i))+'</b> — '+_esc(r.slice(i+3))+'</li>' : '<li>'+_esc(r)+'</li>'; }).join('');
       h+=`<ol class="ruleslist">${items}</ol>`;
     } else {
-      h+=`<div class="hint" style="margin-bottom:6px">Esta liga aún no tiene reglas.${isAdmin()?' Agrégalas con el botón de abajo.':' El admin las puede agregar.'}</div>`;
+      h+=`<div class="hint" style="margin-bottom:6px">Este grupo aún no tiene reglas.${isAdmin()?' Agrégalas con el botón de abajo.':' El admin las puede agregar.'}</div>`;
     }
     if(isAdmin()) h+=`<button class="btn outline block" style="margin-top:10px" onclick="App.editRulesModal()">✏️ Editar reglas</button>`;
     h+=`<button class="btn block" style="margin-top:8px" onclick="App.closeModal()">Cerrar</button>`;
@@ -3665,7 +3665,7 @@ const App = (() => {
       firebase.auth().onAuthStateChanged(function(u){
         _authUser=u||null;
         if(!u){ _authPending=false; if(_devUser&&_devUser.real){ _devUser=null; } render(); if(!_devUser) loginModal(); return; }
-        attachFbSync();   // YA hay sesión → (re)engancha el sync de la liga (el de load() pudo cancelarse por leer sin auth)
+        attachFbSync();   // YA hay sesión → (re)engancha el sync del grupo (el de load() pudo cancelarse por leer sin auth)
         resolveAuthIdentity(u).then(function(){ if(isRealAuth()){ closeModal(); cleanUrl(); } render(); if(_authPending){ _canSelfRegister?joinRegisterModal():loginModal(); } });
       });
     }catch(e){}
@@ -3684,14 +3684,14 @@ const App = (() => {
       // 1) busca en el estado YA cargado (fuente viva)
       const mine=(state.players||[]).find(function(p){ return p && p.uid===u.uid; });
       if(mine){ _devUser={playerId:mine.id, role:roleFor(), uid:u.uid, email:u.email, real:true}; return; }
-      // 2) fallback: lee la liga directo (por si el estado aún no cargó)
+      // 2) fallback: lee el grupo directo (por si el estado aún no cargó)
       return firebase.database().ref('leagues/'+ACTIVE_LEAGUE+'/players').once('value').then(function(s){ return s.val()||{}; }).catch(function(){ return null; }).then(function(players){
-        if(players===null){ if(isSup){ _devUser={playerId:null, role:'super', uid:u.uid, email:u.email, real:true}; } else { _authPending=true; _authDiag='no pude leer la liga (permiso/conexión)'; } return; }
+        if(players===null){ if(isSup){ _devUser={playerId:null, role:'super', uid:u.uid, email:u.email, real:true}; } else { _authPending=true; _authDiag='no pude leer el grupo (permiso/conexión)'; } return; }
         let myPid=null;
         Object.keys(players).forEach(function(pid){ const p=players[pid]; if(p && p.uid===u.uid){ myPid=pid; } });
         if(myPid){ _devUser={playerId:myPid, role:roleFor(), uid:u.uid, email:u.email, real:true}; }
         else if(isSup){ _devUser={playerId:null, role:'super', uid:u.uid, email:u.email, real:true}; }   // súper sin jugador aquí = operador
-        else { _authPending=true; _canSelfRegister=true; _authDiag=Object.keys(players).length?'no estás en esta liga':'eres el primero en esta liga'; }
+        else { _authPending=true; _canSelfRegister=true; _authDiag=Object.keys(players).length?'no estás en este grupo':'eres el primero en este grupo'; }
       });
     });
   }
@@ -3711,7 +3711,7 @@ const App = (() => {
   }
   function signOutAuth(){ try{ if(authAvailable()) firebase.auth().signOut(); }catch(e){} _authUser=null; _authPending=false; _canSelfRegister=false; _devUser=null; try{localStorage.removeItem(userKey());}catch(e){} render(); loginModal(); }
 
-  // Alta del jugador: login con Google (vía link de la liga) = se crea su jugador y se liga, en un paso. Sin código.
+  // Alta del jugador: login con Google (vía link del grupo) = se crea su jugador y se liga, en un paso. Sin código.
   function joinRegisterModal(){
     const em=(_authUser&&_authUser.email)||'';
     const dn=((_authUser&&_authUser.displayName)||'').trim();   // nombre del perfil de Google
@@ -3721,12 +3721,12 @@ const App = (() => {
       <label class="fl">Nombre</label><input id="jr_nombre" class="txt" value="${_esc(nom)}" placeholder="Nombre">
       <label class="fl" style="margin-top:8px">Apellido</label><input id="jr_ape" class="txt" value="${_esc(ape)}" placeholder="Apellido">
       <label class="fl" style="margin-top:8px">Apodo (opcional)</label><input id="jr_apodo" class="txt" placeholder="como te dicen en el 19">
-      <button class="btn block" style="margin-top:14px" onclick="App.joinRegister()">Entrar a la liga</button>
+      <button class="btn block" style="margin-top:14px" onclick="App.joinRegister()">Entrar al grupo</button>
       <button class="btn outline block" style="margin-top:8px" onclick="App.signOutAuth()">Salir</button>`);
   }
   function joinRegister(){
     if(!_authUser){ toast('Inicia sesión primero'); return; }
-    // Idempotente: si ya tienes jugador en esta liga (por uid), adóptalo — NO dupliques aunque salga el registro por error.
+    // Idempotente: si ya tienes jugador en este grupo (por uid), adóptalo — NO dupliques aunque salga el registro por error.
     const mine=(state.players||[]).find(function(p){ return p && p.uid===_authUser.uid; });
     if(mine){ _devUser={playerId:mine.id, role:(isSuper()?'super':roleOfUid(_authUser.uid)), uid:_authUser.uid, email:(_authUser.email||''), real:true}; _authPending=false; _canSelfRegister=false; closeModal(); cleanUrl(); render(); toast('¡Bienvenido de nuevo!'); return; }
     const nombre=((document.getElementById('jr_nombre')||{}).value||'').trim();
@@ -3734,7 +3734,7 @@ const App = (() => {
     const apodo=((document.getElementById('jr_apodo')||{}).value||'').trim();
     const name=(nombre+' '+ape).trim();
     if(!name){ toast('Pon tu nombre'); return; }
-    // El link de la liga (?liga=...) ya define a qué liga entra; aquí se crea el jugador y se liga la cuenta.
+    // El link del grupo (?liga=...) ya define a qué liga entra; aquí se crea el jugador y se liga la cuenta.
     const em=(_authUser.email||''), myuid=_authUser.uid;
     const p={id:uid(), name:name, apodo:apodo, guest:false, fav:true, uid:myuid, email:em};   // el rol vive en leagueMembers, no en el jugador
     state.players.push(p);   // en memoria con nombre; en la base, el nombre vive en users/{uid}
@@ -3753,12 +3753,12 @@ const App = (() => {
     save(); closeModal(); cleanUrl(); render(); toast('¡Bienvenido, '+pname(p.id)+'!');
     try{ if(state.ventSeedOn) applyVentSeed({silent:true}); }catch(e){}   // rellena sus ventajas guardadas (por nombre) sin que las recapture
   }
-  // Tarjeta de Ajustes: código/link para invitar a la liga (admin/super)
+  // Tarjeta de Ajustes: código/link para invitar al grupo (admin/super)
   function cfgInviteHtml(){
     if(!isAdmin() || !authAvailable()) return '';
     const code=ensureJoinCode();
-    let h=`<div class="cfg-sect">Invitar a la liga</div>
-      <div class="card"><h3>Código de la liga</h3>
+    let h=`<div class="cfg-sect">Invitar al grupo</div>
+      <div class="card"><h3>Código del grupo</h3>
         <div class="hint">Compártelo por WhatsApp. Quien entre con este link se <b>da de alta</b> (nombre, apellido, apodo) y se une a <b>${_esc(leagueName(ACTIVE_LEAGUE))}</b>.</div>
         <div style="font-family:'Hanken Grotesk',sans-serif;font-weight:800;font-size:30px;letter-spacing:.14em;color:var(--fairway);text-align:center;margin:10px 0">${_esc(code)}</div>
         <div class="row" style="gap:8px">
@@ -3793,7 +3793,7 @@ const App = (() => {
       if(_authPending && _authUser){
         top+=`<div class="card" style="background:#fff8ee;border:1px solid #f0e0bf;box-shadow:none;font-size:11.5px">
           <div><b>Tu UID:</b> <span style="font-family:monospace;word-break:break-all">${_esc(_authUser.uid)}</span></div>
-          <div style="margin-top:4px"><b>Liga activa:</b> ${_esc(ACTIVE_LEAGUE)}</div>
+          <div style="margin-top:4px"><b>Grupo activo:</b> ${_esc(ACTIVE_LEAGUE)}</div>
           <div style="margin-top:4px;color:var(--clay)"><b>Diagnóstico:</b> ${_esc(_authDiag||'—')}</div>
           <div class="hint" style="margin-top:6px">Súper: crea <code>users/${_esc(_authUser.uid)}/super</code> = <b>true</b> (booleano) en Realtime Database, y recarga.</div></div>`;
       }
@@ -3809,7 +3809,7 @@ const App = (() => {
       <label class="fl" style="margin-top:10px">Rol</label>
       <select id="lg_role" class="txt">
         <option value="regular">Regular (solo lo suyo)</option>
-        <option value="admin">Admin de liga</option>
+        <option value="admin">Admin del grupo</option>
         <option value="super">Súper admin (todo)</option></select>
       <button class="btn ${signedIn?'outline ':''}block" style="margin-top:14px" onclick="App.doLogin()">${signedIn?'Usar modo prueba':'Entrar'}</button>` : '';
     modal(`<h3>${devMode?'Entrar':'Tu sesión'}</h3>${top}${picker}`);
@@ -3869,18 +3869,18 @@ const App = (() => {
   function dismissVentMatch(pid){ if(!isAdmin())return; state.ventSeedConfirm=state.ventSeedConfirm||{}; state.ventSeedConfirm[pid]='__none__'; save(); renderVent(); }
 
   // ===================== LIGAS (DEV, local) =====================
-  // Registro local de ligas + miembros. Persistencia real y envío de correos llegan con el Auth.
+  // Registro local de grupos + miembros. Persistencia real y envío de correos llegan con el Auth.
   const DEFAULT_LEAGUE={id:'campestre-viernes', name:'Campestre León — Viernes'};
   function loadLeagues(){ try{ let L=JSON.parse(localStorage.getItem('cl_leagues')||'[]'); if(!Array.isArray(L)) L=[]; if(!L.find(x=>x.id===DEFAULT_LEAGUE.id)) L.unshift({...DEFAULT_LEAGUE}); return L; }catch(e){ return [{...DEFAULT_LEAGUE}]; } }
   function saveLeagues(L){ try{ localStorage.setItem('cl_leagues', JSON.stringify(L)); }catch(e){} }
   function leagueName(id){ const x=loadLeagues().find(l=>l.id===id); return x?x.name:id; }
-  function createLeague(){ if(!isAdmin()){ toast('Solo admin/súper crea ligas'); return; }
-    const el=document.getElementById('lg_name'); const name=(el?el.value:'').trim(); if(!name){ toast('Ponle nombre a la liga'); return; }
+  function createLeague(){ if(!isAdmin()){ toast('Solo admin/súper crea grupos'); return; }
+    const el=document.getElementById('lg_name'); const name=(el?el.value:'').trim(); if(!name){ toast('Ponle nombre al grupo'); return; }
     const base=name.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'').slice(0,24)||'liga';
     let L=loadLeagues(), id=base, n=1; while(L.find(x=>x.id===id)) id=base+'-'+(++n);
     L.push({id,name}); saveLeagues(L);
     // Un admin SIEMPRE es jugador de su liga (operador = solo el súper). Al crear, el admin real se da de alta
-    // como JUGADOR + admin de la liga nueva (1er miembro). El súper solo la crea (puede ser operador).
+    // como JUGADOR + admin del grupo nueva (1er miembro). El súper solo la crea (puede ser operador).
     const auid=_devUser&&_devUser.real&&_devUser.uid;
     if(auid && !isSuper()){
       const pid=uid();
@@ -3891,7 +3891,7 @@ const App = (() => {
         ['leagues/'+id+'/players/'+pid]: {fav:true, guest:false, uid:auid}
       }); }catch(e){}
     }
-    renderCfg(); toast('Liga creada: '+name+'. Cámbiate a ella para empezar.'); }
+    renderCfg(); toast('Grupo creado: '+name+'. Cámbiate a él para empezar.'); }
   function renameLeague(){ if(!isAdmin()){ toast('Sin permiso para renombrar'); return; }
     const el=document.getElementById('lg_rename'); const name=(el?el.value:'').trim(); if(!name){ toast('Pon un nombre'); return; }
     let L=loadLeagues(); const x=L.find(l=>l.id===ACTIVE_LEAGUE); if(x) x.name=name; else L.push({id:ACTIVE_LEAGUE,name}); saveLeagues(L);
@@ -3900,55 +3900,55 @@ const App = (() => {
   function switchLeague(id){
     const uid=_devUser&&_devUser.uid;
     const allowed = isSuper() || (uid && _users[uid] && _users[uid].leagues && _users[uid].leagues[id]);   // súper: todas; regular: solo las suyas
-    if(!allowed){ toast('No perteneces a esa liga'); return; }
+    if(!allowed){ toast('No perteneces a ese grupo'); return; }
     if(id===ACTIVE_LEAGUE) return; try{ localStorage.setItem('cl_active_league', id); }catch(e){}
-    // navega a URL limpia (sin ?liga/&code) para que el cambio de liga no lo pise un link de invitación
+    // navega a URL limpia (sin ?liga/&code) para que el cambio del grupo no lo pise un link de invitación
     toast('Cambiando a '+leagueName(id)+'…'); setTimeout(()=>{ location.href=location.origin+location.pathname; }, 450); }
   function cfgLeaguesHtml(){
-    const active=ACTIVE_LEAGUE; let h=`<div class="cfg-sect">Liga</div>`;
+    const active=ACTIVE_LEAGUE; let h=`<div class="cfg-sect">Grupo</div>`;
     if(isSuper()){
       const L=loadLeagues();
-      h+=`<div class="card"><h3>Liga activa</h3>
+      h+=`<div class="card"><h3>Grupo activo</h3>
         <select class="txt" style="margin-top:6px" onchange="App.switchLeague(this.value)">
           ${L.map(x=>`<option value="${x.id}" ${x.id===active?'selected':''}>${x.name}</option>`).join('')}</select>
         <div class="row" style="gap:8px;margin-top:10px">
           <input id="lg_rename" class="txt" value="${leagueName(active).replace(/"/g,'&quot;')}" placeholder="Nombre del grupo">
           <button class="btn sm outline" onclick="App.renameLeague()">Renombrar</button></div>
         <div class="row" style="gap:8px;margin-top:8px">
-          <input id="lg_name" class="txt" placeholder="Nombre de nueva liga (ej. TEST)">
+          <input id="lg_name" class="txt" placeholder="Nombre de nuevo grupo (ej. TEST)">
           <button class="btn sm" onclick="App.createLeague()">Crear</button></div>
-        <div class="hint" style="margin-top:6px">Renombrar cambia el nombre del grupo (arriba y al instalar). Crear una liga la deja vacía; cambiar de liga recarga la app.</div></div>`;
+        <div class="hint" style="margin-top:6px">Renombrar cambia el nombre del grupo (arriba y al instalar). Crear uno nuevo lo deja vacío; cambiar de grupo recarga la app.</div></div>`;
     } else {
       h+=`<div class="card"><h3>Tu grupo</h3>
         <div class="row" style="gap:8px;margin-top:6px">
           <input id="lg_rename" class="txt" value="${leagueName(active).replace(/"/g,'&quot;')}" placeholder="Nombre del grupo">
           <button class="btn sm outline" onclick="App.renameLeague()">Renombrar</button></div>
         <div class="row" style="gap:8px;margin-top:8px">
-          <input id="lg_name" class="txt" placeholder="Nombre de nueva liga">
+          <input id="lg_name" class="txt" placeholder="Nombre de nuevo grupo">
           <button class="btn sm" onclick="App.createLeague()">Crear</button></div>
-        <div class="hint" style="margin-top:6px">Renombra tu liga o crea una nueva (nace vacía y quedas como su admin). Cambiar de liga recarga la app.</div></div>`;
+        <div class="hint" style="margin-top:6px">Renombra tu grupo o crea uno nuevo (nace vacío y quedas como su admin). Cambiar de grupo recarga la app.</div></div>`;
     }
     return h;
   }
 
   // ---- "El jugador ES la cuenta": el súper se administra a sí mismo en cada liga (jugar o solo administrar). ----
   function cfgAuthUsersHtml(){
-    if(!isSuper() || !authAvailable()) return '';   // los admin de liga ya son jugadores (salen en la lista); esta tarjeta es solo del súper
+    if(!isSuper() || !authAvailable()) return '';   // los admin del grupo ya son jugadores (salen en la lista); esta tarjeta es solo del súper
     const me=myPid();
     let h=`<div class="cfg-sect">Tu jugador</div>`;
     if(me && player(me)){
-      h+=`<div class="card"><h3>Juegas esta liga</h3>
+      h+=`<div class="card"><h3>Juegas este grupo</h3>
         <div class="hint">Eres <b>${_esc(pname(me))}</b> aquí: apareces en convocatoria, rayas y standings. Para dejar de jugar y solo administrar, bórrate del roster (🗑) abajo.</div></div>`;
     } else {
-      h+=`<div class="card"><h3>Solo administras esta liga</h3>
+      h+=`<div class="card"><h3>Solo administras este grupo</h3>
         <div class="hint">No apareces como jugador (ni en convocatoria, rayas ni standings). Si también juegas aquí, créate tu jugador.</div>
-        <button class="btn outline sm block" style="margin-top:8px" onclick="App.createMyPlayer()">+ Créate tu jugador en esta liga</button></div>`;
+        <button class="btn outline sm block" style="margin-top:8px" onclick="App.createMyPlayer()">+ Créate tu jugador en este grupo</button></div>`;
     }
     return h;
   }
-  function createMyPlayer(){   // el súper se crea su propio jugador en esta liga (con su uid/correo)
+  function createMyPlayer(){   // el súper se crea su propio jugador en este grupo (con su uid/correo)
     if(!isSuper()){ toast('Solo el súper'); return; }
-    if(myPid()){ toast('Ya tienes jugador en esta liga'); return; }
+    if(myPid()){ toast('Ya tienes jugador en este grupo'); return; }
     const dn=((_authUser&&_authUser.displayName)||'').trim() || (_devUser&&_devUser.email) || 'Yo';
     const myuid=(_devUser&&_devUser.uid)||null, em=(_devUser&&_devUser.email)||'';
     const p={id:uid(), name:dn, apodo:'', guest:false, fav:true, uid:myuid, email:em};   // rol del súper viene del flag global; en leagueMembers va 'admin' para mostrarlo
@@ -3961,7 +3961,7 @@ const App = (() => {
         ['leagueMembers/'+ACTIVE_LEAGUE+'/'+myuid]: {role:'admin', pid:p.id},
         ['leagues/'+ACTIVE_LEAGUE+'/players/'+p.id]: {apodo:'', fav:true, guest:false, uid:myuid}
       }); }catch(e){} }
-    save(); render(); toast('Listo, ahora juegas esta liga');
+    save(); render(); toast('Listo, ahora juegas este grupo');
   }
 
   // Pull-to-refresh: jala hacia abajo desde arriba para recargar (pensado para la app instalada en el teléfono).
