@@ -611,7 +611,7 @@
 
 <script>
 const App = (() => {
-  const APP_VERSION = '2026-06-27-30';   // ⬆️ SUBIR en cada deploy: la app se auto-recarga cuando detecta una versión distinta
+  const APP_VERSION = '2026-06-27-31';   // ⬆️ SUBIR en cada deploy: la app se auto-recarga cuando detecta una versión distinta
   const KEY = 'rayas-campestre-v2';
   const uid = () => Math.random().toString(36).slice(2,9);
   // Auto-actualización: revisa el index.html en vivo (sin caché); si la versión cambió, recarga a la versión fresca.
@@ -3968,6 +3968,33 @@ const App = (() => {
     if(id===ACTIVE_LEAGUE) return; try{ localStorage.setItem('cl_active_league', id); }catch(e){}
     // navega a URL limpia (sin ?liga/&code) para que el cambio del grupo no lo pise un link de invitación
     toast('Cambiando a '+leagueName(id)+'…'); setTimeout(()=>{ location.href=location.origin+location.pathname; }, 450); }
+  // Borra un grupo y TODOS sus datos. El nodo raíz leagues/{id} no tiene permiso de borrado, así que
+  // se anulan sus hijos uno a uno + leagueMembers/{id} + las referencias users/{uid}/leagues/{id}.
+  function deleteLeague(id){
+    if(!isSuper()){ toast('Solo el súper borra grupos'); return; }
+    id=id||ACTIVE_LEAGUE; const nm=leagueName(id);
+    confirmModal('¿Borrar el grupo "'+nm+'" y TODOS sus datos (jugadores, días, ventajas, fotos)? No se puede deshacer.','Borrar', function(){
+      Promise.all([
+        firebase.database().ref('leagues/'+id).once('value').then(function(s){return s.val()||{};}).catch(function(){return {};}),
+        firebase.database().ref('leagueMembers/'+id).once('value').then(function(s){return s.val()||{};}).catch(function(){return {};})
+      ]).then(function(r){
+        const node=r[0], members=r[1], updates={};
+        Object.keys(node).forEach(function(k){ updates['leagues/'+id+'/'+k]=null; });          // cada hijo del grupo
+        Object.keys(members).forEach(function(u){ updates['leagueMembers/'+id+'/'+u]=null; updates['users/'+u+'/leagues/'+id]=null; });
+        const myuid=_devUser&&_devUser.uid; if(myuid) updates['users/'+myuid+'/leagues/'+id]=null;
+        updates['photos/'+id]=null;
+        firebase.database().ref().update(updates).catch(function(){});
+        let L=loadLeagues().filter(function(l){return l.id!==id;}); saveLeagues(L);
+        if(myuid && _users[myuid] && _users[myuid].leagues){ delete _users[myuid].leagues[id]; }
+        toast('Grupo "'+nm+'" borrado');
+        if(id===ACTIVE_LEAGUE){
+          const next=(L[0]&&L[0].id)||DEFAULT_LEAGUE.id;
+          try{ localStorage.setItem('cl_active_league', next); }catch(e){}
+          setTimeout(function(){ location.href=location.origin+location.pathname; }, 600);
+        } else { renderCfg(); }
+      });
+    });
+  }
   function cfgLeaguesHtml(){
     const active=ACTIVE_LEAGUE; let h=`<div class="cfg-sect">Grupo</div>`;
     if(isSuper()){
@@ -3982,6 +4009,12 @@ const App = (() => {
           <input id="lg_name" class="txt" placeholder="Nombre de nuevo grupo (ej. TEST)">
           <button class="btn sm" onclick="App.createLeague()">Crear</button></div>
         <div class="hint" style="margin-top:6px">Renombrar cambia el nombre del grupo (arriba y al instalar). Crear uno nuevo lo deja vacío; cambiar de grupo recarga la app.</div></div>`;
+      h+=`<div class="card"><h3>Borrar grupos</h3>
+        <div class="hint">Elimina grupos de prueba. Borra <b>todos</b> sus datos y no se puede deshacer.</div>
+        <div class="plist" style="margin-top:6px">
+        ${lids.map(id=>`<div class="prow"><div class="grow"><div class="nm">${_esc(leagueName(id))}${id===active?' <span class="tag">activo</span>':''}</div></div>
+          <button class="icbtn" style="color:var(--clay)" onclick="App.deleteLeague('${id}')">🗑</button></div>`).join('')}
+        </div></div>`;
     } else {
       h+=`<div class="card"><h3>Tu grupo</h3>
         <div class="row" style="gap:8px;margin-top:6px">
@@ -4278,7 +4311,7 @@ const App = (() => {
   function viewPhoto(dayId,id){ const v=(_photoCache[dayId]||{})[id]; if(!v) return;
     modal(`<img src="${v.img}" style="width:100%;border-radius:8px;display:block">${v.pid?`<div class="hint" style="text-align:center;margin-top:8px">${_esc(pname(v.pid))}</div>`:''}<button class="btn block" style="margin-top:10px" onclick="App.photosModal()">← Volver a las fotos</button>`); }
 
-  return { init,loginModal,doLogin,signInGoogle,signOutAuth,joinRegister,shareInvite,copyInvite,regenJoinCode,createMyPlayer,approveVent,rejectVent,btnApplyVentSeed,confirmVentMatch,dismissVentMatch,createLeague,renameLeague,switchLeague,setMaxGroup,go,switchDay,daysModal,editDayModal,saveDayEdit,delDay,clearHole,clearCard,removeFromDay,playerAdminModal,newDayModal,createDay,
+  return { init,loginModal,doLogin,signInGoogle,signOutAuth,joinRegister,shareInvite,copyInvite,regenJoinCode,createMyPlayer,approveVent,rejectVent,btnApplyVentSeed,confirmVentMatch,dismissVentMatch,createLeague,renameLeague,switchLeague,deleteLeague,setMaxGroup,go,switchDay,daysModal,editDayModal,saveDayEdit,delDay,clearHole,clearCard,removeFromDay,playerAdminModal,newDayModal,createDay,
     toggleAssign:null,togglePlaying,cancelPlayer,moveGroup,confirmMove,sorteo,setSalidaTime,addGuestModal,
     pickScore,score,putt,setOyes,quick,toggleUnit,toggleCast,navHole,gotoPending,gotoPlayerPending,setScoreGroup,setStart,setHoles,setCourse,
     setVentFocus,pickVent,openBet,openH2H,setLiqTab,setScoreTab,setCmp,setVentPick,
