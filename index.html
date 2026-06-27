@@ -69,6 +69,11 @@
   .appbar{display:flex;align-items:center;justify-content:space-between;gap:10px;padding-bottom:11px}
   .ab-brand{font-family:'Newsreader',serif;font-style:italic;font-weight:600;font-size:19px;color:var(--fairway);white-space:nowrap;display:flex;align-items:center;gap:8px;min-width:0}
   .beta-tag{font-family:'Hanken Grotesk',system-ui,sans-serif;font-style:normal;font-weight:800;font-size:9px;letter-spacing:.09em;text-transform:uppercase;color:#9a6b00;background:#fbf1d6;border:1px solid #e6c34a;border-radius:5px;padding:2px 5px;line-height:1;flex:none;align-self:center}
+  .phgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;max-height:52vh;overflow:auto}
+  .phcell{position:relative;border-radius:8px;overflow:hidden;background:#e9ece8;aspect-ratio:1}
+  .phcell img{width:100%;height:100%;object-fit:cover;cursor:pointer;display:block}
+  .phtag{position:absolute;left:0;right:0;bottom:0;background:rgba(0,0,0,.55);color:#fff;font-size:10px;padding:2px 5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .phdel{position:absolute;top:3px;right:3px;width:20px;height:20px;border:0;border-radius:50%;background:rgba(0,0,0,.55);color:#fff;font-size:12px;line-height:20px;text-align:center;cursor:pointer;padding:0}
   .daypill{display:inline-flex;align-items:center;gap:6px;flex:none;max-width:52%;background:#fff;border:1.5px solid var(--fairway);color:var(--fairway);border-radius:999px;padding:7px 12px;font-weight:700;font-size:13px}
   .daypill:active{background:var(--paper-2)}
   .daypill .dp-txt{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -597,7 +602,7 @@
 
 <script>
 const App = (() => {
-  const APP_VERSION = '2026-06-26-21';   // ⬆️ SUBIR en cada deploy: la app se auto-recarga cuando detecta una versión distinta
+  const APP_VERSION = '2026-06-26-22';   // ⬆️ SUBIR en cada deploy: la app se auto-recarga cuando detecta una versión distinta
   const KEY = 'rayas-campestre-v2';
   const uid = () => Math.random().toString(36).slice(2,9);
   // Auto-actualización: revisa el index.html en vivo (sin caché); si la versión cambió, recarga a la versión fresca.
@@ -1333,7 +1338,7 @@ const App = (() => {
       : (isAdmin()
           ? `<button class="btn block" onclick="App.closeDay()">Cerrar el día y ajustar ventajas</button>`
           : `<div class="hint" style="margin-top:6px">El admin cierra el día al terminar (ajusta las ventajas).</div>`);
-    html+=`<div class="exprow"><button class="expbtn" onclick="App.exportImage()">📸 Imagen</button><button class="expbtn" onclick="App.exportComprobante()">📄 Comprobante PDF</button></div>`;
+    html+=`<div class="exprow"><button class="expbtn" onclick="App.exportImage()">📸 Imagen</button><button class="expbtn" onclick="App.exportComprobante()">📄 Comprobante PDF</button><button class="expbtn" onclick="App.photosModal()">📷 Fotos</button></div>`;
 
     // desglose por concepto
     html+=desgloseHtml(res);
@@ -4147,6 +4152,50 @@ const App = (() => {
   function cmpPrint(){ window.print(); }
   function cmpClose(){ const o=document.getElementById('cmpOverlay'); if(o)o.remove(); }
 
+  // ===== Fotos de las jugadas — base64 comprimido en RTDB (ruta aparte 'photos/{lid}/{dayId}', carga perezosa, fuera del sync principal) =====
+  let _photoCache={};
+  function compressPhoto(file){ return new Promise(function(resolve,reject){ const img=new Image(), url=URL.createObjectURL(file);
+    img.onload=function(){ URL.revokeObjectURL(url); let w=img.naturalWidth||img.width, h=img.naturalHeight||img.height; const max=1000;
+      if(w>=h){ if(w>max){ h=Math.round(h*max/w); w=max; } } else { if(h>max){ w=Math.round(w*max/h); h=max; } }
+      const cv=document.createElement('canvas'); cv.width=w; cv.height=h; cv.getContext('2d').drawImage(img,0,0,w,h);
+      try{ resolve(cv.toDataURL('image/jpeg',0.65)); }catch(e){ reject(e); } };
+    img.onerror=function(){ URL.revokeObjectURL(url); reject(new Error('img')); }; img.src=url; }); }
+  function photosRef(dayId){ return firebase.database().ref('photos/'+ACTIVE_LEAGUE+'/'+dayId); }
+  function photosModal(){ const d=curDay(); if(!d){ toast('No hay día activo'); return; }
+    if(_backend!=='fb'){ toast('Las fotos necesitan conexión'); return; }
+    modal(`<h3>📷 Fotos · ${_esc(d.label||'')}</h3>
+      <div id="phGrid" class="phgrid"><div class="hint">Cargando…</div></div>
+      <input id="phFile" type="file" accept="image/*" capture="environment" style="display:none" onchange="App.onPhotoPick(this)">
+      <div class="row" style="gap:8px;margin-top:12px;align-items:center">
+        <select id="phTag" class="txt" style="flex:1"><option value="">Del día (todos)</option>${dayPlayers(d).filter(Boolean).map(id=>`<option value="${id}">${_esc(pname(id))}</option>`).join('')}</select>
+        <button class="btn sm" onclick="document.getElementById('phFile').click()">+ Agregar foto</button></div>
+      <div class="hint" style="margin-top:6px">Se comprime al subir. Cualquiera del grupo puede agregar; borrar lo hace quien la subió o el admin.</div>
+      <button class="btn ghost block" style="margin-top:10px" onclick="App.closeModal()">Cerrar</button>`);
+    renderPhotos(d.id);
+  }
+  function renderPhotos(dayId){ photosRef(dayId).once('value').then(function(s){ const v=s.val()||{}; _photoCache[dayId]=v;
+    const grid=document.getElementById('phGrid'); if(!grid) return;
+    const ids=Object.keys(v).sort(function(a,b){ return (v[b].ts||0)-(v[a].ts||0); });
+    if(!ids.length){ grid.innerHTML='<div class="hint">Aún no hay fotos. Agrega la primera 📸</div>'; return; }
+    const me=(_devUser&&_devUser.uid)||null;
+    grid.innerHTML=ids.map(function(id){ const p=v[id]||{}; const canDel=isAdmin()||(me&&p.by===me);
+      return `<div class="phcell"><img loading="lazy" src="${p.img}" onclick="App.viewPhoto('${dayId}','${id}')">${p.pid?`<div class="phtag">${_esc(pname(p.pid))}</div>`:''}${canDel?`<button class="phdel" onclick="App.delPhoto('${dayId}','${id}')" title="Borrar">✕</button>`:''}</div>`;
+    }).join('');
+  }).catch(function(){ const grid=document.getElementById('phGrid'); if(grid) grid.innerHTML='<div class="hint">No se pudieron cargar (revisa conexión/reglas).</div>'; }); }
+  function onPhotoPick(input){ const f=input.files&&input.files[0]; if(!f){ return; } const d=curDay(); if(!d) return;
+    if(!/^image\//.test(f.type)){ toast('Solo imágenes'); input.value=''; return; }
+    const tag=(document.getElementById('phTag')||{}).value||null;
+    toast('Subiendo foto…');
+    compressPhoto(f).then(function(b64){ if(b64.length>800000){ throw new Error('big'); }
+      const rec={img:b64, by:(_devUser&&_devUser.uid)||null, ts:Date.now()}; if(tag) rec.pid=tag;
+      return photosRef(d.id).push(rec); }).then(function(){ input.value=''; toast('Foto agregada 📸'); renderPhotos(d.id); })
+      .catch(function(e){ input.value=''; toast(e&&e.message==='big'?'La foto pesa mucho aún comprimida':'No se pudo subir la foto'); }); }
+  function delPhoto(dayId,id){ const v=(_photoCache[dayId]||{})[id]||{}; const me=(_devUser&&_devUser.uid)||null;
+    if(!(isAdmin()||(me&&v.by===me))){ toast('Solo quien la subió o el admin'); return; }
+    confirmModal('¿Borrar esta foto?','Borrar',function(){ photosRef(dayId).child(id).remove().then(function(){ photosModal(); toast('Foto borrada'); }).catch(function(){ toast('No se pudo borrar'); }); }); }
+  function viewPhoto(dayId,id){ const v=(_photoCache[dayId]||{})[id]; if(!v) return;
+    modal(`<img src="${v.img}" style="width:100%;border-radius:8px;display:block">${v.pid?`<div class="hint" style="text-align:center;margin-top:8px">${_esc(pname(v.pid))}</div>`:''}<button class="btn block" style="margin-top:10px" onclick="App.photosModal()">← Volver a las fotos</button>`); }
+
   return { init,loginModal,doLogin,signInGoogle,signOutAuth,joinRegister,shareInvite,copyInvite,regenJoinCode,createMyPlayer,approveVent,rejectVent,btnApplyVentSeed,confirmVentMatch,dismissVentMatch,createLeague,renameLeague,switchLeague,setMaxGroup,go,switchDay,daysModal,editDayModal,saveDayEdit,delDay,clearHole,clearCard,removeFromDay,playerAdminModal,newDayModal,createDay,
     toggleAssign:null,togglePlaying,cancelPlayer,moveGroup,confirmMove,sorteo,setSalidaTime,addGuestModal,
     pickScore,score,putt,setOyes,quick,toggleUnit,toggleCast,navHole,gotoPending,gotoPlayerPending,setScoreGroup,setStart,setHoles,setCourse,
@@ -4155,7 +4204,7 @@ const App = (() => {
     setRaya,submitRayaPair,approveRayaReq,rejectRayaReq,removeRayaPair,createPlayer,editPlayerModal,savePlayer,delPlayer,toggleFav,
     courseModal,setHole,setCfgCourse,addCourse,renameCourse,deleteCourse,unitModal,createUnit,delUnit,castModal,createCast,delCast,toggleCastTipo,
     exportData,renderCfg,renderVent,renderDay,closeModal,confirmYes,renderHigh,setHighTab,openProfile,rulesModal,editRulesModal,saveRules,
-    exportComprobante,cmpPrint,cmpClose };
+    exportComprobante,cmpPrint,cmpClose,photosModal,onPhotoPick,delPhoto,viewPhoto };
 })();
 App.init();
 </script>
