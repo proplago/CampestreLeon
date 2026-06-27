@@ -597,7 +597,7 @@
 
 <script>
 const App = (() => {
-  const APP_VERSION = '2026-06-26-20';   // ⬆️ SUBIR en cada deploy: la app se auto-recarga cuando detecta una versión distinta
+  const APP_VERSION = '2026-06-26-21';   // ⬆️ SUBIR en cada deploy: la app se auto-recarga cuando detecta una versión distinta
   const KEY = 'rayas-campestre-v2';
   const uid = () => Math.random().toString(36).slice(2,9);
   // Auto-actualización: revisa el index.html en vivo (sin caché); si la versión cambió, recarga a la versión fresca.
@@ -3858,16 +3858,19 @@ const App = (() => {
     const base=name.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'').slice(0,24)||'liga';
     let L=loadLeagues(), id=base, n=1; while(L.find(x=>x.id===id)) id=base+'-'+(++n);
     L.push({id,name}); saveLeagues(L);
-    // Admin real (no el súper operador): se reclama como ADMIN de la liga nueva (1er miembro) para poder configurarla.
-    const uid=_devUser&&_devUser.real&&_devUser.uid;
-    if(uid && !isSuper()){
-      _users[uid]=_users[uid]||{}; _users[uid].leagues=Object.assign({},_users[uid].leagues,{[id]:true});
+    // Un admin SIEMPRE es jugador de su liga (operador = solo el súper). Al crear, el admin real se da de alta
+    // como JUGADOR + admin de la liga nueva (1er miembro). El súper solo la crea (puede ser operador).
+    const auid=_devUser&&_devUser.real&&_devUser.uid;
+    if(auid && !isSuper()){
+      const pid=uid();
+      _users[auid]=_users[auid]||{}; _users[auid].leagues=Object.assign({},_users[auid].leagues,{[id]:true});
       try{ firebase.database().ref().update({
-        ['users/'+uid+'/leagues/'+id]: true,
-        ['leagueMembers/'+id+'/'+uid]: {role:'admin', pid:null}
+        ['users/'+auid+'/leagues/'+id]: true,
+        ['leagueMembers/'+id+'/'+auid]: {role:'admin', pid:pid},
+        ['leagues/'+id+'/players/'+pid]: {fav:true, guest:false, uid:auid}
       }); }catch(e){}
     }
-    renderCfg(); toast('Liga creada: '+name+'. Cámbiate a ella para configurarla.'); }
+    renderCfg(); toast('Liga creada: '+name+'. Cámbiate a ella para empezar.'); }
   function renameLeague(){ if(!isAdmin()){ toast('Sin permiso para renombrar'); return; }
     const el=document.getElementById('lg_rename'); const name=(el?el.value:'').trim(); if(!name){ toast('Pon un nombre'); return; }
     let L=loadLeagues(); const x=L.find(l=>l.id===ACTIVE_LEAGUE); if(x) x.name=name; else L.push({id:ACTIVE_LEAGUE,name}); saveLeagues(L);
