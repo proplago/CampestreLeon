@@ -611,7 +611,7 @@
 
 <script>
 const App = (() => {
-  const APP_VERSION = '2026-06-27-32';   // ⬆️ SUBIR en cada deploy: la app se auto-recarga cuando detecta una versión distinta
+  const APP_VERSION = '2026-06-27-33';   // ⬆️ SUBIR en cada deploy: la app se auto-recarga cuando detecta una versión distinta
   const KEY = 'rayas-campestre-v2';
   const uid = () => Math.random().toString(36).slice(2,9);
   // Auto-actualización: revisa el index.html en vivo (sin caché); si la versión cambió, recarga a la versión fresca.
@@ -758,6 +758,11 @@ const App = (() => {
   //  Las llaves con '/' son rutas profundas que _fbRef.update() escribe granularmente.
   const _defActiveBets = ()=>({hoyos:true,medal:true,unidades:true,oyes:true,doblar:true,castigos:true});
   function _sig(v){ return v===undefined?undefined:(typeof v==='string'?v:JSON.stringify(v)); }
+  // El caché de shards (_shardCache) DEBE guardar copias independientes, no referencias vivas al estado.
+  // buildShards devuelve algunos shards por referencia (p. ej. scores: out['days/x/scores/pid']=sc[pid]).
+  // Si el caché apunta al mismo objeto y la captura muta gross[] in-place, el diff de save() los ve IGUALES
+  // y NUNCA escribe el cambio. Clonar al guardar el caché rompe ese aliasing.
+  function _cloneShards(m){ const o={}; for(const k in m){ const v=m[k]; o[k]=(v==null||typeof v!=='object')?v:JSON.parse(JSON.stringify(v)); } return o; }
   function _arr(o){ // RTDB puede entregar {0:..,1:..} o array; normaliza a array sin huecos
     if(Array.isArray(o)) return o.filter(x=>x!=null);
     if(o && typeof o==='object') return Object.keys(o).sort((a,b)=>(+a)-(+b)).map(k=>o[k]).filter(x=>x!=null);
@@ -860,7 +865,7 @@ const App = (() => {
     });
     if(!peerChanged) return;
     const ns=rebuildFromShards(merged);
-    if(ns){ state=Object.assign(state,ns); _shardCache=merged; clearStatCache(); if(_loadedOnce) render(); }
+    if(ns){ state=Object.assign(state,ns); _shardCache=_cloneShards(merged); clearStatCache(); if(_loadedOnce) render(); }
   }
   // (Re)engancha el sync de Firebase DESPUÉS de tener sesión. Las reglas exigen auth != null, y un listener enganchado
   // SIN sesión se cancela (permission_denied) y nunca vuelve a entregar datos → por eso no cargaban los jugadores.
@@ -891,7 +896,7 @@ const App = (() => {
         _fbRef.on('value', snap=>{ fbResponded=true; _fbSynced=true; const root=snap.val();
           if(!done){
             const ns=rebuildFromShards(flattenTree(root)); if(ns) state=Object.assign(state,ns);
-            _shardCache=flattenTree(root);   // cache = lo que REALMENTE hay en la base (migrate luego escribe su diff)
+            _shardCache=_cloneShards(flattenTree(root));   // cache = lo que REALMENTE hay en la base (migrate luego escribe su diff)
             hydratePlayers(); fin();
           } else { applyRemoteTree(root); hydratePlayers(); }
         }, ()=>fin());   // permiso/conexión denegada → no bloquear el arranque
@@ -998,7 +1003,7 @@ const App = (() => {
           const mp=myPid();
           Object.keys(updates).forEach(k=>{ if(k.indexOf('players/')===0 && k.slice(8)!==mp) delete updates[k]; });   // ni jugadores ajenos
         }
-        _shardCache=cur;
+        _shardCache=_cloneShards(cur);
         if(Object.keys(updates).length){
           _fbRef.update(updates).then(()=>{ dirty=false; flashSave(); _saveDenied=false; }).catch((e)=>{ dirty=false; const msg=String((e&&e.code)||(e&&e.message)||e); if(/permission|denied/i.test(msg)){ const ks=Object.keys(updates).join(', '); try{console.warn('Firebase rechazó:',ks,msg);}catch(_){} if(!_saveDenied) toast('⚠️ Firebase rechazó: '+ks); _saveDenied=true; } });
         } else { dirty=false; }
@@ -3155,8 +3160,8 @@ const App = (() => {
       <div class="hint">Cada quien aparece al entrar con Google por el link del grupo. ⭐ = favorito (sale arriba al convocar).</div><div class="plist">`;
     [...state.players].sort((a,b)=>(b.fav?1:0)-(a.fav?1:0)||(a.name||'').localeCompare(b.name||'')).forEach(p=>{
       const sub = p.guest ? 'Invitado' : (p.email ? _esc(p.email) : 'sin cuenta');
-      html+=`<div class="prow"><div class="avatar ${p.guest?'g':''}">${(p.apodo||p.name).slice(0,1).toUpperCase()}</div>
-        <div class="grow"><div class="nm">${p.name}${(p.apodo||'').trim()?` <span class="apod">"${p.apodo.trim()}"</span>`:''}${(p.uid&&roleOfUid(p.uid)==='admin')?' <span class="tag">admin</span>':''}</div>
+      html+=`<div class="prow"><div class="avatar ${p.guest?'g':''}">${((p.apodo||p.name||'?').slice(0,1)||'?').toUpperCase()}</div>
+        <div class="grow"><div class="nm">${_esc(p.name||p.apodo||'(sin nombre)')}${(p.apodo||'').trim()?` <span class="apod">"${_esc(p.apodo.trim())}"</span>`:''}${(p.uid&&roleOfUid(p.uid)==='admin')?' <span class="tag">admin</span>':''}</div>
         <div class="desc" style="font-size:11px;color:var(--muted)">${sub}</div></div>
         <button class="icbtn" onclick="App.toggleFav('${p.id}')">${p.fav?'⭐':'☆'}</button>
         <button class="icbtn" onclick="App.editPlayerModal('${p.id}')">✏️</button>
