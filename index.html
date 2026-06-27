@@ -611,7 +611,7 @@
 
 <script>
 const App = (() => {
-  const APP_VERSION = '2026-06-26-28';   // ⬆️ SUBIR en cada deploy: la app se auto-recarga cuando detecta una versión distinta
+  const APP_VERSION = '2026-06-27-29';   // ⬆️ SUBIR en cada deploy: la app se auto-recarga cuando detecta una versión distinta
   const KEY = 'rayas-campestre-v2';
   const uid = () => Math.random().toString(36).slice(2,9);
   // Auto-actualización: revisa el index.html en vivo (sin caché); si la versión cambió, recarga a la versión fresca.
@@ -3108,6 +3108,36 @@ const App = (() => {
     if(fbConfigured())  return {emoji:'⚠️', cls:'warn', t:'Firebase configurado, sin conexión', d:'Revisa el databaseURL o tu internet y recarga.'};
     return {emoji:'📱', cls:'', t:'Solo este dispositivo', d:'Para que el grupo vea lo mismo en vivo, configura Firebase (instrucciones que te pasé).'};
   }
+  // Tarjeta de versión + botones para forzar actualización / limpiar caché (diagnóstico desde el propio teléfono).
+  function cfgVersionHtml(){
+    return `<div class="card">
+      <div class="row" style="justify-content:space-between;align-items:center">
+        <div><h3 style="margin:0">Versión</h3><div class="hint" style="margin:2px 0 0">App v${APP_VERSION}</div></div>
+        <span class="tag">v${APP_VERSION.split('-').pop()}</span></div>
+      <div class="row" style="gap:8px;margin-top:10px">
+        <button class="btn outline sm" style="flex:1" onclick="App.forceUpdate()">🔄 Buscar actualización</button>
+        <button class="btn outline sm" style="flex:1" onclick="App.clearCacheReload()">🧹 Limpiar caché</button></div>
+      <div class="hint" style="margin-top:8px">¿Ves datos viejos o que no son? Toca <b>Limpiar caché</b>: baja el código nuevo y vuelve a leer de la nube (no borra nada del grupo).</div></div>`;
+  }
+  // Revisa si hay versión nueva; si la hay recarga, si no avisa que ya estás al día.
+  async function forceUpdate(){
+    toast('Buscando actualización…');
+    try{
+      const res = await fetch(location.pathname + '?_v=' + Date.now(), { cache:'no-store' });
+      const txt = await res.text();
+      const m = txt.match(/APP_VERSION\s*=\s*'([^']+)'/);
+      if(m && m[1] && m[1] !== APP_VERSION){
+        try{ localStorage.setItem('cl_reloaded_to', m[1]); }catch(e){}
+        location.replace(location.pathname + '?v=' + encodeURIComponent(m[1]));
+      } else { toast('Ya tienes la última versión (v'+APP_VERSION+')'); }
+    }catch(e){ toast('No se pudo revisar. ¿Sin internet?'); }
+  }
+  // Limpia cachés del navegador/SW y recarga con cache-bust (sin tocar datos: todo lo del grupo vive en la nube).
+  async function clearCacheReload(){
+    try{ if(window.caches){ const ks=await caches.keys(); await Promise.all(ks.map(k=>caches.delete(k))); } }catch(e){}
+    try{ if(navigator.serviceWorker){ const rs=await navigator.serviceWorker.getRegistrations(); rs.forEach(r=>r.unregister()); } }catch(e){}
+    location.replace(location.pathname + '?v=' + encodeURIComponent(APP_VERSION) + '-' + Date.now());
+  }
   // Máximo de jugadores por grupo (config del club). Editable por TODOS (si el admin no va, igual se puede fijar).
   function setMaxGroup(kind,v){ const n=Math.max(1,Math.min(12,parseInt(v)||0)); if(kind==='wknd') state.maxWeekend=n; else state.maxWeekday=n; save(); renderCfg(); if(curView==='day') renderDay(); }
   function cfgMaxGroupHtml(){
@@ -3186,6 +3216,7 @@ const App = (() => {
         <div style="font-size:26px">${si.emoji}</div>
         <div><div style="font-weight:700;font-size:14px">${si.t}</div>
           <div style="font-size:12px;color:var(--muted);margin-top:2px">${si.d}</div></div></div>
+      ${cfgVersionHtml()}
       <div class="hint" style="text-align:center;margin-top:4px">La configuración del grupo (jugadores, campos, unidades, valor de raya) la maneja el admin.</div>`;
     box.innerHTML=html;
   }
@@ -3268,6 +3299,8 @@ const App = (() => {
       <div style="font-size:26px">${si.emoji}</div>
       <div><div style="font-weight:700;font-size:14px">${si.t}</div>
         <div style="font-size:12px;color:var(--muted);margin-top:2px">${si.d}</div></div></div>`;
+
+    html+=cfgVersionHtml();
 
     html+=`<div class="card"><h3>Datos</h3><div class="hint">Todo se guarda en este dispositivo. Cuando lo pases a Firebase, la estructura es la misma.</div>
       <button class="btn outline sm" onclick="App.exportData()">Exportar respaldo (JSON)</button></div>`;
@@ -4222,7 +4255,7 @@ const App = (() => {
     setRaya,submitRayaPair,approveRayaReq,rejectRayaReq,removeRayaPair,createPlayer,editPlayerModal,savePlayer,delPlayer,toggleFav,
     courseModal,setHole,setCfgCourse,addCourse,renameCourse,deleteCourse,unitModal,createUnit,delUnit,castModal,createCast,delCast,toggleCastTipo,
     exportData,renderCfg,renderVent,renderDay,closeModal,confirmYes,renderHigh,setHighTab,openProfile,rulesModal,editRulesModal,saveRules,
-    exportComprobante,cmpPrint,cmpClose,photosModal,onPhotoPick,delPhoto,viewPhoto };
+    exportComprobante,cmpPrint,cmpClose,photosModal,onPhotoPick,delPhoto,viewPhoto,forceUpdate,clearCacheReload };
 })();
 App.init();
 </script>
