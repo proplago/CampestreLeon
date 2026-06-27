@@ -602,7 +602,7 @@
 
 <script>
 const App = (() => {
-  const APP_VERSION = '2026-06-26-23';   // ⬆️ SUBIR en cada deploy: la app se auto-recarga cuando detecta una versión distinta
+  const APP_VERSION = '2026-06-26-24';   // ⬆️ SUBIR en cada deploy: la app se auto-recarga cuando detecta una versión distinta
   const KEY = 'rayas-campestre-v2';
   const uid = () => Math.random().toString(36).slice(2,9);
   // Auto-actualización: revisa el index.html en vivo (sin caché); si la versión cambió, recarga a la versión fresca.
@@ -1238,6 +1238,9 @@ const App = (() => {
   }
   function updateBrand(){
     const nm=(state._leagueMeta&&state._leagueMeta.name)||leagueName(ACTIVE_LEAGUE)||'Golf';
+    // El nombre vive sincronizado en meta; la lista local (cl_leagues) puede quedar vieja si renombraron en otro dispositivo.
+    // Aquí la mantenemos al día para que el selector/etiquetas también muestren el nombre nuevo.
+    if(state._leagueMeta && state._leagueMeta.name){ try{ const L=loadLeagues(); const x=L.find(l=>l.id===ACTIVE_LEAGUE); if(x && x.name!==state._leagueMeta.name){ x.name=state._leagueMeta.name; saveLeagues(L); } }catch(e){} }
     const el=document.getElementById('brandName'); if(el) el.textContent=nm;
     try{ document.title=nm; }catch(e){}
   }
