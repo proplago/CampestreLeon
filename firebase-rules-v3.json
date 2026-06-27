@@ -10,6 +10,7 @@
       }
     },
     "leagueMembers": {
+      ".read": "auth != null && root.child('users').child(auth.uid).child('super').val() === true",
       "$lid": {
         ".read": "auth != null",
         "$uid": {
@@ -23,9 +24,11 @@
     "leagues": {
       "$lid": {
         ".read": "auth != null",
+        ".write": "auth != null && root.child('users').child(auth.uid).child('super').val() === true",
         "players": {
+          ".write": "auth != null && (root.child('users').child(auth.uid).child('super').val() === true || root.child('leagueMembers').child($lid).child(auth.uid).child('role').val() === 'admin')",
           "$pid": {
-            ".write": "auth != null && (root.child('users').child(auth.uid).child('super').val() === true || root.child('leagueMembers').child($lid).child(auth.uid).child('role').val() === 'admin' || newData.child('uid').val() === auth.uid || (data.exists() && data.child('uid').val() === auth.uid))"
+            ".write": "auth != null && (newData.child('uid').val() === auth.uid || (data.exists() && data.child('uid').val() === auth.uid))"
           }
         },
         "days":        { ".write": "auth != null" },
