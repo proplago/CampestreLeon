@@ -611,7 +611,7 @@
 
 <script>
 const App = (() => {
-  const APP_VERSION = '2026-06-27-29';   // ⬆️ SUBIR en cada deploy: la app se auto-recarga cuando detecta una versión distinta
+  const APP_VERSION = '2026-06-27-30';   // ⬆️ SUBIR en cada deploy: la app se auto-recarga cuando detecta una versión distinta
   const KEY = 'rayas-campestre-v2';
   const uid = () => Math.random().toString(36).slice(2,9);
   // Auto-actualización: revisa el index.html en vivo (sin caché); si la versión cambió, recarga a la versión fresca.
@@ -3182,11 +3182,7 @@ const App = (() => {
   }
   // Selector de grupos: muestra las grupos a las que pertenece el usuario (o todas, si es súper). Solo si hay >1.
   function cfgMyLeaguesHtml(){
-    const uid=_devUser&&_devUser.uid;
-    let lids = isSuper() ? loadLeagues().map(l=>l.id)
-             : (uid && _users[uid] && _users[uid].leagues ? Object.keys(_users[uid].leagues).filter(l=>_users[uid].leagues[l]) : []);
-    if(lids.indexOf(ACTIVE_LEAGUE)<0) lids.unshift(ACTIVE_LEAGUE);
-    lids = lids.filter((v,i,a)=>a.indexOf(v)===i);
+    const lids = myLeagueIds();
     if(lids.length<=1) return '';
     return `<div class="card"><h3>Grupo</h3>
       <div class="hint">Estás viendo <b>${_esc(leagueName(ACTIVE_LEAGUE))}</b>. Cámbiala si juegas en varias.</div>
@@ -3699,7 +3695,7 @@ const App = (() => {
         _authUser=u||null;
         if(!u){ _authPending=false; if(_devUser&&_devUser.real){ _devUser=null; } render(); if(!_devUser) loginModal(); return; }
         attachFbSync();   // YA hay sesión → (re)engancha el sync del grupo (el de load() pudo cancelarse por leer sin auth)
-        resolveAuthIdentity(u).then(function(){ if(isRealAuth()){ closeModal(); cleanUrl(); } render(); if(_authPending){ _canSelfRegister?joinRegisterModal():loginModal(); } });
+        resolveAuthIdentity(u).then(function(){ if(isRealAuth()){ closeModal(); cleanUrl(); } hydrateLeaguesFromFirebase(); render(); if(_authPending){ _canSelfRegister?joinRegisterModal():loginModal(); } });
       });
     }catch(e){}
   }
@@ -3907,23 +3903,58 @@ const App = (() => {
   function loadLeagues(){ try{ let L=JSON.parse(localStorage.getItem('cl_leagues')||'[]'); if(!Array.isArray(L)) L=[]; if(!L.find(x=>x.id===DEFAULT_LEAGUE.id)) L.unshift({...DEFAULT_LEAGUE}); return L; }catch(e){ return [{...DEFAULT_LEAGUE}]; } }
   function saveLeagues(L){ try{ localStorage.setItem('cl_leagues', JSON.stringify(L)); }catch(e){} }
   function leagueName(id){ const x=loadLeagues().find(l=>l.id===id); return x?x.name:id; }
+  // IDs de los grupos que el usuario debe ver en el selector: su perfil en la nube (users/{uid}/leagues)
+  // UNIÓN la lista local (para el súper) + el grupo activo. Así, tras borrar datos o en un teléfono nuevo,
+  // el selector no se queda solo con el default.
+  function myLeagueIds(){
+    const uid=_devUser&&_devUser.uid;
+    const prof=(uid && _users[uid] && _users[uid].leagues) ? Object.keys(_users[uid].leagues).filter(l=>_users[uid].leagues[l]) : [];
+    let ids=prof.slice();
+    if(isSuper()){ loadLeagues().forEach(l=>{ if(ids.indexOf(l.id)<0) ids.push(l.id); }); }
+    if(ids.indexOf(ACTIVE_LEAGUE)<0) ids.unshift(ACTIVE_LEAGUE);
+    return ids.filter((v,i,a)=>v&&a.indexOf(v)===i);
+  }
+  // Reconstruye la lista LOCAL (cl_leagues) y sus NOMBRES desde Firebase, para que el selector muestre
+  // TODOS tus grupos con su nombre real aunque el dispositivo no los tenga guardados localmente.
+  function hydrateLeaguesFromFirebase(){
+    if(!fbConfigured()) return;
+    const uid=_devUser&&_devUser.uid; if(!uid) return;
+    firebase.database().ref('users/'+uid+'/leagues').once('value').then(function(s){
+      const lg=s.val()||{}; const ids=Object.keys(lg).filter(function(l){return lg[l];});
+      if(!ids.length) return;
+      const L=loadLeagues(); let pending=ids.length, changed=false;
+      const done=function(){ if(--pending<=0 && changed){ saveLeagues(L); if(curView==='cfg') renderCfg(); } };
+      ids.forEach(function(id){
+        firebase.database().ref('leagues/'+id+'/meta/name').once('value').then(function(ms){
+          const nm=ms.val(); const x=L.find(function(l){return l.id===id;});
+          if(!x){ L.push({id:id, name:nm||id}); changed=true; }
+          else if(nm && x.name!==nm){ x.name=nm; changed=true; }
+          done();
+        }).catch(function(){ const x=L.find(function(l){return l.id===id;}); if(!x){ L.push({id:id, name:id}); changed=true; } done(); });
+      });
+    }).catch(function(){});
+  }
   function createLeague(){ if(!isAdmin()){ toast('Solo admin/súper crea grupos'); return; }
     const el=document.getElementById('lg_name'); const name=(el?el.value:'').trim(); if(!name){ toast('Ponle nombre al grupo'); return; }
     const base=name.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'').slice(0,24)||'liga';
     let L=loadLeagues(), id=base, n=1; while(L.find(x=>x.id===id)) id=base+'-'+(++n);
     L.push({id,name}); saveLeagues(L);
     // Un admin SIEMPRE es jugador de su liga (operador = solo el súper). Al crear, el admin real se da de alta
-    // como JUGADOR + admin del grupo nueva (1er miembro). El súper solo la crea (puede ser operador).
+    // como JUGADOR + admin del grupo nueva (1er miembro). El súper la crea (puede ser operador) PERO igual
+    // persiste el nombre y se liga su cuenta, para que el grupo sincronice y aparezca en todos sus dispositivos.
     const auid=_devUser&&_devUser.real&&_devUser.uid;
-    if(auid && !isSuper()){
-      const pid=uid();
+    const updates={};
+    updates['leagues/'+id+'/meta/name']=name;   // nombre en la nube → sincroniza y se hidrata en otros equipos
+    if(auid){
+      updates['users/'+auid+'/leagues/'+id]=true;   // liga la cuenta al grupo (súper o admin)
       _users[auid]=_users[auid]||{}; _users[auid].leagues=Object.assign({},_users[auid].leagues,{[id]:true});
-      try{ firebase.database().ref().update({
-        ['users/'+auid+'/leagues/'+id]: true,
-        ['leagueMembers/'+id+'/'+auid]: {role:'admin', pid:pid},
-        ['leagues/'+id+'/players/'+pid]: {fav:true, guest:false, uid:auid}
-      }); }catch(e){}
+      if(!isSuper()){
+        const pid=uid();
+        updates['leagueMembers/'+id+'/'+auid]={role:'admin', pid:pid};
+        updates['leagues/'+id+'/players/'+pid]={fav:true, guest:false, uid:auid};
+      }
     }
+    try{ firebase.database().ref().update(updates); }catch(e){}
     renderCfg(); toast('Grupo creado: '+name+'. Cámbiate a él para empezar.'); }
   function renameLeague(){ if(!isAdmin()){ toast('Sin permiso para renombrar'); return; }
     const el=document.getElementById('lg_rename'); const name=(el?el.value:'').trim(); if(!name){ toast('Pon un nombre'); return; }
@@ -3940,10 +3971,10 @@ const App = (() => {
   function cfgLeaguesHtml(){
     const active=ACTIVE_LEAGUE; let h=`<div class="cfg-sect">Grupo</div>`;
     if(isSuper()){
-      const L=loadLeagues();
+      const lids=myLeagueIds();
       h+=`<div class="card"><h3>Grupo activo</h3>
         <select class="txt" style="margin-top:6px" onchange="App.switchLeague(this.value)">
-          ${L.map(x=>`<option value="${x.id}" ${x.id===active?'selected':''}>${x.name}</option>`).join('')}</select>
+          ${lids.map(id=>`<option value="${id}" ${id===active?'selected':''}>${_esc(leagueName(id))}</option>`).join('')}</select>
         <div class="row" style="gap:8px;margin-top:10px">
           <input id="lg_rename" class="txt" value="${leagueName(active).replace(/"/g,'&quot;')}" placeholder="Nombre del grupo">
           <button class="btn sm outline" onclick="App.renameLeague()">Renombrar</button></div>
