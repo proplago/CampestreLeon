@@ -602,7 +602,7 @@
 
 <script>
 const App = (() => {
-  const APP_VERSION = '2026-06-26-24';   // ⬆️ SUBIR en cada deploy: la app se auto-recarga cuando detecta una versión distinta
+  const APP_VERSION = '2026-06-26-25';   // ⬆️ SUBIR en cada deploy: la app se auto-recarga cuando detecta una versión distinta
   const KEY = 'rayas-campestre-v2';
   const uid = () => Math.random().toString(36).slice(2,9);
   // Auto-actualización: revisa el index.html en vivo (sin caché); si la versión cambió, recarga a la versión fresca.
@@ -855,7 +855,7 @@ const App = (() => {
   }
   // (Re)engancha el sync de Firebase DESPUÉS de tener sesión. Las reglas exigen auth != null, y un listener enganchado
   // SIN sesión se cancela (permission_denied) y nunca vuelve a entregar datos → por eso no cargaban los jugadores.
-  let _fbSyncOn=false;
+  let _fbSyncOn=false, _fbSynced=false;   // _fbSynced: ya bajamos datos de Firebase con ÉXITO al menos una vez. Hasta entonces NO escribimos (evita pisar con respaldo local viejo).
   function attachFbSync(){
     if(_backend!=='fb' || !_fbRef) return;
     // El token de auth tarda un instante en propagarse a la conexión de RTDB DESPUÉS de onAuthStateChanged.
@@ -866,7 +866,7 @@ const App = (() => {
       try{ ref.off('value'); }catch(e){}
       try{ ref.on('value', onData, function(){ if(tries<8) setTimeout(function(){ live(ref, onData, tries+1); }, Math.min(400+400*tries, 2500)); }); }catch(e){}
     }
-    live(_fbRef, function(snap){ applyRemoteTree(snap.val()||{}); hydratePlayers(); if(_loadedOnce) render(); });
+    live(_fbRef, function(snap){ _fbSynced=true; applyRemoteTree(snap.val()||{}); hydratePlayers(); if(_loadedOnce) render(); });
     live(firebase.database().ref('users'), function(snap){ _users=snap.val()||{}; if(hydratePlayers() && _loadedOnce) render(); });
     live(firebase.database().ref('leagueMembers/'+ACTIVE_LEAGUE), function(snap){ _members=snap.val()||{};
       if(_devUser&&_devUser.uid&&_devUser.role!=='super'){ const r=roleOfUid(_devUser.uid); if(r!==_devUser.role) _devUser.role=r; }
@@ -879,7 +879,7 @@ const App = (() => {
     if(_backend==='fb'){
       let fbResponded=false;
       await new Promise(res=>{ let done=false; const fin=()=>{ if(!done){ done=true; res(); } };
-        _fbRef.on('value', snap=>{ fbResponded=true; const root=snap.val();
+        _fbRef.on('value', snap=>{ fbResponded=true; _fbSynced=true; const root=snap.val();
           if(!done){
             const ns=rebuildFromShards(flattenTree(root)); if(ns) state=Object.assign(state,ns);
             _shardCache=flattenTree(root);   // cache = lo que REALMENTE hay en la base (migrate luego escribe su diff)
@@ -977,6 +977,9 @@ const App = (() => {
         // Sin sesión de Google NO intentes escribir a Firebase (las reglas lo rechazan y saldría el aviso antes de loguearse).
         const authed = (typeof firebase!=='undefined' && firebase.auth && firebase.auth().currentUser);
         if(!authed){ dirty=false; return; }
+        // Aún no bajamos datos frescos de Firebase (p. ej. el token tardó y la 1ª lectura se denegó) → NO escribir,
+        // si no pisaríamos con el respaldo local viejo lo que cambió otro dispositivo. Solo respaldo local; sincroniza y reintenta.
+        if(!_fbSynced){ dirty=false; return; }
         const cur=buildShards(state), updates={};
         for(const k in cur){ if(_sig(_shardCache[k])!==_sig(cur[k])) updates[k]=cur[k]; }   // nuevos/cambiados
         for(const k in _shardCache){ if(!(k in cur)) updates[k]=null; }                     // borrados
