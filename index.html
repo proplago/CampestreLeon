@@ -602,7 +602,7 @@
 
 <script>
 const App = (() => {
-  const APP_VERSION = '2026-06-26-22';   // ⬆️ SUBIR en cada deploy: la app se auto-recarga cuando detecta una versión distinta
+  const APP_VERSION = '2026-06-26-23';   // ⬆️ SUBIR en cada deploy: la app se auto-recarga cuando detecta una versión distinta
   const KEY = 'rayas-campestre-v2';
   const uid = () => Math.random().toString(36).slice(2,9);
   // Auto-actualización: revisa el index.html en vivo (sin caché); si la versión cambió, recarga a la versión fresca.
@@ -1231,6 +1231,7 @@ const App = (() => {
   // =========================================================
   function go(v){
     curView=v;
+    try{ localStorage.setItem('cl_view', v); }catch(e){}   // recuerda la vista para no desorientar al recargar
     document.querySelectorAll('.view').forEach(s=>s.classList.toggle('active',s.id==='v-'+v));
     document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('active',b.dataset.v===v));
     render();
@@ -2391,6 +2392,7 @@ const App = (() => {
         ${notIn.map(p=>`<option value="${p.id}">${p.name}${p.guest?' (inv)':''}</option>`).join('')}
       </select>`;
     }
+    html+=`<button class="btn outline sm" style="margin-top:8px" onclick="App.addGuestModal()">+ Agregar invitado</button>`;
     html+=`</div>`;
 
     // 2. sorteo + grupos
@@ -2455,9 +2457,6 @@ const App = (() => {
     }
 
     // 3. invitados
-    html+=`<div class="card"><h3>Invitados</h3>
-      <div class="hint">Agrega un invitado y captura sus ventajas contra todos los del día.</div>
-      <button class="btn outline sm" onclick="App.addGuestModal()">+ Agregar invitado</button></div>`;
     if((d.salidas||[]).some(g=>(g||[]).filter(Boolean).length)) html+=`<div class="exprow"><button class="expbtn" onclick="App.exportSalidas()">📸 Exportar salidas</button></div>`;
     box.innerHTML=html;
   }
@@ -3772,6 +3771,7 @@ const App = (() => {
   function loginModal(){
     const ps=[...state.players].sort((a,b)=>(a.guest?1:0)-(b.guest?1:0)||(a.name||'').localeCompare(b.name||''));
     const signedIn = isRealAuth() || _authPending;
+    const devMode = isSuper() || !isRealAuth();   // modo prueba (escoger jugador/rol): solo súper o local sin sesión real
     let top='';
     if(signedIn){
       top=`<div class="hint" style="margin-bottom:8px">Sesión de Google: <b>${_esc((_authUser&&_authUser.email)||'')}</b>${_authPending?' · <span style="color:var(--clay)">pendiente de que el admin te asigne</span>':''}</div>`;
@@ -3782,22 +3782,23 @@ const App = (() => {
           <div style="margin-top:4px;color:var(--clay)"><b>Diagnóstico:</b> ${_esc(_authDiag||'—')}</div>
           <div class="hint" style="margin-top:6px">Súper: crea <code>users/${_esc(_authUser.uid)}/super</code> = <b>true</b> (booleano) en Realtime Database, y recarga.</div></div>`;
       }
-      top+=`<button class="btn outline block" style="margin-top:8px" onclick="App.signOutAuth()">Cerrar sesión de Google</button>
-        <div class="hint" style="margin:12px 0 4px;text-align:center">— o usa el modo prueba (temporal) —</div>`;
+      top+=`<button class="btn outline block" style="margin-top:8px" onclick="App.signOutAuth()">Cerrar sesión de Google</button>`;
+      if(devMode) top+=`<div class="hint" style="margin:12px 0 4px;text-align:center">— o usa el modo prueba (temporal) —</div>`;
     } else if(authAvailable()){
-      top=`<button class="btn block" onclick="App.signInGoogle()">Entrar con Google</button>
-        <div class="hint" style="margin:12px 0 4px;text-align:center">— o modo prueba (temporal, sin clave) —</div>`;
+      top=`<button class="btn block" onclick="App.signInGoogle()">Entrar con Google</button>`;
+      if(devMode) top+=`<div class="hint" style="margin:12px 0 4px;text-align:center">— o modo prueba (temporal, sin clave) —</div>`;
     }
-    modal(`<h3>Entrar</h3>${top}
-      <label class="fl">Jugador (modo prueba)</label>
+    // El selector de jugador/rol (modo prueba) es solo del súper o en local sin sesión real. Un regular/admin no puede escoger otro jugador ni su rol.
+    const picker = devMode ? `<label class="fl">Jugador (modo prueba)</label>
       <select id="lg_pid" class="txt">${ps.map(p=>`<option value="${p.id}" ${myPid()===p.id?'selected':''}>${p.name}${p.guest?' (inv)':''}</option>`).join('')}</select>
       <label class="fl" style="margin-top:10px">Rol</label>
       <select id="lg_role" class="txt">
         <option value="regular">Regular (solo lo suyo)</option>
         <option value="admin">Admin de liga</option>
         <option value="super">Súper admin (todo)</option></select>
-      <button class="btn ${signedIn?'outline ':''}block" style="margin-top:14px" onclick="App.doLogin()">${signedIn?'Usar modo prueba':'Entrar'}</button>`);
-    if(_devUser){ const r=document.getElementById('lg_role'); if(r) r.value=_devUser.role; }
+      <button class="btn ${signedIn?'outline ':''}block" style="margin-top:14px" onclick="App.doLogin()">${signedIn?'Usar modo prueba':'Entrar'}</button>` : '';
+    modal(`<h3>${devMode?'Entrar':'Tu sesión'}</h3>${top}${picker}`);
+    if(devMode && _devUser){ const r=document.getElementById('lg_role'); if(r) r.value=_devUser.role; }
   }
   function doLogin(){ const pid=document.getElementById('lg_pid').value, role=document.getElementById('lg_role').value; setDevUser(pid,role); closeModal(); render(); toast('Entraste como '+curUserLabel()); }
 
@@ -3966,7 +3967,9 @@ const App = (() => {
     window.addEventListener('touchend',end,{passive:true});
     window.addEventListener('touchcancel',()=>{ pulling=false; hide(); },{passive:true});
   }
-  async function init(){ try{ if(document.fonts&&document.fonts.load){ document.fonts.load("600 40px Newsreader"); document.fonts.load("700 16px 'Hanken Grotesk'"); } }catch(e){} loadDevUser(); await load(); if(!state.currentDayId && state.days[0]) state.currentDayId=state.days[0].id; render(); initPullRefresh(); startAuth(); if(!_devUser) loginModal();
+  async function init(){ try{ if(document.fonts&&document.fonts.load){ document.fonts.load("600 40px Newsreader"); document.fonts.load("700 16px 'Hanken Grotesk'"); } }catch(e){} loadDevUser(); await load(); if(!state.currentDayId && state.days[0]) state.currentDayId=state.days[0].id; render();
+    try{ const sv=localStorage.getItem('cl_view'); if(sv && ['liq','day','score','vent','high','cfg'].indexOf(sv)>=0 && sv!==curView) go(sv); }catch(e){}   // restaura la última vista (no desorientar al recargar)
+    initPullRefresh(); startAuth(); if(!_devUser) loginModal();
     checkForUpdate();   // ¿hay versión nueva? recarga sola
     document.addEventListener('visibilitychange', ()=>{ if(!document.hidden) checkForUpdate(); });   // y cada vez que vuelves a la app
   }   // muestra la entrada al instante; si hay sesión de Google, se cierra sola al resolver
