@@ -13,7 +13,7 @@
       "$lid": {
         ".read": "auth != null",
         "$uid": {
-          ".write": "auth != null && (root.child('users').child(auth.uid).child('super').val() === true || root.child('leagueMembers').child($lid).child(auth.uid).child('role').val() === 'admin' || (auth.uid === $uid && !data.exists() && newData.child('role').val() === 'regular'))",
+          ".write": "auth != null && (root.child('users').child(auth.uid).child('super').val() === true || root.child('leagueMembers').child($lid).child(auth.uid).child('role').val() === 'admin' || (auth.uid === $uid && !data.exists() && newData.child('role').val() === 'regular') || (auth.uid === $uid && !data.exists() && !root.child('leagueMembers').child($lid).exists()))",
           "role": {
             ".validate": "newData.val() === 'regular' || newData.val() === 'admin'"
           }

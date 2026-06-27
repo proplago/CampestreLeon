@@ -597,7 +597,7 @@
 
 <script>
 const App = (() => {
-  const APP_VERSION = '2026-06-26-19';   // ⬆️ SUBIR en cada deploy: la app se auto-recarga cuando detecta una versión distinta
+  const APP_VERSION = '2026-06-26-20';   // ⬆️ SUBIR en cada deploy: la app se auto-recarga cuando detecta una versión distinta
   const KEY = 'rayas-campestre-v2';
   const uid = () => Math.random().toString(36).slice(2,9);
   // Auto-actualización: revisa el index.html en vivo (sin caché); si la versión cambió, recarga a la versión fresca.
@@ -2648,7 +2648,7 @@ const App = (() => {
       const qk=(rel,lab,c)=>`<button class="qk ${g===Math.max(1,h.par+rel)?'on':''} ${c}" onclick="App.quick('${id}',${hi},${rel})">${lab}</button>`;
       html+=`<div class="hbh">
         <div class="hbh-top">
-          <div class="hbh-name">${p?pname(p.id):'—'}${ppend>0?` <button class="ppend" onclick="App.gotoPlayerPending('${id}')" title="Ir a su primer hoyo sin capturar">⏳${ppend}</button>`:' <span class="pdone">✓</span>'}<span class="raylive ${rvCls}" title="Rayas netas del día (sin contar el ace del hoyo en curso)">${rvTxt}</span></div>
+          <div class="hbh-name">${p?pname(p.id):'—'}${ppend>0?` <button class="ppend" onclick="App.gotoPlayerPending('${id}')" title="Ir a su primer hoyo sin capturar">⏳${ppend}</button>`:' <span class="pdone">✓</span>'}${isAdmin()?` <button class="ppend" style="background:#ece9e2;color:#5f5e5a" onclick="App.playerAdminModal('${id}')" title="Admin: borrar hoyo/tarjeta o quitar del día">⋯</button>`:''}<span class="raylive ${rvCls}" title="Rayas netas del día (sin contar el ace del hoyo en curso)">${rvTxt}</span></div>
           <div class="hbh-sc">
             <button class="mini" onclick="App.score('${id}',${hi},-1)">−</button>
             <div class="scval ${g?((g-h.par)<=-1?'good':(g-h.par)>=1?'over':''):''}">${g||'·'}</div>
@@ -3428,6 +3428,38 @@ const App = (() => {
       save(); closeModal(); render();
     });
   }
+  // ---- Borrado de jugadas (admin/súper) ----
+  function clearHole(pid){ if(!isAdmin()){ toast('Solo el admin'); return; }
+    const d=curDay(); if(!d||!d.scores||!d.scores[pid]){ closeModal(); return; }
+    const h=playOrder(d)[curHoleNav]; const sc=d.scores[pid];
+    if(sc.gross) sc.gross[h]=0; if(sc.putts) sc.putts[h]=null;
+    if(sc.oyes) delete sc.oyes[h]; if(sc.units) delete sc.units[h]; if(sc.cast) delete sc.cast[h];
+    clearStatCache(); save(); closeModal(); renderScore(); toast('Hoyo '+holesOf(d)[h].n+' borrado');
+  }
+  function clearCard(pid){ if(!isAdmin()){ toast('Solo el admin'); return; }
+    const d=curDay(); if(!d) return;
+    confirmModal(`¿Borrar TODA la tarjeta de ${_esc(pname(pid))} en “${_esc(d.label||'')}”? Se eliminan sus capturas; sigue convocado.`,'Borrar tarjeta',()=>{
+      if(d.scores) delete d.scores[pid]; clearStatCache(); save(); closeModal(); renderScore(); toast('Tarjeta borrada');
+    });
+  }
+  function removeFromDay(pid){ if(!isAdmin()){ toast('Solo el admin'); return; }
+    const d=curDay(); if(!d) return;
+    confirmModal(`¿Quitar a ${_esc(pname(pid))} del día? (sin carrilla — para corregir convocatorias por error)`,'Quitar del día',()=>{
+      d.playing=(d.playing||[]).filter(x=>x!==pid);
+      (d.salidas||[]).forEach(s=>{ const i=(s||[]).indexOf(pid); if(i>=0) s.splice(i,1); });
+      if(d.scores) delete d.scores[pid];
+      clearStatCache(); save(); closeModal(); render(); toast(pname(pid)+' fuera del día');
+    });
+  }
+  function playerAdminModal(pid){ if(!isAdmin()) return; const d=curDay(); if(!d) return;
+    const hn=holesOf(d)[playOrder(d)[curHoleNav]].n;
+    modal(`<h3>Administrar a ${_esc(pname(pid))}</h3>
+      <div class="hint" style="margin-bottom:12px">Acciones de admin para “${_esc(d.label||'')}”.</div>
+      <button class="btn outline block" onclick="App.clearHole('${pid}')">Borrar el hoyo ${hn} de su tarjeta</button>
+      <button class="btn outline block" style="margin-top:8px" onclick="App.clearCard('${pid}')">Borrar TODA su tarjeta del día</button>
+      <button class="btn clay outline block" style="margin-top:8px" onclick="App.removeFromDay('${pid}')">Quitar del día (sin carrilla)</button>
+      <button class="btn ghost block" style="margin-top:10px" onclick="App.closeModal()">Cerrar</button>`);
+  }
 
   function addGuestModal(){
     modal(`<h3>Agregar invitado</h3>
@@ -3821,11 +3853,21 @@ const App = (() => {
   function loadLeagues(){ try{ let L=JSON.parse(localStorage.getItem('cl_leagues')||'[]'); if(!Array.isArray(L)) L=[]; if(!L.find(x=>x.id===DEFAULT_LEAGUE.id)) L.unshift({...DEFAULT_LEAGUE}); return L; }catch(e){ return [{...DEFAULT_LEAGUE}]; } }
   function saveLeagues(L){ try{ localStorage.setItem('cl_leagues', JSON.stringify(L)); }catch(e){} }
   function leagueName(id){ const x=loadLeagues().find(l=>l.id===id); return x?x.name:id; }
-  function createLeague(){ if(!isSuper()){ toast('Solo el súper admin crea ligas'); return; }
+  function createLeague(){ if(!isAdmin()){ toast('Solo admin/súper crea ligas'); return; }
     const el=document.getElementById('lg_name'); const name=(el?el.value:'').trim(); if(!name){ toast('Ponle nombre a la liga'); return; }
     const base=name.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'').slice(0,24)||'liga';
     let L=loadLeagues(), id=base, n=1; while(L.find(x=>x.id===id)) id=base+'-'+(++n);
-    L.push({id,name}); saveLeagues(L); renderCfg(); toast('Liga creada: '+name); }
+    L.push({id,name}); saveLeagues(L);
+    // Admin real (no el súper operador): se reclama como ADMIN de la liga nueva (1er miembro) para poder configurarla.
+    const uid=_devUser&&_devUser.real&&_devUser.uid;
+    if(uid && !isSuper()){
+      _users[uid]=_users[uid]||{}; _users[uid].leagues=Object.assign({},_users[uid].leagues,{[id]:true});
+      try{ firebase.database().ref().update({
+        ['users/'+uid+'/leagues/'+id]: true,
+        ['leagueMembers/'+id+'/'+uid]: {role:'admin', pid:null}
+      }); }catch(e){}
+    }
+    renderCfg(); toast('Liga creada: '+name+'. Cámbiate a ella para configurarla.'); }
   function renameLeague(){ if(!isAdmin()){ toast('Sin permiso para renombrar'); return; }
     const el=document.getElementById('lg_rename'); const name=(el?el.value:'').trim(); if(!name){ toast('Pon un nombre'); return; }
     let L=loadLeagues(); const x=L.find(l=>l.id===ACTIVE_LEAGUE); if(x) x.name=name; else L.push({id:ACTIVE_LEAGUE,name}); saveLeagues(L);
@@ -3853,11 +3895,14 @@ const App = (() => {
           <button class="btn sm" onclick="App.createLeague()">Crear</button></div>
         <div class="hint" style="margin-top:6px">Renombrar cambia el nombre del grupo (arriba y al instalar). Crear una liga la deja vacía; cambiar de liga recarga la app.</div></div>`;
     } else {
-      h+=`<div class="card"><h3>Nombre del grupo</h3>
+      h+=`<div class="card"><h3>Tu grupo</h3>
         <div class="row" style="gap:8px;margin-top:6px">
           <input id="lg_rename" class="txt" value="${leagueName(active).replace(/"/g,'&quot;')}" placeholder="Nombre del grupo">
           <button class="btn sm outline" onclick="App.renameLeague()">Renombrar</button></div>
-        <div class="hint" style="margin-top:6px">Cambia el nombre de tu liga (se ve arriba). Crear o cambiar de liga lo hace el súper admin.</div></div>`;
+        <div class="row" style="gap:8px;margin-top:8px">
+          <input id="lg_name" class="txt" placeholder="Nombre de nueva liga">
+          <button class="btn sm" onclick="App.createLeague()">Crear</button></div>
+        <div class="hint" style="margin-top:6px">Renombra tu liga o crea una nueva (nace vacía y quedas como su admin). Cambiar de liga recarga la app.</div></div>`;
     }
     return h;
   }
@@ -4099,7 +4144,7 @@ const App = (() => {
   function cmpPrint(){ window.print(); }
   function cmpClose(){ const o=document.getElementById('cmpOverlay'); if(o)o.remove(); }
 
-  return { init,loginModal,doLogin,signInGoogle,signOutAuth,joinRegister,shareInvite,copyInvite,regenJoinCode,createMyPlayer,approveVent,rejectVent,btnApplyVentSeed,confirmVentMatch,dismissVentMatch,createLeague,renameLeague,switchLeague,setMaxGroup,go,switchDay,daysModal,editDayModal,saveDayEdit,delDay,newDayModal,createDay,
+  return { init,loginModal,doLogin,signInGoogle,signOutAuth,joinRegister,shareInvite,copyInvite,regenJoinCode,createMyPlayer,approveVent,rejectVent,btnApplyVentSeed,confirmVentMatch,dismissVentMatch,createLeague,renameLeague,switchLeague,setMaxGroup,go,switchDay,daysModal,editDayModal,saveDayEdit,delDay,clearHole,clearCard,removeFromDay,playerAdminModal,newDayModal,createDay,
     toggleAssign:null,togglePlaying,cancelPlayer,moveGroup,confirmMove,sorteo,setSalidaTime,addGuestModal,
     pickScore,score,putt,setOyes,quick,toggleUnit,toggleCast,navHole,gotoPending,gotoPlayerPending,setScoreGroup,setStart,setHoles,setCourse,
     setVentFocus,pickVent,openBet,openH2H,setLiqTab,setScoreTab,setCmp,setVentPick,
