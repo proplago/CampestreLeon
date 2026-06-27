@@ -20,6 +20,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Anton&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;0,6..72,700;1,6..72,500;1,6..72,600&family=Hanken+Grotesk:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Patrick+Hand&display=swap" rel="stylesheet">
 <style>
   :root{
     --fairway:#0a6a3a;       /* verde primario (Masters) */
@@ -129,7 +130,7 @@
   .btn:disabled{opacity:.45}
 
   .row{display:flex;align-items:center;gap:10px}
-  .grow{flex:1}
+  .grow{flex:1;min-width:0}
   .txt{width:100%;padding:12px;border:1px solid var(--line);border-radius:10px;background:#fff}
   label.fl{font-size:12px;font-weight:600;color:#54635a;display:block;margin:0 0 5px}
 
@@ -138,7 +139,7 @@
   .prow{display:flex;align-items:center;gap:10px;padding:10px 12px;border:1px solid var(--line);border-radius:12px;background:#fff}
   .avatar{width:34px;height:34px;border-radius:9px;background:var(--fairway);color:#fff;display:grid;place-items:center;font-weight:700;font-size:14px;flex:none}
   .avatar.g{background:var(--amber);color:#3a2c00}
-  .prow .nm{font-weight:600;font-size:14px}
+  .prow .nm{font-weight:600;font-size:14px;word-break:break-word;overflow-wrap:anywhere}
   .prow .tag{font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--amber);font-weight:700}
   .icbtn{width:34px;height:34px;border-radius:9px;background:var(--paper-2);display:grid;place-items:center;font-size:15px;color:#54635a;flex:none}
 
@@ -310,6 +311,10 @@
   .hbh:last-child{border-bottom:none}
   .hbh-top{display:flex;align-items:center;gap:9px;flex-wrap:wrap}
   .hbh-name{font-family:'Newsreader',serif;font-weight:600;font-size:18px;color:var(--fairway);flex:1;min-width:90px}
+  .papercard{background:#f6efda;border:1px solid #d4c39a}
+  .papercard .hbh{border-bottom-color:#e3d6b0}
+  .papercard .hbh-name{font-family:'Patrick Hand','Newsreader',cursive;color:#2f3a2b}
+  .papercard .scval,.papercard .pval{font-family:'Patrick Hand',cursive}
   .raylive{display:inline-block;font-family:'Hanken Grotesk',sans-serif;font-weight:800;font-size:13px;font-variant-numeric:tabular-nums;padding:1px 9px;border-radius:999px;margin-left:7px;vertical-align:middle}
   .raylive.up{color:var(--good);background:#eafaf0}
   .raylive.dn{color:var(--purple);background:#f1ecf8}
@@ -602,7 +607,7 @@
 
 <script>
 const App = (() => {
-  const APP_VERSION = '2026-06-26-25';   // ⬆️ SUBIR en cada deploy: la app se auto-recarga cuando detecta una versión distinta
+  const APP_VERSION = '2026-06-26-26';   // ⬆️ SUBIR en cada deploy: la app se auto-recarga cuando detecta una versión distinta
   const KEY = 'rayas-campestre-v2';
   const uid = () => Math.random().toString(36).slice(2,9);
   // Auto-actualización: revisa el index.html en vivo (sin caché); si la versión cambió, recarga a la versión fresca.
@@ -2648,7 +2653,7 @@ const App = (() => {
       <button onclick="App.navHole(1)" ${curHoleNav===last?'disabled':''}>›</button>
     </div>`;
 
-    html+=`<div class="card" style="padding:8px">`;
+    html+=`<div class="card papercard" style="padding:8px">`;
     gids.forEach(id=>{
       const p=player(id), sc=ensureScore(d,id);
       const g=sc.gross[hi], pv=sc.putts[hi], ov=sc.oyes[hi]||0;
@@ -3777,7 +3782,7 @@ const App = (() => {
   function loginModal(){
     const ps=[...state.players].sort((a,b)=>(a.guest?1:0)-(b.guest?1:0)||(a.name||'').localeCompare(b.name||''));
     const signedIn = isRealAuth() || _authPending;
-    const devMode = isSuper() || !isRealAuth();   // modo prueba (escoger jugador/rol): solo súper o local sin sesión real
+    const devMode = isSuper() || !authAvailable();   // escoger jugador/rol: SOLO el súper (ya logueado), o en local sin Firebase
     let top='';
     if(signedIn){
       top=`<div class="hint" style="margin-bottom:8px">Sesión de Google: <b>${_esc((_authUser&&_authUser.email)||'')}</b>${_authPending?' · <span style="color:var(--clay)">pendiente de que el admin te asigne</span>':''}</div>`;
