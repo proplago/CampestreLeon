@@ -312,9 +312,13 @@
   .hbh-top{display:flex;align-items:center;gap:9px;flex-wrap:wrap}
   .hbh-name{font-family:'Newsreader',serif;font-weight:600;font-size:18px;color:var(--fairway);flex:1;min-width:90px}
   .papercard{background:#f6efda;border:1px solid #d4c39a}
-  .papercard .hbh{border-bottom-color:#e3d6b0}
-  .papercard .hbh-name{font-family:'Patrick Hand','Newsreader',cursive;color:#2f3a2b}
-  .papercard .scval,.papercard .pval{font-family:'Patrick Hand',cursive}
+  .papercard table.sccard{font-family:'Patrick Hand','Newsreader',cursive;font-size:14px}
+  .papercard .sccard .pn{background:#f6efda;box-shadow:1px 0 0 #d4c39a}
+  .papercard .sccard tr:first-child th{border-bottom-color:#cdbf99}
+  .papercard .sccard .parr td,.papercard .sccard .parr th{border-bottom-color:#cdbf99}
+  .papercard .sccard tr:not(:first-child):not(.parr) td,.papercard .sccard tr:not(:first-child):not(.parr) th{border-bottom-color:#e3d6b0}
+  .papercard .sccard td.tt,.papercard .sccard th.tt{border-left-color:#d4c39a}
+  .papercard .sccard td.sub,.papercard .sccard th.sub{background:#efe6c9;border-left-color:#cdbf99}
   .raylive{display:inline-block;font-family:'Hanken Grotesk',sans-serif;font-weight:800;font-size:13px;font-variant-numeric:tabular-nums;padding:1px 9px;border-radius:999px;margin-left:7px;vertical-align:middle}
   .raylive.up{color:var(--good);background:#eafaf0}
   .raylive.dn{color:var(--purple);background:#f1ecf8}
@@ -607,7 +611,7 @@
 
 <script>
 const App = (() => {
-  const APP_VERSION = '2026-06-26-26';   // ⬆️ SUBIR en cada deploy: la app se auto-recarga cuando detecta una versión distinta
+  const APP_VERSION = '2026-06-26-27';   // ⬆️ SUBIR en cada deploy: la app se auto-recarga cuando detecta una versión distinta
   const KEY = 'rayas-campestre-v2';
   const uid = () => Math.random().toString(36).slice(2,9);
   // Auto-actualización: revisa el index.html en vivo (sin caché); si la versión cambió, recarga a la versión fresca.
@@ -2588,7 +2592,7 @@ const App = (() => {
     d.salidas.forEach((grp,gi)=>{
       if(onlyGroup!=null && gi!==onlyGroup) return;
       const ids=(grp||[]).filter(Boolean); if(!ids.length) return;
-      html+=`<div class="card" style="padding:10px 8px">
+      html+=`<div class="card papercard" style="padding:10px 8px">
         <div style="font-weight:700;font-size:13px;color:${gi===0?'var(--fairway)':'#5b3a8a'};margin:0 4px 8px">Grupo ${gi+1}</div>
         <div class="cardscroll"><table class="sccard">
         <tr><th class="pn">Hoyo</th>`;
@@ -2653,7 +2657,7 @@ const App = (() => {
       <button onclick="App.navHole(1)" ${curHoleNav===last?'disabled':''}>›</button>
     </div>`;
 
-    html+=`<div class="card papercard" style="padding:8px">`;
+    html+=`<div class="card" style="padding:8px">`;
     gids.forEach(id=>{
       const p=player(id), sc=ensureScore(d,id);
       const g=sc.gross[hi], pv=sc.putts[hi], ov=sc.oyes[hi]||0;
