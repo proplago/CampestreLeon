@@ -611,7 +611,7 @@
 
 <script>
 const App = (() => {
-  const APP_VERSION = '2026-06-27-33';   // ⬆️ SUBIR en cada deploy: la app se auto-recarga cuando detecta una versión distinta
+  const APP_VERSION = '2026-07-01-34';   // ⬆️ SUBIR en cada deploy: la app se auto-recarga cuando detecta una versión distinta
   const KEY = 'rayas-campestre-v2';
   const uid = () => Math.random().toString(36).slice(2,9);
   // Auto-actualización: revisa el index.html en vivo (sin caché); si la versión cambió, recarga a la versión fresca.
@@ -1537,7 +1537,7 @@ const App = (() => {
         a.pesos+=ipesos;a.birdies+=s.birdies;a.eagles+=s.eagles;a.aces+=s.aces;a.oyesWon+=s.oyesWon;a.calacas+=s.calacas;a.sandies+=s.sandies;a.castigos+=s.castigos;a.days++;
         Object.keys(s.castById||{}).forEach(k=>a.castById[k]=(a.castById[k]||0)+s.castById[k]);
         if(a.bestDay===null||ipesos>a.bestDay)a.bestDay=ipesos; if(a.worstDay===null||ipesos<a.worstDay)a.worstDay=ipesos;
-        a._run=inet>0?a._run+1:0; if(a._run>a.fridayStreak)a.fridayStreak=a._run;
+        a._run=ipesos>0?a._run+1:0; if(a._run>a.fridayStreak)a.fridayStreak=a._run;
         if(d.date && (!a.lastDate || d.date>a.lastDate)) a.lastDate=d.date;
       });
       const pm=st.res.pm||{}; Object.keys(pm).forEach(a=>{ PM[a]=PM[a]||{}; Object.keys(pm[a]).forEach(b=>{ PM[a][b]=(PM[a][b]||0)+pm[a][b]; }); });
@@ -1635,7 +1635,6 @@ const App = (() => {
     if(nem){ push('⚔️','Nemesis',pname(nem.a)+' ›› '+pname(nem.b),_money(nem.val*state.rayaValue),'gold'); }
     if(bot&&bot.pesos<0) push('💸','El que más paga',bot.name,_money(bot.pesos),'bad');
     const worst=ids.map(id=>A[id]).filter(a=>a.worstDay!=null).sort((a,b)=>a.worstDay-b.worstDay)[0]; if(worst&&worst.worstDay<0) push('📉','Peor viernes',worst.name,_money(worst.worstDay),'bad');
-    if(worst&&worst.worstDay<0) push('📉','Peor viernes',worst.name,_money(worst.worstDay),'bad');
     state.castigos.forEach(c=>{ const t=topCast(A,ids,c.id); if(t) push(c.emoji||'🍺','Rey del '+((c.name||'castigo').split(' ')[0]),t.name,'×'+t.val,'bad'); });
     if((x=topBy(A,ids,'cancels'))) push('🐔','Rey de las canceladas',x.name,'×'+x.val,'bad');
     if((x=topBy(A,ids,'noshows'))) push('👻','Fantasma del viernes',x.name,'×'+x.val,'bad');
