@@ -115,6 +115,13 @@ Cadena de respaldo: **Firebase (sync granular) → `window.storage` → `localSt
 awk '/<script>/{f=1;next}/<\/script>/{f=0}f' rayas-campestre.html > /tmp/app.js && node --check /tmp/app.js && echo OK
 ```
 
+**Fixtures del motor** (OBLIGATORIO si tocas cualquier función de cálculo): abre **`tests.html`**
+servido junto a `index.html` (servidor local o https://proplago.github.io/CampestreLeon/tests.html).
+Carga el motor REAL vía `window.__TEST__=true` + `App.__test` (sin arrancar la UI) y corre ~74 checks
+con días sintéticos: las 6 apuestas, ventajas por SI, salida del 10, 9 hoyos, doblar, oyes, castigos
+raya/trago, rayaPairs, seasonStats/careerStats y fuzz con invariantes (cuadre en cero, PM antisimétrica,
+PM≡h2h.net). **Todos deben pasar antes de desplegar.** Resultados legibles por máquina en `window.__RESULTS__`.
+
 **Headless (Playwright/Chromium)** — patrón: `addInitScript` con un stub de `window.storage` (objeto
 en memoria) y **precargar el estado dentro del initScript**. Por el debounce de `save()` (~350–450 ms),
 espera >450 ms antes de leer storage. Verifica que cada día **cuadre en cero**.
