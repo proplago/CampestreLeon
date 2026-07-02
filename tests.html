@@ -308,6 +308,66 @@ async function main(){
     t('día viejo: cuadra en cero',res.sum===0,res.sum);
   }
 
+  // ============ F15 · Skins (bolsa con acarreo, gross) ============
+  sec('F15 skins (bolsa: gana la bola baja, empate acarrea)');
+  {
+    const sk={id:'sk1',name:'Skins',emoji:'💰',template:'skins',alcance:'salida',rayas:1,on:true};
+    // pa birdie h1 (gana bolsa 1) · empates h2-h4 (bolsa llega a 4) · pb birdie h5 (gana bolsa 4)
+    const d=day({playing:['pa','pb','pc'],salidas:[['pa','pb','pc']],customBets:[sk],
+      scores:{pa:sc({gross:gross({0:3})}),pb:sc({gross:gross({4:3})}),pc:sc()}});
+    reset({players:[P('pa','Ana A'),P('pb','Beto B'),P('pc','Caro C')],days:[d],currentDayId:d.id});
+    const res=T.computeDay(d);
+    t('skins: A +2−4=−2 (ganó bolsa de 1, pagó bolsa de 4)',row(res,'pa').sk1===-2,row(res,'pa').sk1);
+    t('skins: B −1+8=+7 (ganó bolsa acarreada de 4)',row(res,'pb').sk1===7,row(res,'pb').sk1);
+    t('skins: C −5',row(res,'pc').sk1===-5,row(res,'pc').sk1);
+    t('skins: cuadra en cero',res.sum===0,res.sum);
+    // acarreo respeta ORDEN DE JUEGO: saliendo del 10, el birdie en hoyo 1 (idx0) cae al final con bolsa de 10
+    const d2=day({start:10,playing:['pa','pb'],salidas:[['pa','pb']],customBets:[JSON.parse(JSON.stringify(sk))],
+      scores:{pa:sc({gross:gross({0:3})}),pb:sc()}});
+    reset({players:[P('pa','Ana A'),P('pb','Beto B')],days:[d2],currentDayId:d2.id});
+    const r2=T.computeDay(d2);
+    t('skins del 10: 9 empates acarrean → bolsa de 10 en el hoyo 1',row(r2,'pa').sk1===10,row(r2,'pa').sk1);
+    t('skins del 10: cuadra en cero',r2.sum===0,r2.sum);
+    // alcance por salida: dos salidas NO se mezclan
+    const d3=day({playing:['pa','pb','pc','pd'],salidas:[['pa','pb'],['pc','pd']],customBets:[JSON.parse(JSON.stringify(sk))],
+      scores:{pa:sc({gross:gross({0:3})}),pb:sc(),pc:sc({gross:gross({0:3})}),pd:sc()}});
+    reset({players:[P('pa','Ana A'),P('pb','Beto B'),P('pc','Caro C'),P('pd','Dany D')],days:[d3],currentDayId:d3.id});
+    const r3=T.computeDay(d3);
+    t('skins por salida: A y C ganan SOLO en su salida (+1 c/u)',row(r3,'pa').sk1===1&&row(r3,'pc').sk1===1,row(r3,'pa').sk1+'/'+row(r3,'pc').sk1);
+    t('skins por salida: cuadra en cero',r3.sum===0,r3.sum);
+  }
+
+  // ============ F16 · Parejas (mejor bola 2v2 por salida de 4) ============
+  sec('F16 parejas (mejor bola gross; parejas rotables por día)');
+  {
+    const pj={id:'pj1',name:'Parejas',emoji:'🤝',template:'parejas',modalidad:'mejorBola',rayas:1,on:true};
+    const ids=['q1','q2','q3','q4'];
+    const mk=(parejas)=>{ const d=day({playing:ids.slice(),salidas:[ids.slice()],customBets:[JSON.parse(JSON.stringify(pj))],
+      scores:{q1:sc({gross:gross({0:3})}),q2:sc(),q3:sc(),q4:sc()}}); if(parejas!==undefined)d.parejas=parejas; return d; };
+    // default: 1&2 vs 3&4 — el birdie de q1 gana el hoyo para su pareja
+    const d=mk();
+    reset({players:ids.map((id,i)=>P(id,'Jug '+(i+1))),days:[d],currentDayId:d.id});
+    const res=T.computeDay(d);
+    t('parejas default: q1 y q2 +2 · q3 y q4 −2',row(res,'q1').pj1===2&&row(res,'q2').pj1===2&&row(res,'q3').pj1===-2&&row(res,'q4').pj1===-2,row(res,'q2').pj1);
+    t('parejas: cuadra en cero',res.sum===0,res.sum);
+    // rotación 1: [q1,q3] vs [q2,q4] — ahora q3 va con el del birdie
+    const d2=mk({0:1});
+    reset({players:ids.map((id,i)=>P(id,'Jug '+(i+1))),days:[d2],currentDayId:d2.id});
+    const r2=T.computeDay(d2);
+    t('parejas rotadas: q1 y q3 +2 · q2 y q4 −2',row(r2,'q1').pj1===2&&row(r2,'q3').pj1===2&&row(r2,'q2').pj1===-2,row(r2,'q3').pj1);
+    // salida de 3: no aplica
+    const d3=day({playing:['q1','q2','q3'],salidas:[['q1','q2','q3']],customBets:[JSON.parse(JSON.stringify(pj))],
+      scores:{q1:sc({gross:gross({0:3})}),q2:sc(),q3:sc()}});
+    reset({players:ids.slice(0,3).map((id,i)=>P(id,'Jug '+(i+1))),days:[d3],currentDayId:d3.id});
+    const r3=T.computeDay(d3);
+    t('salida de 3: parejas no mueve nada',row(r3,'q1').pj1===0,row(r3,'q1').pj1);
+    // bola sin capturar: el hoyo no compara
+    const d4=mk(); d4.scores.q4.gross=Array(18).fill(0); d4.scores.q4.gross[1]=4;   // q4 solo tiene el hoyo 2
+    reset({players:ids.map((id,i)=>P(id,'Jug '+(i+1))),days:[d4],currentDayId:d4.id});
+    const r4=T.computeDay(d4);
+    t('bola faltante: hoyo 1 no compara (falta la 2ª bola del equipo B)',row(r4,'q1').pj1===0,row(r4,'q1').pj1);
+  }
+
   window.__RESULTS__.ready=true;
   flush();
 }

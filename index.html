@@ -611,7 +611,7 @@
 
 <script>
 const App = (() => {
-  const APP_VERSION = '2026-07-01-36';   // ⬆️ SUBIR en cada deploy: la app se auto-recarga cuando detecta una versión distinta
+  const APP_VERSION = '2026-07-02-37';   // ⬆️ SUBIR en cada deploy: la app se auto-recarga cuando detecta una versión distinta
   const KEY = 'rayas-campestre-v2';
   const uid = () => Math.random().toString(36).slice(2,9);
   // Auto-actualización: revisa el index.html en vivo (sin caché); si la versión cambió, recarga a la versión fresca.
@@ -1143,7 +1143,59 @@ const App = (() => {
       default: return false; } }
   const CB_EVENTS=[ ['3putt','Hace 3 putts o más'], ['bogeyPeor','Hace bogey o peor'], ['doblePeor','Doble bogey o peor'], ['birdieMejor','Hace birdie o mejor'], ['parMejor','Hace par o mejor'] ];
   function cbEvLabel(ev){ const x=CB_EVENTS.find(e=>e[0]===ev); return x?x[1]:ev; }
-  function cbDesc(cb){ return cbEvLabel(cb.evento)+' · '+(cb.rayas||1)+' raya'+((cb.rayas||1)===1?'':'s')+' · '+(cb.accion==='cobra'?'cobra a':'paga a')+' '+(cb.alcance==='salida'?'su salida':'todos')+(cb.dobla!==false?' · dobla 2ª':''); }
+  // Plantillas de apuestas de la casa. 'evento' = la original; cb sin template = 'evento' (compat).
+  const CB_TPLS=[ ['evento','Evento por hoyo'], ['skins','Skins (bolsa con acarreo)'], ['parejas','Parejas · mejor bola'] ];
+  function cbTpl(cb){ return (cb&&cb.template)||'evento'; }
+  function cbDesc(cb){
+    const r=(cb.rayas||1), rs=r+' raya'+(r===1?'':'s'), tpl=cbTpl(cb);
+    if(tpl==='skins')   return 'Skins gross · '+rs+' por skin · '+(cb.alcance==='salida'?'por salida':'todos')+' · empate acarrea';
+    if(tpl==='parejas') return 'Mejor bola gross 2v2 · '+rs+' por hoyo · salidas de 4 (parejas en Salidas)';
+    return cbEvLabel(cb.evento)+' · '+rs+' · '+(cb.accion==='cobra'?'cobra a':'paga a')+' '+(cb.alcance==='salida'?'su salida':'todos')+(cb.dobla!==false?' · dobla 2ª':'');
+  }
+  // SKINS (gross): en cada hoyo (en ORDEN DE JUEGO) la bola más baja gana la bolsa; empate acarrea al siguiente.
+  // El ganador cobra pot×rayas a CADA rival del alcance (pairwise → cuadra en cero). Sin ventajas ni doblar (v1).
+  function computeSkins(d,players,cb,R,addP){
+    const groups = cb.alcance==='salida'
+      ? (d.salidas||[]).map(g=>(g||[]).filter(Boolean)).filter(g=>g.length>=2)
+      : [players];
+    groups.forEach(grp=>{
+      let pot=1;
+      playOrder(d).forEach(h=>{
+        const withScore=grp.filter(p=>ensureScore(d,p).gross[h]>0);
+        if(withScore.length<2) return;   // hoyo aún sin capturar: la bolsa no se mueve
+        let best=Infinity; withScore.forEach(p=>{ const g=ensureScore(d,p).gross[h]; if(g<best)best=g; });
+        const winners=withScore.filter(p=>ensureScore(d,p).gross[h]===best);
+        if(winners.length===1){ const w=winners[0], v=pot*(cb.rayas||1);
+          grp.forEach(o=>{ if(o===w) return; R[w][cb.id]+=v; R[o][cb.id]-=v; addP(w,o,v); });
+          pot=1;
+        } else pot++;   // empate: acarrea
+      });
+    });
+  }
+  // PAREJAS (mejor bola, gross): en salidas de EXACTAMENTE 4, 2v2. La bola baja de cada pareja compara por
+  // hoyo (exige las 2 bolas de ambas parejas capturadas); cada ganador cobra rayas a cada perdedor (cuadra en cero).
+  // Las parejas se definen por día en d.parejas[gIdx]; default: 1&2 vs 3&4 del sorteo. Sin ventajas ni doblar (v1).
+  const PAIRINGS=[ [[0,1],[2,3]], [[0,2],[1,3]], [[0,3],[1,2]] ];
+  function dayPairing(d,gi){
+    const grp=((d.salidas||[])[gi]||[]).filter(Boolean); if(grp.length!==4) return null;
+    const k=((d.parejas||{})[gi]||0)%3, pr=PAIRINGS[k];
+    return [ [grp[pr[0][0]],grp[pr[0][1]]], [grp[pr[1][0]],grp[pr[1][1]]] ];
+  }
+  function dayHasParejasBet(d){ return dayCustom(d).some(cb=>cbTpl(cb)==='parejas' && cb.rayas); }
+  function computeParejas(d,cb,R,addP){
+    (d.salidas||[]).forEach((g,gi)=>{
+      const pr=dayPairing(d,gi); if(!pr) return;
+      const [A,B]=pr;
+      for(let h=0;h<18;h++){
+        const gA=A.map(p=>ensureScore(d,p).gross[h]).filter(x=>x>0), gB=B.map(p=>ensureScore(d,p).gross[h]).filter(x=>x>0);
+        if(gA.length!==2||gB.length!==2) continue;
+        const bA=Math.min.apply(null,gA), bB=Math.min.apply(null,gB);
+        if(bA===bB) continue;
+        const W=bA<bB?A:B, L=bA<bB?B:A, v=(cb.rayas||1);
+        W.forEach(w=>L.forEach(l=>{ R[w][cb.id]+=v; R[l][cb.id]-=v; addP(w,l,v); }));
+      }
+    });
+  }
 
   // =========================================================
   //  MOTOR DE CÁLCULO (pareja por pareja, con doblar la 2ª vuelta)
@@ -1281,8 +1333,12 @@ const App = (() => {
       }
     });
 
-    // APUESTAS DE LA CASA (plantilla evento-por-hoyo): quien dispara el evento paga/cobra vs su alcance
+    // APUESTAS DE LA CASA por plantilla: evento-por-hoyo / skins / parejas (todas via addP → cuadran en cero)
     CBS.forEach(cb=>{ if(!cb||!cb.id||!cb.rayas) return;
+      const tpl=cbTpl(cb);
+      if(tpl==='skins'){ computeSkins(d,players,cb,R,addP); return; }
+      if(tpl==='parejas'){ computeParejas(d,cb,R,addP); return; }
+      // 'evento': quien dispara el evento paga/cobra vs su alcance
       players.forEach(p=>{ const sc=ensureScore(d,p);
         for(let h=0;h<18;h++){
           if(!cbEvent(cb,sc,h,d)) continue;
@@ -2523,6 +2579,22 @@ const App = (() => {
     }
     html+=`</div>`;
 
+    // parejas del día (si hay apuesta de parejas activa): 2v2 por salida de 4, rotables
+    if(dayHasParejasBet(d)){
+      const cbP=dayCustom(d).find(cb=>cbTpl(cb)==='parejas');
+      html+=`<div class="card"><h3>${cbP.emoji||'🤝'} Parejas · ${_esc(cbP.name||'mejor bola')}</h3>
+        <div class="hint">2 vs 2 por salida (solo salidas de 4). Toca ↻ para rotar la combinación.</div>`;
+      let any=false;
+      (d.salidas||[]).forEach((g,gi)=>{
+        const pr=dayPairing(d,gi); if(!pr) return; any=true;
+        html+=`<div class="row" style="justify-content:space-between;align-items:center;margin-top:8px">
+          <div style="font-size:13px"><b style="color:var(--fairway)">S${gi+1}:</b> ${pname(pr[0][0])} + ${pname(pr[0][1])} <span style="color:var(--muted)">vs</span> ${pname(pr[1][0])} + ${pname(pr[1][1])}</div>
+          <button class="btn outline sm" onclick="App.cycleParejas(${gi})">↻</button></div>`;
+      });
+      if(!any) html+=`<div class="hint" style="margin-top:6px">Ninguna salida tiene exactamente 4 jugadores todavía.</div>`;
+      html+=`</div>`;
+    }
+
     // evidencia de cambios de salida (post-sorteo)
     if((d.moves||[]).length){
       html+=`<details class="card disclosure"><summary>Cambios de salida (${d.moves.length}) →</summary><div style="margin-top:8px">`;
@@ -2617,6 +2689,11 @@ const App = (() => {
     if(fromG!=null && fromG!==g){ d.moves=d.moves||[]; d.moves.unshift({ts:Date.now(), pid, from:fromG+1, to:g+1, motivo:motivo||'—'}); }
     save(); renderDay();
   }
+  // rota la combinación de parejas 2v2 de una salida (3 posibles). Vive en d.parejas[gi] (0..2).
+  function cycleParejas(gi){ const d=curDay(); if(!d) return;
+    if(captureLocked()){ toast('Día cerrado · solo el admin puede editar'); return; }
+    d.parejas=d.parejas||{}; d.parejas[gi]=(((d.parejas[gi]||0)+1)%3);
+    save(); clearStatCache(); renderDay(); if(curView==='liq') renderLiq(); }
   function sorteo(){
     const d=curDay(); if(!d) return; const pool=[...(d.playing||[])];
     if(captureLocked()){ toast('Día cerrado'); return; }
@@ -3700,14 +3777,14 @@ const App = (() => {
     const cb=(state.customBets||[]).find(x=>x.id===id); if(!cb) return;
     confirmModal('¿Borrar la apuesta "'+(cb.name||'?')+'"? Los días ya creados con ella no cambian.','Borrar',function(){
       state.customBets=(state.customBets||[]).filter(x=>x.id!==id); save(); renderCfg(); toast('Apuesta borrada'); }); }
-  function customBetModal(id){ if(!isAdmin()){ toast('Solo el admin'); return; }
-    const cb=(state.customBets||[]).find(x=>x.id===id)||{name:'',emoji:'🐍',evento:'3putt',accion:'paga',alcance:'todos',rayas:1,dobla:true};
-    modal(`<h3>${id?'Editar':'Nueva'} apuesta de la casa</h3>
-      <div class="hint" style="margin-bottom:8px">Plantilla: <b>evento por hoyo</b> — cuando alguien dispara el evento, paga o cobra rayas.</div>
-      <div class="row" style="gap:10px">
-        <label class="fl" style="flex:1;margin:0">Nombre<input id="cb_name" class="txt" value="${_esc(cb.name)}" placeholder="Víbora"></label>
-        <label class="fl" style="width:74px;margin:0">Emoji<input id="cb_emoji" class="txt" value="${_esc(cb.emoji||'')}" maxlength="4"></label></div>
-      <label class="fl" style="margin-top:8px">Cuando alguien…</label>
+  function customBetModal(id,tplOverride){ if(!isAdmin()){ toast('Solo el admin'); return; }
+    const ex=(state.customBets||[]).find(x=>x.id===id);
+    const tplDefaults={ evento:{emoji:'🐍'}, skins:{emoji:'💰',alcance:'salida'}, parejas:{emoji:'🤝'} };
+    const tpl=tplOverride||cbTpl(ex||{});
+    const cb=Object.assign({name:'',evento:'3putt',accion:'paga',alcance:'todos',rayas:1,dobla:true},tplDefaults[tpl]||{},(ex&&cbTpl(ex)===tpl)?ex:{name:(ex?ex.name:''),emoji:(ex?ex.emoji:(tplDefaults[tpl]||{}).emoji)});
+    let campos='';
+    if(tpl==='evento'){
+      campos=`<label class="fl" style="margin-top:8px">Cuando alguien…</label>
       <select id="cb_ev" class="txt">${CB_EVENTS.map(e=>`<option value="${e[0]}" ${cb.evento===e[0]?'selected':''}>${e[1]}</option>`).join('')}</select>
       <div class="row" style="gap:10px;margin-top:8px">
         <label class="fl" style="flex:1;margin:0">Acción<select id="cb_ac" class="txt">
@@ -3715,14 +3792,37 @@ const App = (() => {
         <label class="fl" style="flex:1;margin:0">A quién<select id="cb_al" class="txt">
           <option value="todos" ${cb.alcance!=='salida'?'selected':''}>Todos</option><option value="salida" ${cb.alcance==='salida'?'selected':''}>Su salida</option></select></label>
         <label class="fl" style="width:84px;margin:0">Rayas<input id="cb_r" class="txt" type="number" inputmode="numeric" min="1" max="10" value="${cb.rayas||1}"></label></div>
-      <label style="display:flex;gap:8px;margin-top:12px;align-items:center;font-size:14px"><input type="checkbox" id="cb_d" ${cb.dobla!==false?'checked':''}> Se dobla en la 2ª vuelta (si la pareja dobló)</label>
+      <label style="display:flex;gap:8px;margin-top:12px;align-items:center;font-size:14px"><input type="checkbox" id="cb_d" ${cb.dobla!==false?'checked':''}> Se dobla en la 2ª vuelta (si la pareja dobló)</label>`;
+    } else if(tpl==='skins'){
+      campos=`<div class="row" style="gap:10px;margin-top:8px">
+        <label class="fl" style="flex:1;margin:0">Entre quiénes<select id="cb_al" class="txt">
+          <option value="salida" ${cb.alcance!=='todos'?'selected':''}>Cada salida</option><option value="todos" ${cb.alcance==='todos'?'selected':''}>Todos los del día</option></select></label>
+        <label class="fl" style="width:110px;margin:0">Rayas por skin<input id="cb_r" class="txt" type="number" inputmode="numeric" min="1" max="10" value="${cb.rayas||1}"></label></div>
+      <div class="hint" style="margin-top:8px">La bola <b>más baja (gross)</b> del hoyo gana la bolsa y cobra a cada rival. Empate = la bolsa <b>se acarrea</b> al siguiente hoyo (en orden de juego). Sin ventajas ni doblar.</div>`;
+    } else if(tpl==='parejas'){
+      campos=`<div class="row" style="gap:10px;margin-top:8px">
+        <label class="fl" style="flex:1;margin:0">Modalidad<select id="cb_mod" class="txt"><option value="mejorBola" selected>Mejor bola (gross)</option></select></label>
+        <label class="fl" style="width:110px;margin:0">Rayas por hoyo<input id="cb_r" class="txt" type="number" inputmode="numeric" min="1" max="10" value="${cb.rayas||1}"></label></div>
+      <div class="hint" style="margin-top:8px">2 vs 2 en salidas de <b>exactamente 4</b>: la mejor bola de cada pareja compara hoyo por hoyo; cada ganador le cobra a cada perdedor. Las parejas se definen <b>por día en Salidas</b> (default: 1&2 vs 3&4 del sorteo). Sin ventajas ni doblar.</div>`;
+    }
+    modal(`<h3>${id?'Editar':'Nueva'} apuesta de la casa</h3>
+      <label class="fl">Plantilla</label>
+      <select class="txt" onchange="App.customBetModal('${id||''}',this.value)">${CB_TPLS.map(t=>`<option value="${t[0]}" ${tpl===t[0]?'selected':''}>${t[1]}</option>`).join('')}</select>
+      <input type="hidden" id="cb_tpl" value="${tpl}">
+      <div class="row" style="gap:10px;margin-top:8px">
+        <label class="fl" style="flex:1;margin:0">Nombre<input id="cb_name" class="txt" value="${_esc(cb.name||'')}" placeholder="${tpl==='skins'?'Skins':tpl==='parejas'?'Parejas':'Víbora'}"></label>
+        <label class="fl" style="width:74px;margin:0">Emoji<input id="cb_emoji" class="txt" value="${_esc(cb.emoji||'')}" maxlength="4"></label></div>
+      ${campos}
       <button class="btn block" style="margin-top:14px" onclick="App.saveCustomBet('${id||''}')">${id?'Guardar':'Crear apuesta'}</button>`); }
   function saveCustomBet(id){ if(!isAdmin()) return;
     const name=((document.getElementById('cb_name')||{}).value||'').trim(); if(!name){ toast('Ponle nombre'); return; }
-    const cb={ id:id||uid(), name, emoji:((document.getElementById('cb_emoji')||{}).value||'').trim(),
-      evento:(document.getElementById('cb_ev')||{}).value||'3putt', accion:(document.getElementById('cb_ac')||{}).value||'paga',
-      alcance:(document.getElementById('cb_al')||{}).value||'todos', rayas:Math.max(1,Math.min(10,parseInt((document.getElementById('cb_r')||{}).value)||1)),
-      dobla:!!((document.getElementById('cb_d')||{}).checked), on:true };
+    const gv=eid=>{ const el=document.getElementById(eid); return el?el.value:undefined; };
+    const tpl=gv('cb_tpl')||'evento';
+    const cb={ id:id||uid(), name, template:tpl, emoji:(gv('cb_emoji')||'').trim(),
+      rayas:Math.max(1,Math.min(10,parseInt(gv('cb_r'))||1)), on:true };
+    if(tpl==='evento'){ cb.evento=gv('cb_ev')||'3putt'; cb.accion=gv('cb_ac')||'paga'; cb.alcance=gv('cb_al')||'todos'; cb.dobla=!!((document.getElementById('cb_d')||{}).checked); }
+    else if(tpl==='skins'){ cb.alcance=gv('cb_al')||'salida'; }
+    else if(tpl==='parejas'){ cb.modalidad=gv('cb_mod')||'mejorBola'; }
     state.customBets=state.customBets||[];
     const i=state.customBets.findIndex(x=>x.id===cb.id);
     if(i>=0){ cb.on=state.customBets[i].on!==false; state.customBets[i]=cb; } else state.customBets.push(cb);
@@ -4446,7 +4546,7 @@ const App = (() => {
     modal(`<img src="${v.img}" style="width:100%;border-radius:8px;display:block">${v.pid?`<div class="hint" style="text-align:center;margin-top:8px">${_esc(pname(v.pid))}</div>`:''}<button class="btn block" style="margin-top:10px" onclick="App.photosModal()">← Volver a las fotos</button>`); }
 
   return { init,loginModal,doLogin,signInGoogle,signOutAuth,joinRegister,shareInvite,copyInvite,regenJoinCode,createMyPlayer,approveVent,rejectVent,btnApplyVentSeed,confirmVentMatch,dismissVentMatch,createLeague,renameLeague,switchLeague,deleteLeague,setMaxGroup,go,switchDay,daysModal,editDayModal,saveDayEdit,delDay,clearHole,clearCard,removeFromDay,playerAdminModal,newDayModal,createDay,
-    toggleAssign:null,togglePlaying,cancelPlayer,moveGroup,confirmMove,sorteo,setSalidaTime,addGuestModal,
+    toggleAssign:null,togglePlaying,cancelPlayer,moveGroup,confirmMove,sorteo,cycleParejas,setSalidaTime,addGuestModal,
     pickScore,score,putt,setOyes,quick,toggleUnit,toggleCast,navHole,gotoPending,gotoPlayerPending,setScoreGroup,setStart,setHoles,setCourse,
     setVentFocus,pickVent,openBet,openH2H,setLiqTab,setScoreTab,setCmp,setVentPick,
     setDblPlayer,toggleDbl,closeDay,historyModal,exportImage,exportHigh,exportProfile,exportSalidas,exportSeasonTable,exportCompare,exportScorecard,toggleSound,
