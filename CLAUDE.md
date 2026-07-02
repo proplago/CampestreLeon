@@ -54,7 +54,14 @@ salvo donde se indique.
 ## Modelo de datos
 
 `state = { rayaValue, courses[], players[], days[], ventajas{}, ventHistory[], dblHistory[],
-celebrated{}, sound, currentDayId, units[], castigos[] }`
+celebrated{}, sound, currentDayId, units[], castigos[], activeBets{}, customBets[] }`
+
+- **Registro de apuestas** (`CORE_BETS` + helpers `betOn/dayCustom/snapshotBets/cbEvent`): las 6 core se
+  prenden/apagan por grupo (`state.activeBets`) y las **apuestas de la casa** (`state.customBets[]`) son
+  plantillas `evento-por-hoyo`: `{id,name,emoji,evento,accion:'paga'|'cobra',alcance:'todos'|'salida',rayas,dobla,on}`.
+  **Cada día CONGELA su snapshot al crearse** (`d.bets{}` + `d.customBets[]`): reconfigurar apuestas NUNCA
+  reescribe días ya creados/cerrados. Días sin snapshot (viejos) = las 6 activas. El gateo de doblar vive
+  DENTRO de `isDoubled()` (un solo punto). UI: Ajustes → "Apuestas del grupo" (solo admin/súper).
 
 - **courses[]**: `{ id, name, holes:[{n,par,si}] }`. Hay dos: `'campestre'` y `'molino'` (ambos par 72).
 - **players[]**: `{ id, name, apodo, fav, guest }`.

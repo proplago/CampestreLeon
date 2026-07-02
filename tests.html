@@ -243,6 +243,71 @@ async function main(){
     });
   }
 
+  // ============ F12 · Apuestas apagadas (snapshot d.bets) ============
+  sec('F12 gateo por apuesta (d.bets del snapshot manda)');
+  {
+    const allOn={hoyos:true,medal:true,unidades:true,oyes:true,doblar:true,castigos:true};
+    // oyes+medal apagados: el birdie y los lugares no mueven ese dinero
+    const d=day({playing:['pa','pb'],salidas:[['pa','pb']],bets:Object.assign({},allOn,{medal:false,oyes:false}),
+      scores:{pa:sc({gross:gross({0:3}),oyes:{3:1}}),pb:sc({oyes:{3:2}})}});
+    reset({players:[P('pa','Ana A'),P('pb','Beto B')],days:[d],currentDayId:d.id});
+    const res=T.computeDay(d), a=row(res,'pa');
+    t('medal OFF: bucket 0 (con birdie que ganaría 1ª9 y total)',a.medal===0,a.medal);
+    t('oyes OFF: bucket 0 (con lugares capturados)',a.oyes===0,a.oyes);
+    t('hoyos y unidades siguen: total +2',a.total===2,a.total);
+    t('cuadra en cero',res.sum===0,res.sum);
+    // doblar apagado: la doblada registrada NO multiplica
+    const d2=day({playing:['pa','pb'],salidas:[['pa','pb']],bets:Object.assign({},allOn,{doblar:false}),
+      doubles:{pb:{pa:true}},scores:{pa:sc(),pb:sc({gross:gross({9:3})})}});
+    reset({players:[P('pa','Ana A'),P('pb','Beto B')],days:[d2],currentDayId:d2.id});
+    const r2=T.computeDay(d2), b2=row(r2,'pb');
+    t('doblar OFF: birdie 2ª vuelta vale ×1 (hoyo1+unid1+medal2 = +4, no +7)',b2.total===4,b2.total);
+    t('doblar OFF: cuadra en cero',r2.sum===0,r2.sum);
+    // castigos apagados: calaca no genera ni trago ni dinero
+    const d3=day({playing:['pa','pb'],salidas:[['pa','pb']],bets:Object.assign({},allOn,{castigos:false}),
+      scores:{pa:sc({gross:gross({0:10})}),pb:sc()}});
+    const cast=JSON.parse(JSON.stringify(DEF.castigos)); cast.find(c=>c.id==='calaca').tipo='raya';
+    reset({players:[P('pa','Ana A'),P('pb','Beto B')],days:[d3],currentDayId:d3.id,castigos:cast});
+    const r3=T.computeDay(d3), a3=row(r3,'pa');
+    t('castigos OFF: castig 0 y sin tragos (aunque calaca sea raya)',a3.castig===0&&Object.keys(r3.drinks.pa).length===0,a3.castig);
+    t('castigos OFF: cuadra en cero',r3.sum===0,r3.sum);
+  }
+
+  // ============ F13 · Apuesta de la casa (plantilla evento-por-hoyo) ============
+  sec('F13 apuesta custom: Víbora (3 putts paga 1 raya a todos)');
+  {
+    const vib={id:'vib1',name:'Víbora',emoji:'🐍',evento:'3putt',accion:'paga',alcance:'todos',rayas:1,dobla:true,on:true};
+    const pu=Array(18).fill(2); pu[4]=3;   // A hace 3-putt en idx4
+    const d=day({playing:['pa','pb','pc'],salidas:[['pa','pb','pc']],customBets:[vib],
+      scores:{pa:sc({putts:pu}),pb:sc(),pc:sc()}});
+    reset({players:[P('pa','Ana A'),P('pb','Beto B'),P('pc','Caro C')],days:[d],currentDayId:d.id});
+    const res=T.computeDay(d), a=row(res,'pa');
+    t('víbora: A paga 1 a cada quien (bucket −2)',a.vib1===-2,a.vib1);
+    t('víbora: B y C +1',row(res,'pb').vib1===1&&row(res,'pc').vib1===1,row(res,'pb').vib1);
+    t('víbora entra al total (A −2)',a.total===-2,a.total);
+    t('cuadra en cero',res.sum===0,res.sum);
+    // alcance 'salida': solo su foursome; y 'cobra' invierte el sentido
+    const vib2={id:'vib2',name:'Birdie bravo',evento:'birdieMejor',accion:'cobra',alcance:'salida',rayas:2,dobla:false,on:true};
+    const d2=day({playing:['pa','pb','pc'],salidas:[['pa','pb'],['pc']],customBets:[vib2],
+      scores:{pa:sc({gross:gross({0:3})}),pb:sc(),pc:sc()}});
+    reset({players:[P('pa','Ana A'),P('pb','Beto B'),P('pc','Caro C')],days:[d2],currentDayId:d2.id});
+    const r2=T.computeDay(d2), a2=row(r2,'pa');
+    t('cobra+salida: A cobra 2 SOLO a B (C va en otra salida)',a2.vib2===2&&row(r2,'pb').vib2===-2&&row(r2,'pc').vib2===0,a2.vib2+'/'+row(r2,'pc').vib2);
+    t('custom con birdie normal: cuadra en cero',r2.sum===0,r2.sum);
+  }
+
+  // ============ F14 · Día viejo sin snapshot: todo activo (historia inmutable) ============
+  sec('F14 compatibilidad (día sin d.bets = las 6 activas, como siempre)');
+  {
+    const d=day({playing:['pa','pb'],salidas:[['pa','pb']],doubles:{pb:{pa:true}},
+      scores:{pa:sc({gross:gross({1:3})}),pb:sc({gross:gross({9:3,10:3})})}});
+    delete d.bets; delete d.customBets;   // simula un día guardado ANTES del registro
+    reset({players:[P('pa','Ana A'),P('pb','Beto B')],days:[d],currentDayId:d.id});
+    const res=T.computeDay(d);
+    t('día viejo: mismo resultado de siempre (F5: B +8 con doblada)',row(res,'pb').total===8,row(res,'pb').total);
+    t('día viejo: cuadra en cero',res.sum===0,res.sum);
+  }
+
   window.__RESULTS__.ready=true;
   flush();
 }

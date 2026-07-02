@@ -611,7 +611,7 @@
 
 <script>
 const App = (() => {
-  const APP_VERSION = '2026-07-01-35';   // ⬆️ SUBIR en cada deploy: la app se auto-recarga cuando detecta una versión distinta
+  const APP_VERSION = '2026-07-01-36';   // ⬆️ SUBIR en cada deploy: la app se auto-recarga cuando detecta una versión distinta
   const KEY = 'rayas-campestre-v2';
   const uid = () => Math.random().toString(36).slice(2,9);
   // Auto-actualización: revisa el index.html en vivo (sin caché); si la versión cambió, recarga a la versión fresca.
@@ -771,7 +771,7 @@ const App = (() => {
   function buildShards(st){
     const out={};
     out['meta']  = st._leagueMeta || {name:'Grupo', schema:2};
-    out['rules'] = { rayaValue:(st.rayaValue!=null?st.rayaValue:20), activeBets: st.activeBets || _defActiveBets(), maxWeekday:(st.maxWeekday||6), maxWeekend:(st.maxWeekend||5), rayaPairs:(st.rayaPairs||{}), rayaReq:(st.rayaReq||{}), ventSeedOn:!!st.ventSeedOn, ventSeedConfirm:(st.ventSeedConfirm||{}) };
+    out['rules'] = { rayaValue:(st.rayaValue!=null?st.rayaValue:20), activeBets: st.activeBets || _defActiveBets(), customBets:(st.customBets||[]), maxWeekday:(st.maxWeekday||6), maxWeekend:(st.maxWeekend||5), rayaPairs:(st.rayaPairs||{}), rayaReq:(st.rayaReq||{}), ventSeedOn:!!st.ventSeedOn, ventSeedConfirm:(st.ventSeedConfirm||{}) };
     // jugadores GRANULAR (por pid, como los scores): así dos teléfonos que registran distinto NO se pisan el roster.
     (st.players||[]).forEach(p=>{ if(p&&p.id){ const o=Object.assign({},p); delete o.id; delete o.role; if(o.uid){ delete o.name; delete o.email; } out['players/'+p.id]=o; } });   // rol vive en leagueMembers; nombre/correo en users/{uid}
     const courses={}; (st.courses||[]).forEach(c=>{ if(c&&c.id){ const o=Object.assign({},c); delete o.id; courses[c.id]=o; } }); out['courses']=courses;
@@ -825,6 +825,7 @@ const App = (() => {
     const rules = sh['rules']||{};
     g.rayaValue = (rules.rayaValue!=null?rules.rayaValue:20);
     g.activeBets = rules.activeBets || _defActiveBets();
+    g.customBets = _arr(rules.customBets);
     g.maxWeekday = rules.maxWeekday||6; g.maxWeekend = rules.maxWeekend||5;
     g.rayaPairs = rules.rayaPairs || {}; g.rayaReq = rules.rayaReq || {};
     g.ventSeedOn = !!rules.ventSeedOn; g.ventSeedConfirm = rules.ventSeedConfirm || {};
@@ -957,6 +958,7 @@ const App = (() => {
     if(typeof state.sound!=='boolean') state.sound=true;
     // V2: metadatos del grupo y reglas custom
     state.activeBets = state.activeBets || _defActiveBets();
+    state.customBets = state.customBets || [];
     if(typeof state.maxWeekday!=='number') state.maxWeekday=6;
     if(typeof state.maxWeekend!=='number') state.maxWeekend=5;
     state.ventMeta = state.ventMeta || {};
@@ -1110,6 +1112,40 @@ const App = (() => {
   function autoCast(gross){ return gross>=10 ? ['calaca'] : []; }
 
   // =========================================================
+  //  REGISTRO DE APUESTAS
+  //  Las 6 core se prenden/apagan por grupo (state.activeBets) — su LÓGICA no se toca.
+  //  Cada día guarda un SNAPSHOT (d.bets + d.customBets) al crearse: los días cerrados
+  //  nunca cambian aunque el admin reconfigure después (los resultados se derivan al vuelo).
+  // =========================================================
+  const CORE_BETS=[
+    {id:'hoyos',    name:'Hoyos',    emoji:'⛳', hint:'Match play neto, hoyo por hoyo'},
+    {id:'medal',    name:'Medal',    emoji:'🏅', hint:'Nassau 9 / 9 / 18'},
+    {id:'unidades', name:'Unidades', emoji:'🐦', hint:'Birdie, eagle, sandy, aqua…'},
+    {id:'oyes',     name:'Oyes',     emoji:'🎯', hint:'Par 3, misma salida'},
+    {id:'doblar',   name:'Doblar',   emoji:'✌️', hint:'Pierde la 1ª vuelta → dobla la 2ª'},
+    {id:'castigos', name:'Castigos', emoji:'💀', hint:'Chevez, calaca, pomo'},
+  ];
+  // ¿Está activa la apuesta k en ESTE día? Días viejos (sin snapshot) = todas activas.
+  function betOn(d,k){ const B=d&&d.bets; return !(B && B[k]===false); }
+  // Apuestas custom (plantillas) congeladas en el día. Firebase descarta [] vacío → default seguro.
+  function dayCustom(d){ return (d&&d.customBets)||[]; }
+  // Snapshot para días nuevos: config actual del grupo.
+  function snapshotBets(){ const o={}; CORE_BETS.forEach(b=>{ o[b.id]=!(state.activeBets&&state.activeBets[b.id]===false); }); return o; }
+  function activeCustomList(){ return JSON.parse(JSON.stringify((state.customBets||[]).filter(cb=>cb&&cb.on!==false))); }
+  // Plantilla 'evento-por-hoyo': ¿el jugador disparó el evento en ese hoyo?
+  function cbEvent(cb,sc,h,d){ const g=(sc.gross||[])[h]; if(!g) return false; const par=holesOf(d)[h].par;
+    switch(cb.evento){
+      case '3putt':       return (sc.putts[h]||0)>=3;
+      case 'bogeyPeor':   return g>par;
+      case 'doblePeor':   return g>=par+2;
+      case 'birdieMejor': return g<par;
+      case 'parMejor':    return g<=par;
+      default: return false; } }
+  const CB_EVENTS=[ ['3putt','Hace 3 putts o más'], ['bogeyPeor','Hace bogey o peor'], ['doblePeor','Doble bogey o peor'], ['birdieMejor','Hace birdie o mejor'], ['parMejor','Hace par o mejor'] ];
+  function cbEvLabel(ev){ const x=CB_EVENTS.find(e=>e[0]===ev); return x?x[1]:ev; }
+  function cbDesc(cb){ return cbEvLabel(cb.evento)+' · '+(cb.rayas||1)+' raya'+((cb.rayas||1)===1?'':'s')+' · '+(cb.accion==='cobra'?'cobra a':'paga a')+' '+(cb.alcance==='salida'?'su salida':'todos')+(cb.dobla!==false?' · dobla 2ª':''); }
+
+  // =========================================================
   //  MOTOR DE CÁLCULO (pareja por pareja, con doblar la 2ª vuelta)
   // =========================================================
   function dayStart(d){ return (typeof d.start==='number')?d.start:1; }
@@ -1132,7 +1168,7 @@ const App = (() => {
   }
   function pairKey(a,b){ return [a,b].sort().join('|'); }
   // doubles DIRECCIONAL en memoria: d.doubles[doubler][target]=true. isDoubled sigue siendo simétrico (el par está doblado).
-  function isDoubled(d,a,b){ const D=d.doubles||{}; return !!((D[a]&&D[a][b]) || (D[b]&&D[b][a])); }
+  function isDoubled(d,a,b){ if(!betOn(d,'doblar')) return false; const D=d.doubles||{}; return !!((D[a]&&D[a][b]) || (D[b]&&D[b][a])); }
   function toggleDouble(d,a,b){ d.doubles=d.doubles||{};   // a = el que dobla (perdedor de la 1ª vuelta)
     if(isDoubled(d,a,b)){ if(d.doubles[a]) delete d.doubles[a][b]; if(d.doubles[b]) delete d.doubles[b][a];
       if(d.doubles[a]&&!Object.keys(d.doubles[a]).length) delete d.doubles[a]; if(d.doubles[b]&&!Object.keys(d.doubles[b]).length) delete d.doubles[b]; }
@@ -1158,17 +1194,20 @@ const App = (() => {
     const sa=ensureScore(d,a), sb=ensureScore(d,b);
     const allocA=allocate(received(a,b),d), allocB=allocate(received(b,a),d);
     const dbl=isDoubled(d,a,b), sg=sameGroup(d,a,b);
+    const ON={hoyos:betOn(d,'hoyos'),medal:betOn(d,'medal'),unidades:betOn(d,'unidades'),oyes:betOn(d,'oyes')};   // mismo gateo que el motor
     let net=0, firstNet=0; const P={hoyos:0,unidades:0,oyes:0,medal:0};   // desglose por apuesta (persp. de a, con doblar ya incluido); NO altera net
     for(let h=0;h<18;h++){
       const sec=isSecond(d,h), mult=(dbl&&sec)?2:1; let dd=0;
-      if(sa.gross[h]&&sb.gross[h]){ const na=sa.gross[h]-allocA[h], nb=sb.gross[h]-allocB[h]; let hh=0; if(na<nb)hh=1; else if(nb<na)hh=-1; dd+=hh; P.hoyos+=hh*mult; }
-      const uu=unitsOnHole(d,a,h)-unitsOnHole(d,b,h); dd+=uu; P.unidades+=uu*mult;
-      if(sg && holesOf(d)[h].par===3){ const pa=sa.oyes[h]||0,pb=sb.oyes[h]||0; if(pa&&pb){ let oo=0; if(pa<pb)oo=1; else if(pb<pa)oo=-1; dd+=oo; P.oyes+=oo*mult; } }
+      if(ON.hoyos && sa.gross[h]&&sb.gross[h]){ const na=sa.gross[h]-allocA[h], nb=sb.gross[h]-allocB[h]; let hh=0; if(na<nb)hh=1; else if(nb<na)hh=-1; dd+=hh; P.hoyos+=hh*mult; }
+      if(ON.unidades){ const uu=unitsOnHole(d,a,h)-unitsOnHole(d,b,h); dd+=uu; P.unidades+=uu*mult; }
+      if(ON.oyes && sg && holesOf(d)[h].par===3){ const pa=sa.oyes[h]||0,pb=sb.oyes[h]||0; if(pa&&pb){ let oo=0; if(pa<pb)oo=1; else if(pb<pa)oo=-1; dd+=oo; P.oyes+=oo*mult; } }
       net += dd*mult; if(!sec) firstNet += dd;
     }
-    const ms=medalSeg(d,a,b,allocA,allocB);
-    if(ms.first){ if(ms.first.winner==='a')firstNet+=1; else if(ms.first.winner==='b')firstNet-=1; }
-    [ms.first,ms.second,ms.total].forEach(s=>{ if(!s)return; let mm=0; if(s.winner==='a')mm=s.mult; else if(s.winner==='b')mm=-s.mult; net+=mm; P.medal+=mm; });
+    if(ON.medal){
+      const ms=medalSeg(d,a,b,allocA,allocB);
+      if(ms.first){ if(ms.first.winner==='a')firstNet+=1; else if(ms.first.winner==='b')firstNet-=1; }
+      [ms.first,ms.second,ms.total].forEach(s=>{ if(!s)return; let mm=0; if(s.winner==='a')mm=s.mult; else if(s.winner==='b')mm=-s.mult; net+=mm; P.medal+=mm; });
+    }
     return {net, firstNet, parts:P, doubled:dbl};
   }
 
@@ -1189,7 +1228,9 @@ const App = (() => {
     if(players.length===0) return null;
 
     const R={}, drinks={}, PM={};
-    players.forEach(p=>R[p]={hoyos:0,unidades:0,medal:0,oyes:0,castig:0,total:0,uList:{}});
+    const CBS=dayCustom(d);   // apuestas custom congeladas en el día
+    const ON={hoyos:betOn(d,'hoyos'),medal:betOn(d,'medal'),unidades:betOn(d,'unidades'),oyes:betOn(d,'oyes'),castigos:betOn(d,'castigos')};   // doblar se gatea dentro de isDoubled
+    players.forEach(p=>{ R[p]={hoyos:0,unidades:0,medal:0,oyes:0,castig:0,total:0,uList:{}}; CBS.forEach(cb=>R[p][cb.id]=0); });
     const addP=(a,b,v)=>{ if(!v)return; (PM[a]=PM[a]||{}); (PM[b]=PM[b]||{}); PM[a][b]=(PM[a][b]||0)+v; PM[b][a]=(PM[b][a]||0)-v; };
 
     // detalle de unidades por jugador (para tarjeta/desglose)
@@ -1206,25 +1247,30 @@ const App = (() => {
       const dbl=isDoubled(d,a,b), sg=sameGroup(d,a,b);
       for(let h=0;h<18;h++){
         const mult=(dbl && isSecond(d,h))?2:1;
-        if(sa.gross[h] && sb.gross[h]){
+        if(ON.hoyos && sa.gross[h] && sb.gross[h]){
           const na=sa.gross[h]-allocA[h], nb=sb.gross[h]-allocB[h];
           if(na<nb){R[a].hoyos+=mult;R[b].hoyos-=mult;addP(a,b,mult);} else if(nb<na){R[b].hoyos+=mult;R[a].hoyos-=mult;addP(b,a,mult);}
         }
-        const ua=unitsOnHole(d,a,h), ub=unitsOnHole(d,b,h);
-        if(ua){ R[a].unidades+=ua*mult; R[b].unidades-=ua*mult; addP(a,b,ua*mult); }
-        if(ub){ R[b].unidades+=ub*mult; R[a].unidades-=ub*mult; addP(b,a,ub*mult); }
-        if(sg && holesOf(d)[h].par===3){
+        if(ON.unidades){
+          const ua=unitsOnHole(d,a,h), ub=unitsOnHole(d,b,h);
+          if(ua){ R[a].unidades+=ua*mult; R[b].unidades-=ua*mult; addP(a,b,ua*mult); }
+          if(ub){ R[b].unidades+=ub*mult; R[a].unidades-=ub*mult; addP(b,a,ub*mult); }
+        }
+        if(ON.oyes && sg && holesOf(d)[h].par===3){
           const pa=sa.oyes[h]||0, pb=sb.oyes[h]||0;
           if(pa&&pb){ if(pa<pb){R[a].oyes+=mult;R[b].oyes-=mult;addP(a,b,mult);} else if(pb<pa){R[b].oyes+=mult;R[a].oyes-=mult;addP(b,a,mult);} }
         }
       }
-      const ms=medalSeg(d,a,b,allocA,allocB);
-      [ms.first,ms.second,ms.total].forEach(s=>{ if(!s)return;
-        if(s.winner==='a'){R[a].medal+=s.mult;R[b].medal-=s.mult;addP(a,b,s.mult);} else if(s.winner==='b'){R[b].medal+=s.mult;R[a].medal-=s.mult;addP(b,a,s.mult);} });
+      if(ON.medal){
+        const ms=medalSeg(d,a,b,allocA,allocB);
+        [ms.first,ms.second,ms.total].forEach(s=>{ if(!s)return;
+          if(s.winner==='a'){R[a].medal+=s.mult;R[b].medal-=s.mult;addP(a,b,s.mult);} else if(s.winner==='b'){R[b].medal+=s.mult;R[a].medal-=s.mult;addP(b,a,s.mult);} });
+      }
     }
 
     // CASTIGOS: cuenta del 19 (tragos) o raya ($)
-    players.forEach(p=>{ const sc=ensureScore(d,p); drinks[p]={};
+    players.forEach(p=>{ drinks[p]={}; });
+    if(ON.castigos) players.forEach(p=>{ const sc=ensureScore(d,p);
       for(let h=0;h<18;h++){
         const auto=sc.gross[h]?autoCast(sc.gross[h]):[], manual=sc.cast[h]||[];
         new Set([...auto,...manual]).forEach(cid=>{
@@ -1235,7 +1281,23 @@ const App = (() => {
       }
     });
 
-    players.forEach(p=>{ R[p].total += R[p].hoyos+R[p].unidades+R[p].medal+R[p].oyes+R[p].castig; });
+    // APUESTAS DE LA CASA (plantilla evento-por-hoyo): quien dispara el evento paga/cobra vs su alcance
+    CBS.forEach(cb=>{ if(!cb||!cb.id||!cb.rayas) return;
+      players.forEach(p=>{ const sc=ensureScore(d,p);
+        for(let h=0;h<18;h++){
+          if(!cbEvent(cb,sc,h,d)) continue;
+          players.forEach(o=>{ if(o===p) return;
+            if(cb.alcance==='salida' && !sameGroup(d,p,o)) return;
+            const mult=(cb.dobla!==false && isDoubled(d,p,o) && isSecond(d,h))?2:1;
+            const v=(cb.rayas||1)*mult;
+            if(cb.accion==='cobra'){ R[p][cb.id]+=v; R[o][cb.id]-=v; addP(p,o,v); }
+            else                   { R[p][cb.id]-=v; R[o][cb.id]+=v; addP(o,p,v); }
+          });
+        }
+      });
+    });
+
+    players.forEach(p=>{ R[p].total += R[p].hoyos+R[p].unidades+R[p].medal+R[p].oyes+R[p].castig + CBS.reduce((s,cb)=>s+(R[p][cb.id]||0),0); });
     // pesos = suma pareja por pareja de (rayas netas vs ese rival × valor de raya acordado con ese rival).
     // Es simétrico (PM[a][b]=-PM[b][a], mismo valor) → el día sigue cuadrando en cero.
     const rows=players.map(p=>{ const row=PM[p]||{}; let pesos=0; Object.keys(row).forEach(o=>{ pesos+=row[o]*pairRaya(p,o); }); return {id:p,...R[p],pesos}; }).sort((x,y)=>y.pesos-x.pesos);
@@ -1362,7 +1424,7 @@ const App = (() => {
     html+=`<div class="exprow"><button class="expbtn" onclick="App.exportImage()">📸 Imagen</button><button class="expbtn" onclick="App.exportComprobante()">📄 Comprobante PDF</button><button class="expbtn" onclick="App.photosModal()">📷 Fotos</button></div>`;
 
     // desglose por concepto
-    html+=desgloseHtml(res);
+    html+=desgloseHtml(res,d);
 
     // castigos / cuenta del 19
     const anyDrink=Object.values(res.drinks).some(o=>Object.keys(o).length);
@@ -1381,15 +1443,16 @@ const App = (() => {
   }
   const sgn=n=> (n>0?'+':'')+n;
   // Desglose por concepto (Hoyos / Unidades / Oyes / Medal / Castigo$ / Total). Reutilizado en El 19 y en Comparar.
-  function desgloseHtml(res){
+  function desgloseHtml(res,d){
     if(!res||!res.rows||!res.rows.length) return '';
     const anyCastig=res.rows.some(r=>r.castig);
+    const cbs=dayCustom(d).filter(cb=>res.rows.some(r=>r[cb.id]));   // columnas de apuestas de la casa con movimiento
     let html=`<details class="card disclosure"><summary>Ver desglose por concepto →</summary><div style="margin-top:8px">`;
     html+=`<table style="width:100%;border-collapse:collapse;font-size:12.5px">
-      <tr style="color:#7c8a80;text-align:right"><th style="text-align:left">Jugador</th><th>Hoyos</th><th>Unid.</th><th>Oyes</th><th>Medal</th>${anyCastig?'<th>Cast$</th>':''}<th>Total</th></tr>`;
+      <tr style="color:#7c8a80;text-align:right"><th style="text-align:left">Jugador</th><th>Hoyos</th><th>Unid.</th><th>Oyes</th><th>Medal</th>${anyCastig?'<th>Cast$</th>':''}${cbs.map(cb=>`<th>${cb.emoji||_esc((cb.name||'?').slice(0,5))}</th>`).join('')}<th>Total</th></tr>`;
     res.rows.forEach(r=>{
       html+=`<tr style="text-align:right;border-top:1px solid var(--line)"><td style="text-align:left;padding:6px 0">${pname(r.id)}</td>
-      <td>${sgn(r.hoyos)}</td><td>${sgn(r.unidades)}</td><td>${sgn(r.oyes)}</td><td>${sgn(r.medal)}</td>${anyCastig?`<td>${sgn(r.castig||0)}</td>`:''}<td><b>${sgn(r.total)}</b></td></tr>`;
+      <td>${sgn(r.hoyos)}</td><td>${sgn(r.unidades)}</td><td>${sgn(r.oyes)}</td><td>${sgn(r.medal)}</td>${anyCastig?`<td>${sgn(r.castig||0)}</td>`:''}${cbs.map(cb=>`<td>${sgn(r[cb.id]||0)}</td>`).join('')}<td><b>${sgn(r.total)}</b></td></tr>`;
     });
     html+=`</table><div class="hint" style="margin-top:6px">Unidades, oyes y medal son <b>netos</b> contra todos (lo que ganas menos lo que te ganan). Si doblaron, la 2ª vuelta de esa pareja ya va ×2.</div></div></details>`;
     return html;
@@ -2636,7 +2699,7 @@ const App = (() => {
     if(!d){ box.innerHTML=seg+emptyState('📝','Sin día activo','Crea un día y asigna salidas.','App.go(\'day\')','Ir a Salidas'); return; }
     const ids=dayPlayers(d).filter(Boolean);
     if(ids.length===0){ box.innerHTML=seg+emptyState('⛳','No hay jugadores','Asigna jugadores en “Salidas”.','App.go(\'day\')','Ir a Salidas'); return; }
-    if(scoreTab==='cmp'){ box.innerHTML=seg+renderCompare()+desgloseHtml(compute()); return; }
+    if(scoreTab==='cmp'){ box.innerHTML=seg+renderCompare()+desgloseHtml(compute(),d); return; }
 
     // ---- CAPTURA HOYO POR HOYO ----
     if(!Array.isArray(d.start) && typeof d.start!=='number') d.start=1;
@@ -3274,6 +3337,9 @@ const App = (() => {
     });
     html+=`</div></div>`;
 
+    // apuestas del grupo (registro: 6 core on/off + apuestas de la casa por plantilla)
+    html+=cfgBetsHtml();
+
     // campos (multi-campo)
     if(!state.courses.find(c=>c.id===cfgCourseId)) cfgCourseId=state.courses[0].id;
     const cc=state.courses.find(c=>c.id===cfgCourseId)||state.courses[0];
@@ -3428,7 +3494,8 @@ const App = (() => {
     if(!label){ const dt=new Date(date+'T12:00'); const wd=dt.toLocaleDateString('es-MX',{weekday:'long'}); label=wd.charAt(0).toUpperCase()+wd.slice(1)+' '+dt.toLocaleDateString('es-MX',{day:'numeric',month:'short'}); }
     const lastDay=state.days[0]; const lastCourse=(lastDay&&lastDay.courseId)||'campestre';
     const salidaTimes=(lastDay&&Array.isArray(lastDay.salidaTimes))?lastDay.salidaTimes.slice():['2:10','2:20'];
-    const d={id:uid(),date,label,playing:[],salidas:[[],[]],start:1,holes:18,courseId:lastCourse,salidaTimes,doubles:{},closed:false,scores:{}};
+    const d={id:uid(),date,label,playing:[],salidas:[[],[]],start:1,holes:18,courseId:lastCourse,salidaTimes,doubles:{},closed:false,scores:{},
+      bets:snapshotBets(),customBets:activeCustomList()};   // snapshot: las apuestas del día se congelan al crearlo
     state.days.unshift(d); state.currentDayId=d.id; save(); closeModal(); go('day');
   }
   function switchDay(id){ state.currentDayId=id; save(); render(); }
@@ -3598,6 +3665,68 @@ const App = (() => {
     modal(h);
   }
   function setHole(i,f,v){ cfgCourse().holes[i][f]=Math.max(0,parseInt(v)||0); save(); }
+
+  // ---- Apuestas del grupo (Ajustes, solo admin/súper) ----
+  function cfgBetsHtml(){
+    const ab=state.activeBets||_defActiveBets();
+    let h=`<div class="cfg-sect">Apuestas</div>
+      <div class="card"><h3>Apuestas del grupo</h3>
+      <div class="hint">Prende o apaga lo que juega tu grupo. Aplica a los días <b>nuevos</b>: cada día congela sus apuestas al crearse (los cerrados no cambian).</div><div class="plist">`;
+    CORE_BETS.forEach(b=>{ const on=ab[b.id]!==false;
+      h+=`<div class="prow"><div class="avatar" style="background:#e8f2ec">${b.emoji}</div>
+        <div class="grow"><div class="nm">${b.name}</div><div class="desc" style="font-size:11px;color:var(--muted)">${b.hint}</div></div>
+        <button class="sw ${on?'on':''}" onclick="App.toggleBet('${b.id}')"><span></span></button></div>`; });
+    h+=`</div></div>`;
+    h+=`<div class="card"><div class="row" style="justify-content:space-between"><h3>Apuestas de la casa</h3>
+      <button class="btn outline sm" onclick="App.customBetModal()">+ Agregar</button></div>
+      <div class="hint">Apuestas propias del grupo (ej. víbora por 3 putts). Apagar no borra.</div><div class="plist">`;
+    (state.customBets||[]).forEach(cb=>{ const on=cb.on!==false;
+      h+=`<div class="prow"><div class="avatar" style="background:#faf3e0">${cb.emoji||'🎲'}</div>
+        <div class="grow"><div class="nm" style="${on?'':'color:var(--muted-2)'}">${_esc(cb.name||'?')}</div><div class="desc" style="font-size:11px;color:var(--muted)">${_esc(cbDesc(cb))}</div></div>
+        <button class="icbtn" onclick="App.customBetModal('${cb.id}')">✏️</button>
+        <button class="icbtn" onclick="App.delCustomBet('${cb.id}')">🗑</button>
+        <button class="sw ${on?'on':''}" onclick="App.toggleCustomBet('${cb.id}')"><span></span></button></div>`; });
+    if(!(state.customBets||[]).length) h+=`<div class="hint" style="padding:6px 0">Aún no hay apuestas de la casa.</div>`;
+    h+=`</div></div>`;
+    return h;
+  }
+  function toggleBet(k){ if(!isAdmin()){ toast('Solo el admin'); return; }
+    state.activeBets=state.activeBets||_defActiveBets();
+    const cur=state.activeBets[k]!==false; state.activeBets[k]=!cur;
+    save(); renderCfg(); toast((CORE_BETS.find(b=>b.id===k)||{}).name+(!cur?' activada':' desactivada')+' · aplica a días nuevos'); }
+  function toggleCustomBet(id){ if(!isAdmin()){ toast('Solo el admin'); return; }
+    const cb=(state.customBets||[]).find(x=>x.id===id); if(!cb) return; cb.on=!(cb.on!==false); save(); renderCfg(); }
+  function delCustomBet(id){ if(!isAdmin()){ toast('Solo el admin'); return; }
+    const cb=(state.customBets||[]).find(x=>x.id===id); if(!cb) return;
+    confirmModal('¿Borrar la apuesta "'+(cb.name||'?')+'"? Los días ya creados con ella no cambian.','Borrar',function(){
+      state.customBets=(state.customBets||[]).filter(x=>x.id!==id); save(); renderCfg(); toast('Apuesta borrada'); }); }
+  function customBetModal(id){ if(!isAdmin()){ toast('Solo el admin'); return; }
+    const cb=(state.customBets||[]).find(x=>x.id===id)||{name:'',emoji:'🐍',evento:'3putt',accion:'paga',alcance:'todos',rayas:1,dobla:true};
+    modal(`<h3>${id?'Editar':'Nueva'} apuesta de la casa</h3>
+      <div class="hint" style="margin-bottom:8px">Plantilla: <b>evento por hoyo</b> — cuando alguien dispara el evento, paga o cobra rayas.</div>
+      <div class="row" style="gap:10px">
+        <label class="fl" style="flex:1;margin:0">Nombre<input id="cb_name" class="txt" value="${_esc(cb.name)}" placeholder="Víbora"></label>
+        <label class="fl" style="width:74px;margin:0">Emoji<input id="cb_emoji" class="txt" value="${_esc(cb.emoji||'')}" maxlength="4"></label></div>
+      <label class="fl" style="margin-top:8px">Cuando alguien…</label>
+      <select id="cb_ev" class="txt">${CB_EVENTS.map(e=>`<option value="${e[0]}" ${cb.evento===e[0]?'selected':''}>${e[1]}</option>`).join('')}</select>
+      <div class="row" style="gap:10px;margin-top:8px">
+        <label class="fl" style="flex:1;margin:0">Acción<select id="cb_ac" class="txt">
+          <option value="paga" ${cb.accion!=='cobra'?'selected':''}>Paga</option><option value="cobra" ${cb.accion==='cobra'?'selected':''}>Cobra</option></select></label>
+        <label class="fl" style="flex:1;margin:0">A quién<select id="cb_al" class="txt">
+          <option value="todos" ${cb.alcance!=='salida'?'selected':''}>Todos</option><option value="salida" ${cb.alcance==='salida'?'selected':''}>Su salida</option></select></label>
+        <label class="fl" style="width:84px;margin:0">Rayas<input id="cb_r" class="txt" type="number" inputmode="numeric" min="1" max="10" value="${cb.rayas||1}"></label></div>
+      <label style="display:flex;gap:8px;margin-top:12px;align-items:center;font-size:14px"><input type="checkbox" id="cb_d" ${cb.dobla!==false?'checked':''}> Se dobla en la 2ª vuelta (si la pareja dobló)</label>
+      <button class="btn block" style="margin-top:14px" onclick="App.saveCustomBet('${id||''}')">${id?'Guardar':'Crear apuesta'}</button>`); }
+  function saveCustomBet(id){ if(!isAdmin()) return;
+    const name=((document.getElementById('cb_name')||{}).value||'').trim(); if(!name){ toast('Ponle nombre'); return; }
+    const cb={ id:id||uid(), name, emoji:((document.getElementById('cb_emoji')||{}).value||'').trim(),
+      evento:(document.getElementById('cb_ev')||{}).value||'3putt', accion:(document.getElementById('cb_ac')||{}).value||'paga',
+      alcance:(document.getElementById('cb_al')||{}).value||'todos', rayas:Math.max(1,Math.min(10,parseInt((document.getElementById('cb_r')||{}).value)||1)),
+      dobla:!!((document.getElementById('cb_d')||{}).checked), on:true };
+    state.customBets=state.customBets||[];
+    const i=state.customBets.findIndex(x=>x.id===cb.id);
+    if(i>=0){ cb.on=state.customBets[i].on!==false; state.customBets[i]=cb; } else state.customBets.push(cb);
+    save(); closeModal(); renderCfg(); toast(id?'Apuesta actualizada':'Apuesta creada: '+name+' · aplica a días nuevos'); }
 
   function unitModal(){
     modal(`<h3>Nueva unidad</h3>
@@ -4323,6 +4452,7 @@ const App = (() => {
     setDblPlayer,toggleDbl,closeDay,historyModal,exportImage,exportHigh,exportProfile,exportSalidas,exportSeasonTable,exportCompare,exportScorecard,toggleSound,
     setRaya,submitRayaPair,approveRayaReq,rejectRayaReq,removeRayaPair,createPlayer,editPlayerModal,savePlayer,delPlayer,toggleFav,
     courseModal,setHole,setCfgCourse,addCourse,renameCourse,deleteCourse,unitModal,createUnit,delUnit,castModal,createCast,delCast,toggleCastTipo,
+    toggleBet,customBetModal,saveCustomBet,delCustomBet,toggleCustomBet,
     exportData,renderCfg,renderVent,renderDay,closeModal,confirmYes,renderHigh,setHighTab,openProfile,rulesModal,editRulesModal,saveRules,
     exportComprobante,cmpPrint,cmpClose,photosModal,onPhotoPick,delPhoto,viewPhoto,forceUpdate,clearCacheReload,
     // Gancho de PRUEBAS (tests.html): acceso directo al motor con estado sintético. NO usar desde la UI.
