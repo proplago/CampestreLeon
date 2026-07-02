@@ -611,7 +611,7 @@
 
 <script>
 const App = (() => {
-  const APP_VERSION = '2026-07-02-37';   // ⬆️ SUBIR en cada deploy: la app se auto-recarga cuando detecta una versión distinta
+  const APP_VERSION = '2026-07-02-38';   // ⬆️ SUBIR en cada deploy: la app se auto-recarga cuando detecta una versión distinta
   const KEY = 'rayas-campestre-v2';
   const uid = () => Math.random().toString(36).slice(2,9);
   // Auto-actualización: revisa el index.html en vivo (sin caché); si la versión cambió, recarga a la versión fresca.
@@ -1284,6 +1284,8 @@ const App = (() => {
     const ON={hoyos:betOn(d,'hoyos'),medal:betOn(d,'medal'),unidades:betOn(d,'unidades'),oyes:betOn(d,'oyes'),castigos:betOn(d,'castigos')};   // doblar se gatea dentro de isDoubled
     players.forEach(p=>{ R[p]={hoyos:0,unidades:0,medal:0,oyes:0,castig:0,total:0,uList:{}}; CBS.forEach(cb=>R[p][cb.id]=0); });
     const addP=(a,b,v)=>{ if(!v)return; (PM[a]=PM[a]||{}); (PM[b]=PM[b]||{}); PM[a][b]=(PM[a][b]||0)+v; PM[b][a]=(PM[b][a]||0)-v; };
+    // matriz SOLO de apuestas de la casa (para que el comprobante separe ese dinero del residual de castigos)
+    const PMX={}; const addX=(a,b,v)=>{ if(!v)return; (PMX[a]=PMX[a]||{}); (PMX[b]=PMX[b]||{}); PMX[a][b]=(PMX[a][b]||0)+v; PMX[b][a]=(PMX[b][a]||0)-v; addP(a,b,v); };
 
     // detalle de unidades por jugador (para tarjeta/desglose)
     players.forEach(p=>{ const sc=ensureScore(d,p);
@@ -1336,8 +1338,8 @@ const App = (() => {
     // APUESTAS DE LA CASA por plantilla: evento-por-hoyo / skins / parejas (todas via addP → cuadran en cero)
     CBS.forEach(cb=>{ if(!cb||!cb.id||!cb.rayas) return;
       const tpl=cbTpl(cb);
-      if(tpl==='skins'){ computeSkins(d,players,cb,R,addP); return; }
-      if(tpl==='parejas'){ computeParejas(d,cb,R,addP); return; }
+      if(tpl==='skins'){ computeSkins(d,players,cb,R,addX); return; }
+      if(tpl==='parejas'){ computeParejas(d,cb,R,addX); return; }
       // 'evento': quien dispara el evento paga/cobra vs su alcance
       players.forEach(p=>{ const sc=ensureScore(d,p);
         for(let h=0;h<18;h++){
@@ -1346,8 +1348,8 @@ const App = (() => {
             if(cb.alcance==='salida' && !sameGroup(d,p,o)) return;
             const mult=(cb.dobla!==false && isDoubled(d,p,o) && isSecond(d,h))?2:1;
             const v=(cb.rayas||1)*mult;
-            if(cb.accion==='cobra'){ R[p][cb.id]+=v; R[o][cb.id]-=v; addP(p,o,v); }
-            else                   { R[p][cb.id]-=v; R[o][cb.id]+=v; addP(o,p,v); }
+            if(cb.accion==='cobra'){ R[p][cb.id]+=v; R[o][cb.id]-=v; addX(p,o,v); }
+            else                   { R[p][cb.id]-=v; R[o][cb.id]+=v; addX(o,p,v); }
           });
         }
       });
@@ -1358,7 +1360,7 @@ const App = (() => {
     // Es simétrico (PM[a][b]=-PM[b][a], mismo valor) → el día sigue cuadrando en cero.
     const rows=players.map(p=>{ const row=PM[p]||{}; let pesos=0; Object.keys(row).forEach(o=>{ pesos+=row[o]*pairRaya(p,o); }); return {id:p,...R[p],pesos}; }).sort((x,y)=>y.pesos-x.pesos);
     const sum=rows.reduce((s,r)=>s+r.pesos,0);
-    return {rows,drinks,sum,nPlayers:players.length,pm:PM};
+    return {rows,drinks,sum,nPlayers:players.length,pm:PM,pmx:PMX};
   }
 
   // =========================================================
@@ -1515,13 +1517,26 @@ const App = (() => {
   }
 
   // ---- Temporada (acumulado + estadística + HCP interno) ----
+  // HCP interno estilo WHS simplificado: de las ÚLTIMAS 20 vueltas completas (recencia primero),
+  // promedia las MEJORES 8 (o el mejor 40% si aún no hay 20). diffs deben venir MÁS RECIENTE PRIMERO.
+  // Así el HCP evoluciona con tu juego actual: una vuelta heroica de hace 2 años ya no te persigue.
   function intHcp(diffs){
-    if(!diffs.length) return null;
-    const s=[...diffs].sort((a,b)=>a-b);
-    const n=Math.min(s.length,20), pool=s.slice(0,n);
-    let cnt = n>=20?8:Math.max(1,Math.round(n*0.4));
-    return Math.round(pool.slice(0,cnt).reduce((a,b)=>a+b,0)/cnt);
+    if(!diffs||!diffs.length) return null;
+    const recent=diffs.slice(0,20);                       // ventana de recencia
+    const s=[...recent].sort((a,b)=>a-b);                 // mejores primero
+    const cnt = recent.length>=20?8:Math.max(1,Math.round(recent.length*0.4));
+    return Math.round(s.slice(0,cnt).reduce((a,b)=>a+b,0)/cnt*10)/10;
   }
+  function dayParTotal(d){ return holesOf(d).reduce((s,h)=>s+h.par,0); }
+  // Diferenciales (gross − par del campo) de las vueltas COMPLETAS de un jugador, más reciente primero.
+  function playerDiffs(pid){
+    const out=[];
+    state.days.forEach(d=>{ const sc=(d.scores||{})[pid]; if(!sc||!sc.gross) return;
+      if(sc.gross.filter(x=>x>0).length!==18) return;     // solo vueltas de 18 completas
+      out.push(sc.gross.reduce((a,b)=>a+b,0)-dayParTotal(d)); });
+    return out;                                           // state.days[0] es el más reciente
+  }
+  function intHcpOf(pid){ return intHcp(playerDiffs(pid)); }
   // rayas netas de un jugador ese día contando SOLO rivales internos (invitados no acumulan)
   function internalRayas(res,pid){ if(!res||!res.pm) return 0; const row=res.pm[pid]||{}; let s=0; Object.keys(row).forEach(o=>{ const op=player(o); if(op&&!op.guest) s+=row[o]; }); return s; }
   function renderSeason(){
@@ -1535,7 +1550,7 @@ const App = (() => {
         const sc=ensureScore(d,pid); const done=sc.gross.filter(x=>x>0).length;
         if(done===18){
           const g=sc.gross.reduce((a,b)=>a+b,0);
-          st[pid].rounds++; st[pid].gross+=g; st[pid].diffs.push(g-72);
+          st[pid].rounds++; st[pid].gross+=g; st[pid].diffs.push(g-dayParTotal(d));
           if(sc.putts.some(x=>x!=null)){ st[pid].putts+=sc.putts.reduce((a,b)=>a+(b||0),0); st[pid].prounds++; }
           sc.gross.forEach((gg,hi)=>{ if(gg>0){ const df=gg-holesOf(d)[hi].par; if(df===-1)st[pid].bird++; else if(df<=-2)st[pid].eag++; } });
         }
@@ -3165,11 +3180,18 @@ const App = (() => {
 
     const me=player(ventFocus);
     const R=30;
+    // HCP interno de cada quien (para sugerir la ventaja = diferencia de HCPs; solo informativo, el admin decide)
+    const hcps={}; state.players.forEach(p=>{ hcps[p.id]=intHcpOf(p.id); });
     const vrowH=p=>{ const v=signedV(ventFocus,p.id);   // + = ${me} da (rojo, va en su contra) · − = le dan a ${me} (verde)
       const desc = v>0?`${pname(me.id)} le da ${v}`:v<0?`le da ${-v} a ${pname(me.id)}`:'parejos';
+      let sugTxt='';
+      if(hcps[ventFocus]!=null && hcps[p.id]!=null){
+        const sug=Math.round(hcps[p.id]-hcps[ventFocus]);
+        sugTxt=`<div class="desc" style="color:var(--muted-2)">HCP int. sugiere ${sug>0?'+'+sug:sug}${(isAdmin()&&sug!==v)?` · <span style="color:var(--fairway);text-decoration:underline;cursor:pointer" onclick="App.pickVent('${p.id}','${sug}')">usar</span>`:''}</div>`;
+      }
       let opts=''; for(let n=R;n>=-R;n--){ opts+=`<option value="${n}" ${n===v?'selected':''}>${n>0?'+'+n:n}</option>`; }
       return `<div class="vrow">
-        <div><div class="who">${p.name}${p.guest?' ·inv':''}</div><div class="desc">${desc}</div></div>
+        <div><div class="who">${p.name}${p.guest?' ·inv':''}</div><div class="desc">${desc}</div>${sugTxt}</div>
         <select class="txt vsel ${v>0?'neg':v<0?'pos':''}" style="max-width:92px" onchange="App.pickVent('${p.id}',this.value)">${opts}</select>
         </div>`; };
     const meIsGuest=me&&me.guest;
@@ -4337,26 +4359,27 @@ const App = (() => {
   // Tarjeta hoyo-por-hoyo de una pareja, estilo papel hecho a mano. Renglón "Va" = acumulado del de arriba
   // (match+unidades+oyes con doblar); en OUT/IN/TOT se suma el medal del tramo, así TOT = neto y cierra contra la matriz.
   // Marcas tipo tarjeta: ○ birdie, ◎ eagle, □ bogey, ⊡ doble bogey, • golpe de ventaja, emoji de oyes/holeout/sandy/aqua.
-  function cmpCardHtml(d,a,b,ord,Hs,nine,PM){
+  function cmpCardHtml(d,a,b,ord,Hs,nine,PM,PMX){
     const sa=ensureScore(d,a), sb=ensureScore(d,b);
     const allocA=allocate(received(a,b),d), allocB=allocate(received(b,a),d);
     const dbl=isDoubled(d,a,b), sg=sameGroup(d,a,b);
+    const ON={hoyos:betOn(d,'hoyos'),medal:betOn(d,'medal'),unidades:betOn(d,'unidades'),oyes:betOn(d,'oyes')};   // mismo gateo que el motor
     const uEmoji=id=>{ const u=state.units.find(x=>x.id===id); return u?u.emoji:''; };
     const cls=v=>v>0?'pos':(v<0?'neg':'');
     let run=0; const C=[];
     ord.forEach(h=>{ const sec=isSecond(d,h), mult=(dbl&&sec)?2:1; let dd=0;
       const ga=sa.gross[h]||0, gb=sb.gross[h]||0, par=Hs[h].par;
-      if(ga&&gb){ const na=ga-(allocA[h]||0), nb=gb-(allocB[h]||0); if(na<nb)dd+=1; else if(nb<na)dd-=1; }
-      dd += unitsOnHole(d,a,h)-unitsOnHole(d,b,h);
+      if(ON.hoyos && ga&&gb){ const na=ga-(allocA[h]||0), nb=gb-(allocB[h]||0); if(na<nb)dd+=1; else if(nb<na)dd-=1; }
+      if(ON.unidades) dd += unitsOnHole(d,a,h)-unitsOnHole(d,b,h);
       let oyA=false,oyB=false;
-      if(sg && par===3){ const pa=sa.oyes[h]||0,pb=sb.oyes[h]||0; if(pa&&pb){ if(pa<pb){dd+=1;oyA=true;} else if(pb<pa){dd-=1;oyB=true;} } }
+      if(ON.oyes && sg && par===3){ const pa=sa.oyes[h]||0,pb=sb.oyes[h]||0; if(pa&&pb){ if(pa<pb){dd+=1;oyA=true;} else if(pb<pa){dd-=1;oyB=true;} } }
       run += dd*mult;
       const uA=ga?[].concat(autoUnits(ga,h,sa.putts[h],Hs),validManual(sa,h,Hs)):[];
       const uB=gb?[].concat(autoUnits(gb,h,sb.putts[h],Hs),validManual(sb,h,Hs)):[];
       C.push({n:Hs[h].n,par,ga,gb,sA:allocA[h]||0,sB:allocB[h]||0,uA,uB,oyA,oyB,run}); });
     const ms=medalSeg(d,a,b,allocA,allocB), mv=s=>s?(s.winner==='a'?s.mult:(s.winner==='b'?-s.mult:0)):0;
-    const mF=mv(ms.first), mS=mv(ms.second), mT=mv(ms.total), medal=mF+mS+mT;
-    const pmv=((PM[a]&&PM[a][b])||0), castig=pmv-run-medal, pesos=pmv*pairRaya(a,b);
+    const mF=ON.medal?mv(ms.first):0, mS=ON.medal?mv(ms.second):0, mT=ON.medal?mv(ms.total):0, medal=mF+mS+mT;
+    const pmv=((PM[a]&&PM[a][b])||0), casa=((PMX&&PMX[a]&&PMX[a][b])||0), castig=pmv-run-medal-casa, pesos=pmv*pairRaya(a,b);
     function mark(g,par,stroke,units,oyes){ if(!g) return '<span class="e">·</span>';
       const df=g-par, sh=df<=-2?'eagle':df===-1?'bird':df===1?'bog':df>=2?'dbog':'';
       let ex=''; (units||[]).forEach(u=>{ if(u!=='birdie'&&u!=='eagle') ex+=uEmoji(u); }); if(oyes) ex+='😎';
@@ -4380,10 +4403,10 @@ const App = (() => {
         + grid(back,[{label:'IN',par:S(back,'par'),ga:S(back,'ga'),gb:S(back,'gb'),va:run18+mF+mS},{label:'TOT',par:S(C,'par'),ga:S(C,'ga'),gb:S(C,'gb'),va:pmv}]);
     const vA=received(a,b), vB=received(b,a);
     const vNote=vA>0?`${_esc(cmpShortName(a))} recibe ${vA}`:(vB>0?`${_esc(cmpShortName(b))} recibe ${vB}`:'parejo');
-    const medTxt=nine?`Medal ${cmpRaya(medal)}`:`Medal ${cmpRaya(medal)} (1ª9 ${cmpRaya(mF)} · 2ª9 ${cmpRaya(mS)} · 18 ${cmpRaya(mT)})`;
+    const medTxt=!betOn(d,'medal')?'Medal —':(nine?`Medal ${cmpRaya(medal)}`:`Medal ${cmpRaya(medal)} (1ª9 ${cmpRaya(mF)} · 2ª9 ${cmpRaya(mS)} · 18 ${cmpRaya(mT)})`);
     return `<div class="cmp-card"><div class="cc-h"><span class="cc-t">${_esc(cmpShortName(a))} vs ${_esc(cmpShortName(b))}</span><span class="cc-m">${dbl?'dobló ✓ · ':''}${vNote}</span></div>`+
       grids+
-      `<div class="cc-f">${medTxt} · el medal entra en OUT/IN/TOT${castig?` · castigos <b class="${cls(castig)}">${cmpRaya(castig)}</b>`:''} → Neto <b class="${cls(pmv)}">${cmpRaya(pmv)} r = ${cmpMoney(pesos)}</b></div></div>`;
+      `<div class="cc-f">${medTxt} · el medal entra en OUT/IN/TOT${casa?` · de la casa <b class="${cls(casa)}">${cmpRaya(casa)}</b>`:''}${castig?` · castigos <b class="${cls(castig)}">${cmpRaya(castig)}</b>`:''} → Neto <b class="${cls(pmv)}">${cmpRaya(pmv)} r = ${cmpMoney(pesos)}</b></div></div>`;
   }
   function exportComprobante(){
     const d=curDay(); if(!d){ toast('No hay día activo'); return; }
@@ -4412,8 +4435,8 @@ const App = (() => {
     H+= res.sum===0?`<div class="cmp-ok">✓ Cuadra en cero — lo que unos ganan, otros lo pierden</div>`:`<div class="cmp-warn">⚠ Descuadre de ${cmpMoney(res.sum)} (capturas incompletas)</div>`;
     // — tarjetas por pareja (hoyo por hoyo, estilo caddie): el renglón "Va" lleva el acumulado del de arriba
     H+=`<div class="cmp-sec">Tarjetas por pareja · hoyo por hoyo</div><div class="cmp-hint">Como las lleva el caddie: el renglón <b>Va</b> suma hoyo por hoyo (match de hoyos + unidades + oyes) desde la perspectiva del jugador de arriba. El <b>•</b> marca el hoyo donde ese jugador recibe golpe de ventaja. Medal, doblar y castigos se suman abajo para el neto final (que cierra contra el cuadro de arriba).</div>`;
-    const ord=playOrder(d), Hs=holesOf(d), nine=isNine(d);
-    for(let i=0;i<N;i++)for(let j=i+1;j<N;j++){ H+=cmpCardHtml(d,ids[i],ids[j],ord,Hs,nine,PM); }
+    const ord=playOrder(d), Hs=holesOf(d), nine=isNine(d), PMX=res.pmx||{};
+    for(let i=0;i<N;i++)for(let j=i+1;j<N;j++){ H+=cmpCardHtml(d,ids[i],ids[j],ord,Hs,nine,PM,PMX); }
     // — cuentas T por jugador (esquema de mayor)
     H+=`<div class="cmp-sec">Cuentas T por jugador (esquema de mayor)</div><div class="cmp-grid">`;
     ids.forEach(a=>{ const debe=[],haber=[]; let sD=0,sH=0;
@@ -4556,7 +4579,7 @@ const App = (() => {
     exportData,renderCfg,renderVent,renderDay,closeModal,confirmYes,renderHigh,setHighTab,openProfile,rulesModal,editRulesModal,saveRules,
     exportComprobante,cmpPrint,cmpClose,photosModal,onPhotoPick,delPhoto,viewPhoto,forceUpdate,clearCacheReload,
     // Gancho de PRUEBAS (tests.html): acceso directo al motor con estado sintético. NO usar desde la UI.
-    __test:{ computeDay,_computeDayRaw,medalSeg,h2h,allocate,received,playOrder,orderIdx,isSecond,autoUnits,validManual,unitsOnHole,inferOyes,autoCast,dayStats,seasonStats,careerStats,clearStatCache,
+    __test:{ computeDay,_computeDayRaw,medalSeg,h2h,allocate,received,playOrder,orderIdx,isSecond,autoUnits,validManual,unitsOnHole,inferOyes,autoCast,dayStats,seasonStats,careerStats,clearStatCache,intHcp,intHcpOf,playerDiffs,
       setState:function(st){ state=Object.assign(state,st); clearStatCache(); },
       getState:function(){ return state; } } };
 })();

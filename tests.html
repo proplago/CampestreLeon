@@ -368,6 +368,46 @@ async function main(){
     t('bola faltante: hoyo 1 no compara (falta la 2ª bola del equipo B)',row(r4,'q1').pj1===0,row(r4,'q1').pj1);
   }
 
+  // ============ F17 · pmx: matriz de apuestas de la casa (para el comprobante) ============
+  sec('F17 pmx (dinero de la casa separado del residual de castigos)');
+  {
+    const vib={id:'vx',name:'Víbora',template:'evento',evento:'3putt',accion:'paga',alcance:'todos',rayas:1,dobla:true,on:true};
+    const pu=Array(18).fill(2); pu[4]=3;
+    const d=day({playing:['pa','pb','pc'],salidas:[['pa','pb','pc']],customBets:[vib],
+      scores:{pa:sc({gross:gross({0:3}),putts:pu}),pb:sc(),pc:sc()}});
+    reset({players:[P('pa','Ana A'),P('pb','Beto B'),P('pc','Caro C')],days:[d],currentDayId:d.id});
+    const res=T.computeDay(d);
+    t('pmx existe y es antisimétrica',res.pmx&&((res.pmx.pa||{}).pb||0)===-((res.pmx.pb||{}).pa||0),JSON.stringify(res.pmx));
+    t('pmx solo trae la casa: pa→pb = −1 (la víbora)',((res.pmx.pa||{}).pb||0)===-1,(res.pmx.pa||{}).pb);
+    // identidad del comprobante: PM − pmx === h2h.net (sin castigos core en escena)
+    let ok=true; ['pa','pb','pc'].forEach((x,i,arr)=>arr.forEach(y=>{ if(x===y) return;
+      const pmv=((res.pm[x]||{})[y]||0), px=((res.pmx[x]||{})[y]||0);
+      if(pmv-px!==T.h2h(d,x,y).net) ok=false; }));
+    t('PM − pmx ≡ h2h.net en toda pareja (el residual de castigos queda limpio)',ok);
+    t('cuadra en cero',res.sum===0,res.sum);
+  }
+
+  // ============ F18 · HCP interno (ventana de recencia + mejores vueltas) ============
+  sec('F18 HCP interno (últimas 20 vueltas, mejores 8 / 40%)');
+  {
+    // recencia: 20 vueltas recientes de +10 y 5 VIEJAS de −10 → las viejas NO cuentan
+    const dRec=Array(20).fill(10).concat(Array(5).fill(-10));
+    t('ventana de recencia: hcp=10 (ignora las heroicas viejas)',T.intHcp(dRec)===10,T.intHcp(dRec));
+    // pocas vueltas: 40% mejores — [8,4] → 1 vuelta → 4 · [10,6,2,14,4] → 2 mejores (2,4) → 3
+    t('2 vueltas → la mejor: 4',T.intHcp([8,4])===4,T.intHcp([8,4]));
+    t('5 vueltas → promedio de las 2 mejores: 3',T.intHcp([10,6,2,14,4])===3,T.intHcp([10,6,2,14,4]));
+    t('sin vueltas → null',T.intHcp([])===null,T.intHcp([]));
+    // intHcpOf desde días reales: día reciente diff 4, día viejo diff 8, y un día incompleto que se ignora
+    const g4=PARS.slice(); [0,1,2,3].forEach(i=>g4[i]++);         // +4
+    const g8=PARS.slice(); [0,1,2,3,4,5,6,7].forEach(i=>g8[i]++); // +8
+    const dNew=day({playing:['pa'],salidas:[['pa']],scores:{pa:sc({gross:g4})}});
+    const dOld=day({playing:['pa'],salidas:[['pa']],scores:{pa:sc({gross:g8})}});
+    const dInc=day({playing:['pa'],salidas:[['pa']],scores:{pa:sc({gross:gross(null,true)})}});  // solo 9 hoyos
+    reset({players:[P('pa','Ana A')],days:[dInc,dNew,dOld],currentDayId:dNew.id});   // days[0]=más reciente
+    t('playerDiffs ignora vueltas incompletas y va reciente-primero',JSON.stringify(T.playerDiffs('pa'))==='[4,8]',JSON.stringify(T.playerDiffs('pa')));
+    t('intHcpOf: 2 vueltas → la mejor = 4',T.intHcpOf('pa')===4,T.intHcpOf('pa'));
+  }
+
   window.__RESULTS__.ready=true;
   flush();
 }
