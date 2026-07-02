@@ -408,6 +408,25 @@ async function main(){
     t('intHcpOf: 2 vueltas → la mejor = 4',T.intHcpOf('pa')===4,T.intHcpOf('pa'));
   }
 
+  // ============ F19 · Integridad del catálogo de campos (seed curado) ============
+  sec('F19 seed de campos (par de 18 + índice permutación válida 1..18)');
+  {
+    const seed=T.COURSE_SEED||[];
+    t('el seed tiene campos',seed.length>0,seed.length);
+    const slugs={};
+    seed.forEach(c=>{
+      const n=c.par.length;
+      t(c.name+': par tiene 18 hoyos',n===18,n);
+      t(c.name+': índice tiene 18 hoyos',c.si.length===18,c.si.length);
+      const sorted=[...c.si].sort((a,b)=>a-b);
+      let perm=sorted.length===18; for(let i=0;i<18;i++) if(sorted[i]!==i+1) perm=false;
+      t(c.name+': índice es permutación exacta de 1..18',perm,JSON.stringify(sorted));
+      const allPar=c.par.every(p=>p>=3&&p<=6);
+      t(c.name+': pares plausibles (3..6)',allPar,JSON.stringify(c.par));
+      const slug=T.courseSlug(c.name); t(c.name+': slug único ('+slug+')',!slugs[slug],slug); slugs[slug]=1;
+    });
+  }
+
   window.__RESULTS__.ready=true;
   flush();
 }

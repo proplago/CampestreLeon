@@ -45,6 +45,13 @@
         "houseRules":  { ".write": "auth != null && (root.child('users').child(auth.uid).child('super').val() === true || root.child('leagueMembers').child($lid).child(auth.uid).child('role').val() === 'admin')" }
       }
     },
+    "coursesCatalog": {
+      ".read": "auth != null",
+      "$slug": {
+        ".write": "auth != null",
+        "name":  { ".validate": "newData.isString() && newData.val().length <= 60" }
+      }
+    },
     "photos": {
       "$lid": {
         ".read": "auth != null",

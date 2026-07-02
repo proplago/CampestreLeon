@@ -611,7 +611,7 @@
 
 <script>
 const App = (() => {
-  const APP_VERSION = '2026-07-02-38';   // ⬆️ SUBIR en cada deploy: la app se auto-recarga cuando detecta una versión distinta
+  const APP_VERSION = '2026-07-02-39';   // ⬆️ SUBIR en cada deploy: la app se auto-recarga cuando detecta una versión distinta
   const KEY = 'rayas-campestre-v2';
   const uid = () => Math.random().toString(36).slice(2,9);
   // Auto-actualización: revisa el index.html en vivo (sin caché); si la versión cambió, recarga a la versión fresca.
@@ -3453,7 +3453,7 @@ const App = (() => {
           <button class="btn outline sm" onclick="App.renameCourse()">✏️ Nombre</button>
           <button class="btn outline sm" onclick="App.courseModal()">Editar hoyos</button>
         </div></div>
-      <div style="font-size:12px;color:var(--muted)">Par total <b style="color:var(--ink)">${cc.holes.reduce((a,h)=>a+h.par,0)}</b>${state.courses.length>1?` · <span class="lnk" onclick="App.deleteCourse()" style="color:var(--clay);cursor:pointer">eliminar campo</span>`:''}</div></div>`;
+      <div style="font-size:12px;color:var(--muted)">Par total <b style="color:var(--ink)">${cc.holes.reduce((a,h)=>a+h.par,0)}</b> · <span class="lnk" onclick="App.publishCourse()" style="color:var(--fairway);cursor:pointer;text-decoration:underline">☁️ publicar al catálogo</span>${state.courses.length>1?` · <span class="lnk" onclick="App.deleteCourse()" style="color:var(--clay);cursor:pointer">eliminar campo</span>`:''}</div></div>`;
 
     // ===================== APP =====================
     html+=`<div class="cfg-sect">App</div>`;
@@ -3733,12 +3733,82 @@ const App = (() => {
 
   function cfgCourse(){ return state.courses.find(c=>c.id===cfgCourseId)||state.courses[0]; }
   function setCfgCourse(id){ if(state.courses.find(c=>c.id===id)) cfgCourseId=id; renderCfg(); }
-  function addCourse(){
-    const name=(prompt('Nombre del campo nuevo:','Campo nuevo')||'').trim(); if(!name) return;
-    const nc={id:uid(), name, holes:Array.from({length:18},(_,i)=>({n:i+1,par:4,si:i+1}))};
-    state.courses.push(nc); cfgCourseId=nc.id; save(); renderCfg();
-    toast('Campo agregado · ajusta par e índice');
+  // =========================================================
+  //  CATÁLOGO DE CAMPOS
+  //  Seed curado (tarjetas investigadas) + catálogo comunitario en RTDB (coursesCatalog/{slug}):
+  //  un campo se captura UNA vez y queda disponible para todos los grupos de la app.
+  // =========================================================
+  // Tarjetas curadas (par e índice investigados de fuentes oficiales/cruzadas). El par es sólido en todas;
+  // las marcadas con note:'índice por confirmar' tienen el SI en disputa entre fuentes (confirmar con tarjeta física).
+  const COURSE_SEED=[
+    {name:'El Bosque · Gran Jardín', city:'León, Gto',
+      par:[5,4,3,4,4,4,3,5,4,5,4,3,4,4,3,4,4,5], si:[7,17,9,11,13,1,15,5,3,12,8,18,2,4,16,6,10,14]},
+    {name:'Marina Vallarta', city:'Puerto Vallarta, Jal · par 71',
+      par:[5,4,4,3,5,3,4,4,4,5,4,5,3,4,3,4,3,4], si:[1,5,3,9,15,17,13,11,7,10,12,6,14,4,16,2,18,8]},
+    {name:'Vista Vallarta · Nicklaus', city:'Puerto Vallarta, Jal',
+      par:[4,4,5,4,3,4,4,5,3,5,4,5,4,4,3,4,3,4], si:[11,7,1,13,15,3,9,5,17,4,12,2,14,6,16,10,18,8]},
+    {name:'Vista Vallarta · Weiskopf', city:'Puerto Vallarta, Jal',
+      par:[4,4,3,5,4,4,3,5,4,5,4,4,3,4,3,4,5,4], si:[5,13,17,3,1,9,15,7,11,2,12,10,18,8,16,4,6,14]},
+    {name:'El Tigre', city:'Nuevo Vallarta, Nay',
+      par:[4,3,4,5,4,3,4,4,5,5,4,3,4,5,3,4,3,5], si:[3,15,7,13,1,17,11,9,5,18,6,12,2,16,14,4,10,8]},
+    {name:'Punta Mita · Pacífico', city:'Punta Mita, Nay',
+      par:[4,5,3,4,4,3,5,3,5,4,3,4,5,4,5,4,3,4], si:[9,5,15,11,1,13,7,17,3,8,16,18,2,14,10,4,12,6]},
+    {name:'Punta Mita · Bahía', city:'Punta Mita, Nay',
+      par:[4,5,3,4,3,5,4,5,3,4,3,4,5,4,4,3,4,5], si:[7,11,3,5,9,1,17,15,13,6,18,8,2,14,16,10,12,4]},
+    {name:'Ventanas de San Miguel', city:'San Miguel de Allende, Gto · par 71',
+      par:[5,4,3,4,3,5,5,4,3,4,4,3,4,5,4,4,3,4], si:[11,3,13,5,9,1,15,7,17,14,8,18,6,4,16,12,10,2]},
+    {name:'Malanquín', city:'San Miguel de Allende, Gto', note:'índice por confirmar',
+      par:[4,3,4,4,5,4,4,3,5,4,5,5,4,3,4,3,4,4], si:[15,11,3,1,7,5,17,13,9,18,8,12,2,14,16,10,6,4]},
+  ];
+  function catalogRef(){ return firebase.database().ref('coursesCatalog'); }
+  function courseSlug(name){ return (name||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'').slice(0,40)||'campo'; }
+  function mkCourseHoles(par,si){ return par.map((p,i)=>({n:i+1,par:p,si:(si&&si[i])||(i+1)})); }
+  function addCourse(){   // ahora abre el catálogo; crear en blanco sigue disponible adentro
+    let h=`<h3>Agregar campo</h3><div class="hint">Elige del catálogo (tarjetas ya capturadas) o crea uno en blanco.</div><div class="plist" id="cat_list">`;
+    COURSE_SEED.forEach((c,i)=>{ h+=`<div class="prow"><div class="grow"><div class="nm">⛳ ${_esc(c.name)}</div>
+      <div class="desc" style="font-size:11px;color:var(--muted)">${_esc(c.city||'')} · par ${c.par.reduce((a,b)=>a+b,0)}${c.note?' · '+_esc(c.note):''}</div></div>
+      <button class="btn outline sm" onclick="App.importSeedCourse(${i})">Usar</button></div>`; });
+    h+=`</div><div class="hint" id="cat_comm" style="margin-top:6px">☁️ Buscando campos de otros grupos…</div>
+      <button class="btn outline block" style="margin-top:10px" onclick="App.createBlankCourse()">+ Crear en blanco</button>`;
+    modal(h);
+    // catálogo comunitario (lazy): campos publicados por cualquier grupo de esta app
+    if(fbConfigured()) catalogRef().once('value').then(function(s){
+      const cat=s.val()||{}, box=document.getElementById('cat_list'), hint=document.getElementById('cat_comm');
+      if(!box) return;
+      const seedSlugs=COURSE_SEED.map(c=>courseSlug(c.name));
+      const keys=Object.keys(cat).filter(k=>seedSlugs.indexOf(k)<0);
+      if(hint) hint.textContent = keys.length ? '☁️ De otros grupos:' : (COURSE_SEED.length?'☁️ Aún no hay campos de otros grupos.':'☁️ Catálogo vacío — crea el primero.');
+      keys.forEach(function(k){ const c=cat[k]; if(!c||!c.holes) return;
+        const par=(c.holes||[]).reduce(function(a,h2){return a+(h2&&h2.par||0);},0);
+        const div=document.createElement('div'); div.className='prow';
+        div.innerHTML='<div class="grow"><div class="nm">☁️ '+_esc(c.name||k)+'</div><div class="desc" style="font-size:11px;color:var(--muted)">publicado por otro grupo · par '+par+'</div></div>'+
+          '<button class="btn outline sm" onclick="App.importCatCourse(\''+k+'\')">Usar</button>';
+        box.appendChild(div);
+      });
+    }).catch(function(){ const hint=document.getElementById('cat_comm'); if(hint) hint.textContent='☁️ Sin conexión al catálogo.'; });
   }
+  function _addCourseToGroup(name,holes,noteToast){
+    if(state.courses.find(c=>c.name.toLowerCase()===String(name).toLowerCase())){ toast('Ese campo ya está en tu grupo'); closeModal(); return; }
+    const nc={id:courseSlug(name)+'-'+uid().slice(0,4), name:name, holes:JSON.parse(JSON.stringify(holes))};
+    state.courses.push(nc); cfgCourseId=nc.id; save(); closeModal(); renderCfg(); toast(noteToast||('Campo agregado: '+name));
+  }
+  function importSeedCourse(i){ const c=COURSE_SEED[i]; if(!c) return;
+    _addCourseToGroup(c.name, mkCourseHoles(c.par,c.si), c.note?('⛳ '+c.name+' · '+c.note):('⛳ '+c.name+' listo')); }
+  function importCatCourse(k){ if(!fbConfigured()) return;
+    catalogRef().child(k).once('value').then(function(s){ const c=s.val(); if(!c||!c.holes){ toast('No se pudo leer el campo'); return; }
+      _addCourseToGroup(c.name||k, c.holes, '☁️ '+(c.name||k)+' importado'); }).catch(function(){ toast('No se pudo importar'); }); }
+  function createBlankCourse(){
+    const name=(prompt('Nombre del campo nuevo:','Campo nuevo')||'').trim(); if(!name) return;
+    _addCourseToGroup(name, Array.from({length:18},(_,i)=>({n:i+1,par:4,si:i+1})), 'Campo agregado · ajusta par e índice');
+  }
+  // Publica el campo seleccionado al catálogo comunitario (upsert por slug). Solo admin/súper.
+  function publishCourse(){ if(!isAdmin()){ toast('Solo el admin'); return; }
+    if(!fbConfigured()){ toast('Necesitas conexión'); return; }
+    const c=cfgCourse(); if(!c||!c.holes||c.holes.length<9){ toast('Campo incompleto'); return; }
+    const slug=courseSlug(c.name);
+    catalogRef().child(slug).set({ name:c.name, holes:c.holes, ts:Date.now(), by:leagueName(ACTIVE_LEAGUE) })
+      .then(function(){ toast('☁️ "'+c.name+'" publicado al catálogo — ya lo pueden usar todos los grupos'); })
+      .catch(function(){ toast('⚠️ No se pudo publicar (¿reglas de Firebase actualizadas?)'); }); }
   function renameCourse(){ const c=cfgCourse(); const name=(prompt('Nombre del campo:',c.name)||'').trim(); if(!name)return; c.name=name; save(); renderCfg(); }
   function deleteCourse(){
     if(state.courses.length<=1){ toast('Debe quedar al menos un campo'); return; }
@@ -4574,12 +4644,12 @@ const App = (() => {
     setVentFocus,pickVent,openBet,openH2H,setLiqTab,setScoreTab,setCmp,setVentPick,
     setDblPlayer,toggleDbl,closeDay,historyModal,exportImage,exportHigh,exportProfile,exportSalidas,exportSeasonTable,exportCompare,exportScorecard,toggleSound,
     setRaya,submitRayaPair,approveRayaReq,rejectRayaReq,removeRayaPair,createPlayer,editPlayerModal,savePlayer,delPlayer,toggleFav,
-    courseModal,setHole,setCfgCourse,addCourse,renameCourse,deleteCourse,unitModal,createUnit,delUnit,castModal,createCast,delCast,toggleCastTipo,
+    courseModal,setHole,setCfgCourse,addCourse,importSeedCourse,importCatCourse,createBlankCourse,publishCourse,renameCourse,deleteCourse,unitModal,createUnit,delUnit,castModal,createCast,delCast,toggleCastTipo,
     toggleBet,customBetModal,saveCustomBet,delCustomBet,toggleCustomBet,
     exportData,renderCfg,renderVent,renderDay,closeModal,confirmYes,renderHigh,setHighTab,openProfile,rulesModal,editRulesModal,saveRules,
     exportComprobante,cmpPrint,cmpClose,photosModal,onPhotoPick,delPhoto,viewPhoto,forceUpdate,clearCacheReload,
     // Gancho de PRUEBAS (tests.html): acceso directo al motor con estado sintético. NO usar desde la UI.
-    __test:{ computeDay,_computeDayRaw,medalSeg,h2h,allocate,received,playOrder,orderIdx,isSecond,autoUnits,validManual,unitsOnHole,inferOyes,autoCast,dayStats,seasonStats,careerStats,clearStatCache,intHcp,intHcpOf,playerDiffs,
+    __test:{ computeDay,_computeDayRaw,medalSeg,h2h,allocate,received,playOrder,orderIdx,isSecond,autoUnits,validManual,unitsOnHole,inferOyes,autoCast,dayStats,seasonStats,careerStats,clearStatCache,intHcp,intHcpOf,playerDiffs,COURSE_SEED,courseSlug,
       setState:function(st){ state=Object.assign(state,st); clearStatCache(); },
       getState:function(){ return state; } } };
 })();
