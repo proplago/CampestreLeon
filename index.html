@@ -611,7 +611,7 @@
 
 <script>
 const App = (() => {
-  const APP_VERSION = '2026-07-03-51';   // ⬆️ SUBIR en cada deploy: la app se auto-recarga cuando detecta una versión distinta
+  const APP_VERSION = '2026-07-03-52';   // ⬆️ SUBIR en cada deploy: la app se auto-recarga cuando detecta una versión distinta
   const KEY = 'rayas-campestre-v2';
   const uid = () => Math.random().toString(36).slice(2,9);
   // Auto-actualización: revisa el index.html en vivo (sin caché); si la versión cambió, recarga a la versión fresca.
@@ -1094,11 +1094,14 @@ const App = (() => {
   // El día MÁS RECIENTE por fecha (empate → el creado más reciente, que es state.days[0]). Cubre "la pasada o la que viene si ya está creada".
   function mostRecentDayId(){ if(!state.days||!state.days.length) return null;
     let best=state.days[0]; state.days.forEach(d=>{ if((d.date||'')>(best.date||'')) best=d; }); return best.id; }
-  // Al abrir (o la 1ª vez que bajan días por sync) cae en la salida más reciente para TODOS; también repara si el día actual ya no existe.
-  // NO pisa la navegación manual del usuario a mitad de sesión (solo la 1ª vez, o si su día se borró).
+  // El día visto se guarda APARTE (no viaja en los shards de Firebase; en un refresh normal currentDayId llega null).
+  function curDayKey(){ return 'cl_curday::'+ACTIVE_LEAGUE; }
+  function rememberCurDay(){ try{ if(state.currentDayId) localStorage.setItem(curDayKey(), state.currentDayId); }catch(e){} }
+  // Al abrir: respeta el día que el usuario tenía (persistido); si no hay uno válido, cae en el más reciente. NO pisa su selección en un refresh.
   function autoPickDay(){ if(!state.days||!state.days.length) return;
-    const valid=state.days.some(d=>d.id===state.currentDayId);
-    if(_openedFresh || !valid){ state.currentDayId=mostRecentDayId(); _openedFresh=false; } }
+    if(state.days.some(d=>d.id===state.currentDayId)) return;                 // ya hay un día válido → respétalo
+    try{ const saved=localStorage.getItem(curDayKey()); if(saved && state.days.some(d=>d.id===saved)){ state.currentDayId=saved; return; } }catch(e){}   // restaura el último que vio
+    state.currentDayId=mostRecentDayId(); rememberCurDay(); }
   function dayPlayers(d){ if(d.playing) return [...d.playing]; return (d.salidas||[]).reduce((a,g)=>a.concat(g||[]),[]); }
   // Cap de salida por día de la semana: sáb/dom máx 5 (fivesome), entre semana máx 6 (sixsome).
   function dayOfWeek(d){ if(!d||!d.date) return null; const m=/^(\d{4})-(\d{2})-(\d{2})/.exec(d.date); if(!m) return null; return new Date(+m[1],+m[2]-1,+m[3]).getDay(); }
@@ -1821,9 +1824,9 @@ const App = (() => {
     if((x=topBy(S,ids,'holeouts'))) push('🕳️','Hole out',x.name,'×'+x.val,'good');
     // TODOS los que iban abajo se salvaron por el clima — título variado (con la voz de la app), uno distinto por jugador
     if(wash){ const savers=played.filter(s=>s.pesos<0).sort((a,b)=>a.pesos-b.pesos);
-      savers.forEach((s,i)=>{ const T=SAVED_TROPHIES[i%SAVED_TROPHIES.length]; push(T[0],T[1],s.name,_money(-s.pesos)+' '+(T[2]||'que no pagó'),'gold'); });
+      savers.forEach((s,i)=>{ const T=SAVED_TROPHIES[i%SAVED_TROPHIES.length]; push(T[0],T[1],s.name,_money(-s.pesos),'gold'); });   // val corto (solo el monto que esquivó); la frase va en el título
       const robbed=played.filter(s=>s.pesos>0).sort((a,b)=>b.pesos-a.pesos);   // iban ganando y la lluvia les quitó el cobro
-      robbed.forEach((s,i)=>{ const M=MISSED_TROPHIES[i%MISSED_TROPHIES.length]; push(M[0],M[1],s.name,_money(s.pesos)+' '+(M[2]||'que no cobró'),''); }); }
+      robbed.forEach((s,i)=>{ const M=MISSED_TROPHIES[i%MISSED_TROPHIES.length]; push(M[0],M[1],s.name,_money(s.pesos),''); }); }
     else if(bot&&bot.pesos<0) push('💸','Cajero del día',bot.name,_money(bot.pesos),'bad');
     if((x=topBy(S,ids,'coldStreak'))&&x.val>=2) push('🧊','Racha fría',x.name,x.val+' hoyos','bad');
     if((x=topBy(S,ids,'zopilotes'))) push('🦃','Zopilotero',x.name,'×'+x.val,'bad');
@@ -1843,8 +1846,8 @@ const App = (() => {
     if(nem){ push('⚔️','Nemesis',pname(nem.a)+' ›› '+pname(nem.b),_money(nem.val*state.rayaValue),'gold'); }
     if(bot&&bot.pesos<0) push('💸','El que más paga',bot.name,_money(bot.pesos),'bad');
     const worst=ids.map(id=>A[id]).filter(a=>a.worstDay!=null).sort((a,b)=>a.worstDay-b.worstDay)[0]; if(worst&&worst.worstDay<0) push('📉','Peor viernes',worst.name,_money(worst.worstDay),'bad');
-    const svd=ids.map(id=>A[id]).filter(a=>a.saved>0).sort((a,b)=>b.saved-a.saved)[0]; if(svd) push('🛟','Salvado por el clima',svd.name,_money(svd.saved)+' 🌂','gold');   // La Acapulqueña: lo que esquivó de pagar
-    const msd=ids.map(id=>A[id]).filter(a=>a.missed>0).sort((a,b)=>b.missed-a.missed)[0]; if(msd) push('🌂','El que más dejó de cobrar',msd.name,_money(msd.missed)+' que borró la lluvia','bad');   // iba ganando y el clima le quitó el cobro
+    const svd=ids.map(id=>A[id]).filter(a=>a.saved>0).sort((a,b)=>b.saved-a.saved)[0]; if(svd) push('🛟','Salvado por el clima',svd.name,_money(svd.saved),'gold');   // La Acapulqueña: lo que esquivó de pagar
+    const msd=ids.map(id=>A[id]).filter(a=>a.missed>0).sort((a,b)=>b.missed-a.missed)[0]; if(msd) push('🌂','El que más dejó de cobrar',msd.name,_money(msd.missed),'bad');   // iba ganando y el clima le quitó el cobro
     state.castigos.forEach(c=>{ const t=topCast(A,ids,c.id); if(t) push(c.emoji||'🍺','Rey del '+((c.name||'castigo').split(' ')[0]),t.name,'×'+t.val,'bad'); });
     if((x=topBy(A,ids,'cancels'))) push('🐔','Rey de las canceladas',x.name,'×'+x.val,'bad');
     if((x=topBy(A,ids,'noshows'))) push('👻','Fantasma del viernes',x.name,'×'+x.val,'bad');
@@ -3706,9 +3709,9 @@ const App = (() => {
     const salidaTimes=(lastDay&&Array.isArray(lastDay.salidaTimes))?lastDay.salidaTimes.slice():['2:10','2:20'];
     const d={id:uid(),date,label,playing:[],salidas:[[],[]],start:1,holes:18,courseId:lastCourse,salidaTimes,doubles:{},closed:false,scores:{},
       bets:snapshotBets(),customBets:activeCustomList()};   // snapshot: las apuestas del día se congelan al crearlo
-    state.days.unshift(d); state.currentDayId=d.id; save(); closeModal(); go('day');
+    state.days.unshift(d); state.currentDayId=d.id; rememberCurDay(); save(); closeModal(); go('day');
   }
-  function switchDay(id){ state.currentDayId=id; save(); render(); }
+  function switchDay(id){ state.currentDayId=id; rememberCurDay(); save(); render(); }
 
   function daysModal(){
     const admin=isAdmin();
