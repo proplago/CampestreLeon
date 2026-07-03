@@ -611,7 +611,7 @@
 
 <script>
 const App = (() => {
-  const APP_VERSION = '2026-07-03-44';   // ⬆️ SUBIR en cada deploy: la app se auto-recarga cuando detecta una versión distinta
+  const APP_VERSION = '2026-07-03-45';   // ⬆️ SUBIR en cada deploy: la app se auto-recarga cuando detecta una versión distinta
   const KEY = 'rayas-campestre-v2';
   const uid = () => Math.random().toString(36).slice(2,9);
   // Auto-actualización: revisa el index.html en vivo (sin caché); si la versión cambió, recarga a la versión fresca.
@@ -1435,7 +1435,7 @@ const App = (() => {
   function dayAllFinished(d){ const ids=dayPlayers(d).filter(Boolean); if(!ids.length) return false; const order=playOrder(d);
     return ids.every(pid=>{ if(isRetired(d,pid)) return true; const sc=ensureScore(d,pid); return order.every(h=>sc.gross[h]); }); }
   // FINAL = todos capturaron sus hoyos, O el día está cerrado (lo que pase primero)
-  function isFinalDay(d){ return !!(d.closed || dayAllFinished(d)); }
+  function isFinalDay(d){ return !!(d.closed || d.washout || dayAllFinished(d)); }
 
   // ---- Liquidación ----
   function renderLiq(){
@@ -1455,7 +1455,7 @@ const App = (() => {
     const val=validateDay(d);
     // El aviso de validación solo aplica antes de cerrar; en un día cerrado se omite (ya hay banner de "Día cerrado").
     const skTxt=(val.skipped||[]).map(x=>x.name+' '+x.msg).join(' · ');
-    const valBanner = d.closed ? '' : (
+    const valBanner = (d.closed||d.washout) ? '' : (
       val.issues.length
         ? `<div class="valbar warn"><b>⚠ Revisa antes de cerrar</b><div class="valdet">${val.issues.map(x=>x.name+': '+x.msg).join(' · ')}${skTxt?' · '+skTxt:''}</div></div>`
         : skTxt
@@ -1465,7 +1465,10 @@ const App = (() => {
     const ini=s=>(s||'').trim().split(/\s+/).slice(0,2).map(w=>w[0]||'').join('').toUpperCase();
     const fmtP=n=> n>0?'+'+n.toLocaleString('es-MX') : n<0?'−'+Math.abs(n).toLocaleString('es-MX') : '0';
     const clsP=n=> n>0?'pos':n<0?'neg':'zero';
-    let html=seg+valBanner;
+    const wash=!!d.washout;   // 🌂 La Acapulqueña: apuestas canceladas por clima
+    const pesoTxt=n=> wash ? `<span style="text-decoration:line-through;opacity:.5">${fmtP(n)}</span>${n<0?' 🛟':''}` : fmtP(n);
+    const washBanner = wash ? `<div class="valbar" style="background:#e6f1fb;border:1px solid #b5d4f4;color:#185fa5"><b>🌂 La Acapulqueña</b> · campo cerrado por clima — apuestas <b>canceladas</b>, nadie paga. Queda la carrilla y el 🛟 salvavidas.</div>` : '';
+    let html=seg+washBanner+valBanner;
     const fin=isFinalDay(d), hasScores=dayAnyScores(d);
     const statusTag = fin ? `<span class="pgfinal">FINAL</span>` : `<span class="pglive">EN VIVO</span>`;
 
@@ -1477,7 +1480,7 @@ const App = (() => {
           ${first?`<div class="pod-crown"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#b98a2e" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 8.5l4 3.2L12 5l4.5 6.7 4-3.2-1.6 9.3H5.1Z"/><path d="M5.5 20.5h13"/></svg></div>`:''}
           <div class="pod-av">${ini(pname(r.id))}</div>
           <div class="pod-name">${pname(r.id)}</div>
-          <div class="pod-pesos ${clsP(r.pesos)}">${fmtP(r.pesos)}</div>
+          <div class="pod-pesos ${clsP(r.pesos)}">${pesoTxt(r.pesos)}</div>
           <div class="pod-base">${idx+1}</div>
         </div>`;
       });
@@ -1494,7 +1497,7 @@ const App = (() => {
       html+=`<div class="lb-row" onclick="App.openBet('${r.id}')">
         <div class="pos">${i+1}</div>
         <div class="nm">${pname(r.id)}${i===0?' <span class="star">★</span>':''}${p&&p.guest?' <span style="font-size:10px;color:var(--muted-2)">·inv</span>':''}${thru}</div>
-        <div class="pesos ${clsP(r.pesos)}">${fmtP(r.pesos)}</div>
+        <div class="pesos ${clsP(r.pesos)}">${pesoTxt(r.pesos)}</div>
         <div class="rayas">${r.total>0?'+':r.total<0?'−':''}${Math.abs(r.total)||0}</div>
       </div>`;
     });
@@ -1503,14 +1506,16 @@ const App = (() => {
       ? `<div class="lbcap final">✓ Resultado FINAL · posiciones firmes</div>`
       : `<div class="lbcap live">⏳ Provisional · cada quien va en distinto hoyo (thru). Las posiciones se fijan cuando todos terminen o al cerrar.</div>`;
 
-    html+= res.sum===0
+    if(!wash) html+= res.sum===0
       ? `<div class="zeroline"><span class="zchk">✓</span>Cuadra en cero${d.closed?'':' · listo para cerrar'}</div>`
       : `<div class="valbar warn" style="margin-top:12px">⚠ Descuadre de $${res.sum} (revisa capturas incompletas)</div>`;
-    html+= d.closed
-      ? `<div class="valbar ok" style="margin-top:6px">✓ Día cerrado · ventajas ajustadas (ver historial en Ventajas)</div>`
-      : (isAdmin()
-          ? `<button class="btn block" onclick="App.closeDay()">Cerrar el día y ajustar ventajas</button>`
-          : `<div class="hint" style="margin-top:6px">El admin cierra el día al terminar (ajusta las ventajas).</div>`);
+    html+= wash
+      ? `<div class="valbar" style="background:#e6f1fb;border:1px solid #b5d4f4;color:#185fa5;margin-top:6px">🌂 La Acapulqueña — apuestas canceladas por clima.${isAdmin()?` <span onclick="App.washoutDay()" style="text-decoration:underline;cursor:pointer;font-weight:600">reactivar</span>`:''}</div>`
+      : d.closed
+        ? `<div class="valbar ok" style="margin-top:6px">✓ Día cerrado · ventajas ajustadas (ver historial en Ventajas)</div>`
+        : (isAdmin()
+            ? `<button class="btn block" onclick="App.closeDay()">Cerrar el día y ajustar ventajas</button><button class="btn ghost block" style="margin-top:8px;color:#185fa5;border-color:#b5d4f4" onclick="App.washoutDay()">🌂 La Acapulqueña · cancelar por clima</button>`
+            : `<div class="hint" style="margin-top:6px">El admin cierra el día al terminar (ajusta las ventajas).</div>`);
     html+=`<div class="exprow"><button class="expbtn" onclick="App.exportImage()">📸 Imagen</button><button class="expbtn" onclick="App.exportComprobante()">📄 Comprobante PDF</button><button class="expbtn" onclick="App.photosModal()">📷 Fotos</button></div>`;
 
     // desglose por concepto
@@ -1689,26 +1694,28 @@ const App = (() => {
       });
       S[id]=st;
     });
-    return {S,ids,res,order};
+    return {S,ids,res,order,washout:!!d.washout};
   }
 
   function seasonStats(){
     const ids=state.players.filter(p=>!p.guest).map(p=>p.id);   // invitados fuera de los trofeos de temporada
-    const A={}; ids.forEach(id=>A[id]={id,name:pname(id),pesos:0,birdies:0,eagles:0,aces:0,oyesWon:0,calacas:0,sandies:0,castigos:0,castById:{},days:0,fridayStreak:0,_run:0,cancels:0,noshows:0,lastDate:null,bestDay:null,worstDay:null});
+    const A={}; ids.forEach(id=>A[id]={id,name:pname(id),pesos:0,saved:0,washouts:0,birdies:0,eagles:0,aces:0,oyesWon:0,calacas:0,sandies:0,castigos:0,castById:{},days:0,fridayStreak:0,_run:0,cancels:0,noshows:0,lastDate:null,bestDay:null,worstDay:null});
     const PM={}; const chrono=[...state.days].reverse();
-    chrono.forEach(d=>{ const st=dayStats(d);
+    chrono.forEach(d=>{ const st=dayStats(d); const wash=!!d.washout;   // La Acapulqueña: día cancelado por clima, no mueve dinero
       (d.cancels||[]).forEach(cc=>{ const a=A[cc.pid]; if(!a) return; if(cc.type==='noshow')a.noshows++; else a.cancels++; });
       const resPM=(st.res&&st.res.pm)||{};   // día vacío (salida auto-creada sin jugadores) → matriz vacía, no truena
       st.ids.forEach(id=>{ if(!A[id]) return; const s=st.S[id]; if(s.played===0) return; const a=A[id];
         // saldo de temporada: SOLO vs internos (lo jugado vs invitados no se acumula)
         const pmRow=resPM[id]||{}; let ipesos=0; Object.keys(pmRow).forEach(o=>{ const op=player(o); if(op && !op.guest) ipesos+=pmRow[o]*pairRaya(id,o); });
-        a.pesos+=ipesos;a.birdies+=s.birdies;a.eagles+=s.eagles;a.aces+=s.aces;a.oyesWon+=s.oyesWon;a.calacas+=s.calacas;a.sandies+=s.sandies;a.castigos+=s.castigos;a.days++;
+        a.birdies+=s.birdies;a.eagles+=s.eagles;a.aces+=s.aces;a.oyesWon+=s.oyesWon;a.calacas+=s.calacas;a.sandies+=s.sandies;a.castigos+=s.castigos;a.days++;
         Object.keys(s.castById||{}).forEach(k=>a.castById[k]=(a.castById[k]||0)+s.castById[k]);
+        if(wash){ a.washouts++; if(ipesos<0) a.saved+=(-ipesos); if(d.date && (!a.lastDate || d.date>a.lastDate)) a.lastDate=d.date; return; }   // 🌂 clima: NO cuenta dinero, guarda lo que "se salvó"
+        a.pesos+=ipesos;
         if(a.bestDay===null||ipesos>a.bestDay)a.bestDay=ipesos; if(a.worstDay===null||ipesos<a.worstDay)a.worstDay=ipesos;
         a._run=ipesos>0?a._run+1:0; if(a._run>a.fridayStreak)a.fridayStreak=a._run;
         if(d.date && (!a.lastDate || d.date>a.lastDate)) a.lastDate=d.date;
       });
-      Object.keys(resPM).forEach(a=>{ PM[a]=PM[a]||{}; Object.keys(resPM[a]).forEach(b=>{ PM[a][b]=(PM[a][b]||0)+resPM[a][b]; }); });
+      if(!wash) Object.keys(resPM).forEach(a=>{ PM[a]=PM[a]||{}; Object.keys(resPM[a]).forEach(b=>{ PM[a][b]=(PM[a][b]||0)+resPM[a][b]; }); });   // clima no cuenta para el h2h de temporada
     });
     let nem=null; Object.keys(PM).forEach(a=>Object.keys(PM[a]).forEach(b=>{ const v=PM[a][b]; if(v>0 && A[a] && A[b] && (!nem||v>nem.val)) nem={a,b,val:v}; }));   // sin invitados
     return {A, ids: ids.filter(id=>A[id].days>0 || A[id].cancels>0 || A[id].noshows>0), nem};
@@ -1738,12 +1745,18 @@ const App = (() => {
     const play=ids.map(id=>S[id]).filter(s=>s.played>0); if(!play.length) return L.slice(0,7);
     const sorted=[...play].sort((a,b)=>a.pesos-b.pesos); const loser=sorted[0], winner=sorted[sorted.length-1];
     const closed=!!(dC&&dC.closed);   // ronda abierta → presente/progresivo · cerrada → pasado (resultado definitivo)
-    if(winner&&winner.pesos>0) L.push(_pick(closed
+    const wash=!!(dC&&dC.washout);   // 🌂 La Acapulqueña: se cerró el campo por clima, se cancelan las apuestas
+    if(wash){
+      L.push(_pick([`🌂 LA ACAPULQUEÑA — se cerró el campo por clima, ¡se cancelaron las apuestas!`,`☔ Llovió y se cayó todo: nadie paga hoy, gracias al de arriba 🙏`]));
+      play.filter(s=>s.pesos<0).sort((a,b)=>a.pesos-b.pesos).forEach(s=>L.push(_pick([`🛟 ${s.name} se salvó de pagar ${_money(-s.pesos)} — bendita lluvia`,`${s.name} iba pagando ${_money(-s.pesos)} y lo salvó el clima 🌂 qué suerte`,`🍀 ${s.name} jugó pésimo pero no pagó: ${_money(-s.pesos)} que se esfumaron`])));
+      play.filter(s=>s.pesos>0).forEach(s=>L.push(`😤 ${s.name} iba cobrando ${_money(s.pesos)} y se quedó con las ganas — culpa de la lluvia`));
+    }
+    if(!wash && winner&&winner.pesos>0) L.push(_pick(closed
       ? [`👑 ${winner.name} arrasó con ${_money(winner.pesos)}`,`${winner.name} cobró parejo: ${_money(winner.pesos)} 🤑`]
       : [`👑 ${winner.name} va arrasando con ${_money(winner.pesos)}`,`${winner.name} va cobrando parejo: ${_money(winner.pesos)} 🤑`]));
     play.filter(s=>s.hotStreak>=3).forEach(s=>L.push(`🔥 ${s.name} se prendió: ${s.hotStreak} hoyos ganados al hilo`));
     play.filter(s=>s.birdieStreak>=2).forEach(s=>L.push(`🐦‍🔥 ${s.name} hiló ${s.birdieStreak} pajaritos seguidos`));
-    if(loser&&loser.pesos<0) L.push(_pick(closed
+    if(!wash && loser&&loser.pesos<0) L.push(_pick(closed
       ? [`${loser.name} dejó ${_money(-loser.pesos)} en la mesa 📉`,`Pagó la fiesta: ${loser.name} con ${_money(loser.pesos)} 💸`,`${loser.name}, ¿seguro trajiste palos? ${_money(loser.pesos)} 😂`]
       : [`${loser.name} va dejando ${_money(-loser.pesos)} en la mesa 📉`,`Va pagando la fiesta: ${loser.name} con ${_money(loser.pesos)} 💸`,`${loser.name}, ¿seguro trajiste palos? ${_money(loser.pesos)} 😂`]));
     play.filter(s=>(s.castById||{}).calaca>0).forEach(s=>{const n=s.castById.calaca; L.push(_pick(closed
@@ -1773,10 +1786,10 @@ const App = (() => {
     return L.slice(0,7);
   }
 
-  function dayHighlights(st){ const {S,ids}=st; const out=[]; const push=(e,t,n,v,c)=>out.push({e,t,n,v,c});
+  function dayHighlights(st){ const {S,ids}=st; const wash=st.washout; const out=[]; const push=(e,t,n,v,c)=>out.push({e,t,n,v,c});
     const played=ids.map(id=>S[id]).filter(s=>s.played>0); if(!played.length) return out;
     const sorted=[...played].sort((a,b)=>b.pesos-a.pesos); const top=sorted[0], bot=sorted[sorted.length-1]; let x;
-    if(top&&top.pesos>0) push('👑','Líder del día',top.name,_money(top.pesos),'gold');
+    if(!wash && top&&top.pesos>0) push('👑','Líder del día',top.name,_money(top.pesos),'gold');   // clima: no hubo dinero
     if((x=topBy(S,ids,'aces'))) push('⛳','¡Hoyo en uno!',x.name,'×'+x.val,'ace');
     if((x=topBy(S,ids,'birdies'))) push('🐦','Rey del birdie',x.name,'×'+x.val,'good');
     if((x=topBy(S,ids,'eagles'))) push('🦅','Águila',x.name,'×'+x.val,'good');
@@ -1784,7 +1797,8 @@ const App = (() => {
     if((x=topBy(S,ids,'hotStreak'))&&x.val>=2) push('🔥','Racha caliente',x.name,x.val+' hoyos','fire');
     if((x=topBy(S,ids,'birdieStreak'))&&x.val>=2) push('🐦‍🔥','Racha de pajaritos',x.name,'×'+x.val,'fire');
     if((x=topBy(S,ids,'holeouts'))) push('🕳️','Hole out',x.name,'×'+x.val,'good');
-    if(bot&&bot.pesos<0) push('💸','Cajero del día',bot.name,_money(bot.pesos),'bad');
+    if(bot&&bot.pesos<0){ if(wash) push('🛟','Salvavidas',bot.name,_money(-bot.pesos)+' que no pagó 🌂','gold'); else push('💸','Cajero del día',bot.name,_money(bot.pesos),'bad'); }
+    if(wash) played.filter(s=>s.pesos<0 && s!==bot).forEach(s=>push('🌂','Salvado por la lluvia',s.name,_money(-s.pesos)+' que no pagó','gold'));   // carrilla: todos los que iban perdiendo se salvaron
     if((x=topBy(S,ids,'coldStreak'))&&x.val>=2) push('🧊','Racha fría',x.name,x.val+' hoyos','bad');
     if((x=topBy(S,ids,'zopilotes'))) push('🦃','Zopilotero',x.name,'×'+x.val,'bad');
     state.castigos.forEach(c=>{ const t=topCast(S,ids,c.id); if(t) push(c.emoji||'🍺','Rey del '+((c.name||'castigo').split(' ')[0]),t.name,'×'+t.val,'bad'); });
@@ -1803,6 +1817,7 @@ const App = (() => {
     if(nem){ push('⚔️','Nemesis',pname(nem.a)+' ›› '+pname(nem.b),_money(nem.val*state.rayaValue),'gold'); }
     if(bot&&bot.pesos<0) push('💸','El que más paga',bot.name,_money(bot.pesos),'bad');
     const worst=ids.map(id=>A[id]).filter(a=>a.worstDay!=null).sort((a,b)=>a.worstDay-b.worstDay)[0]; if(worst&&worst.worstDay<0) push('📉','Peor viernes',worst.name,_money(worst.worstDay),'bad');
+    const svd=ids.map(id=>A[id]).filter(a=>a.saved>0).sort((a,b)=>b.saved-a.saved)[0]; if(svd) push('🛟','Salvado por el clima',svd.name,_money(svd.saved)+' 🌂','gold');   // La Acapulqueña: lo que esquivó de pagar
     state.castigos.forEach(c=>{ const t=topCast(A,ids,c.id); if(t) push(c.emoji||'🍺','Rey del '+((c.name||'castigo').split(' ')[0]),t.name,'×'+t.val,'bad'); });
     if((x=topBy(A,ids,'cancels'))) push('🐔','Rey de las canceladas',x.name,'×'+x.val,'bad');
     if((x=topBy(A,ids,'noshows'))) push('👻','Fantasma del viernes',x.name,'×'+x.val,'bad');
@@ -2246,6 +2261,12 @@ const App = (() => {
     apply();
   }
 
+  // ---- La Acapulqueña: campo cerrado por clima → apuestas canceladas (nadie paga), pero queda la carrilla y el 🛟 salvavidas ----
+  function washoutDay(){ if(!isAdmin()){ toast('Solo el admin'); return; } const d=curDay(); if(!d) return;
+    if(d.washout){ confirmModal('¿Reactivar las apuestas de este día? (quitar La Acapulqueña)','Reactivar',()=>{ d.washout=false; save(); clearStatCache(); render(); toast('Apuestas reactivadas'); }); return; }
+    confirmModal('🌂 <b>La Acapulqueña</b>: se cerró el campo por clima. Se <b>cancelan todas las apuestas</b> — nadie paga. Queda la carrilla y el 🛟 salvavidas para los que iban perdiendo. ¿Aplicar?','Aplicar Acapulqueña',()=>{
+      d.washout=true; autoCreateNext(d); save(); clearStatCache(); render(); toast('🌂 La Acapulqueña — apuestas canceladas, quedó la carrilla'); });
+  }
   // ---- Cerrar viernes + sliding automático ----
   function closeDay(){
     const d=curDay(); if(!d) return;
@@ -4715,14 +4736,14 @@ const App = (() => {
     toggleAssign:null,togglePlaying,cancelPlayer,moveGroup,confirmMove,sorteo,cycleParejas,setSalidaTime,addGuestModal,
     pickScore,score,putt,setOyes,quick,toggleUnit,toggleCast,navHole,gotoPending,gotoPlayerPending,setScoreGroup,setStart,setSalidaStart,setHoles,setCourse,
     setVentFocus,pickVent,openBet,openH2H,setLiqTab,setScoreTab,setCmp,setVentPick,
-    setDblPlayer,toggleDbl,closeDay,historyModal,exportImage,exportHigh,exportProfile,exportSalidas,exportSeasonTable,exportCompare,exportScorecard,toggleSound,
+    setDblPlayer,toggleDbl,closeDay,washoutDay,historyModal,exportImage,exportHigh,exportProfile,exportSalidas,exportSeasonTable,exportCompare,exportScorecard,toggleSound,
     setRaya,submitRayaPair,approveRayaReq,rejectRayaReq,removeRayaPair,createPlayer,editPlayerModal,savePlayer,delPlayer,toggleFav,
     courseModal,setHole,setCfgCourse,addCourse,importSeedCourse,importCatCourse,createBlankCourse,publishCourse,renameCourse,deleteCourse,unitModal,createUnit,delUnit,castModal,createCast,delCast,toggleCastTipo,
     toggleBet,customBetModal,saveCustomBet,delCustomBet,toggleCustomBet,
     exportData,renderCfg,renderVent,renderDay,closeModal,confirmYes,renderHigh,setHighTab,openProfile,rulesModal,editRulesModal,saveRules,
     exportComprobante,cmpPrint,cmpClose,photosModal,onPhotoPick,delPhoto,viewPhoto,forceUpdate,clearCacheReload,
     // Gancho de PRUEBAS (tests.html): acceso directo al motor con estado sintético. NO usar desde la UI.
-    __test:{ computeDay,_computeDayRaw,medalSeg,h2h,allocate,received,playOrder,orderIdx,isSecond,autoUnits,validManual,unitsOnHole,inferOyes,autoCast,dayStats,seasonStats,careerStats,clearStatCache,intHcp,intHcpOf,playerDiffs,COURSE_SEED,courseSlug,mostRecentDayId,autoPickDay,resetOpenedFresh:function(){_openedFresh=true;},startOf,pairSameStart,dayMixedStarts,salidaStartOf,firstNineDone,isRetired,dayAllFinished,validateDay,dayThru,
+    __test:{ computeDay,_computeDayRaw,medalSeg,h2h,allocate,received,playOrder,orderIdx,isSecond,autoUnits,validManual,unitsOnHole,inferOyes,autoCast,dayStats,seasonStats,careerStats,clearStatCache,intHcp,intHcpOf,playerDiffs,COURSE_SEED,courseSlug,mostRecentDayId,autoPickDay,resetOpenedFresh:function(){_openedFresh=true;},startOf,pairSameStart,dayMixedStarts,salidaStartOf,firstNineDone,isRetired,dayAllFinished,validateDay,dayThru,dayHighlights,dayCarrilla,
       setState:function(st){ state=Object.assign(state,st); clearStatCache(); },
       getState:function(){ return state; } } };
 })();

@@ -558,6 +558,33 @@ async function main(){
     t('pb NO aparece como incompleto',!v.issues.some(i=>i.name===T.getState().players.find(p=>p.id==='pb').name && /faltan/.test(i.msg)),'');
   }
 
+  // ============ F27 · La Acapulqueña (día cancelado por clima) ============
+  sec('F27 clima: no cuenta dinero en temporada, guarda el salvavidas, motor intacto');
+  {
+    const d=day({playing:['pa','pb'],salidas:[['pa','pb']],washout:true,scores:{pa:sc({gross:gross({0:3})}),pb:sc()}});
+    reset({players:[P('pa','Ana'),P('pb','Beto')],days:[d],currentDayId:d.id});
+    const res=T.computeDay(d);
+    t('el motor NO cambia con la marca: sigue cuadrando en cero',res.sum===0,res.sum);
+    t('pb iba perdiendo $80 (4 rayas × $20)',row(res,'pb').pesos===-80,row(res,'pb').pesos);
+    const ss=T.seasonStats();
+    t('clima: pa.pesos NO cuenta (0)',ss.A.pa.pesos===0,ss.A.pa.pesos);
+    t('clima: pb.pesos NO cuenta (0)',ss.A.pb.pesos===0,ss.A.pb.pesos);
+    t('salvavidas: pb.saved = 80 (lo que esquivó de pagar)',ss.A.pb.saved===80,ss.A.pb.saved);
+    t('el que iba ganando (pa) no acumula saved',ss.A.pa.saved===0,ss.A.pa.saved);
+    t('pb.washouts = 1',ss.A.pb.washouts===1,ss.A.pb.washouts);
+    t('las jugadas SÍ cuentan (pa.birdies = 1)',ss.A.pa.birdies===1,ss.A.pa.birdies);
+    const hl=T.dayHighlights(T.dayStats(d));
+    t('dayHighlights incluye 🛟 Salvavidas',hl.some(h=>/Salvavidas/.test(h.t)),JSON.stringify(hl.map(h=>h.t)));
+    t('dayHighlights NO da "Cajero del día" en clima',!hl.some(h=>/Cajero/.test(h.t)),'');
+    const car=T.dayCarrilla(T.dayStats(d));
+    t('la carrilla menciona La Acapulqueña / se salvó',car.some(l=>/ACAPULQUEÑA|salvó|salvo|lluvia/i.test(l)),JSON.stringify(car).slice(0,120));
+    // control: sin washout, sí cuenta y es cajero
+    const d2=day({playing:['pa','pb'],salidas:[['pa','pb']],scores:{pa:sc({gross:gross({0:3})}),pb:sc()}});
+    reset({players:[P('pa','Ana'),P('pb','Beto')],days:[d2],currentDayId:d2.id});
+    const ss2=T.seasonStats();
+    t('control: sin clima, pb.pesos = −80 y saved 0',ss2.A.pb.pesos===-80&&ss2.A.pb.saved===0,ss2.A.pb.pesos+'/'+ss2.A.pb.saved);
+  }
+
   window.__RESULTS__.ready=true;
   flush();
 }
