@@ -611,7 +611,7 @@
 
 <script>
 const App = (() => {
-  const APP_VERSION = '2026-07-03-40';   // ⬆️ SUBIR en cada deploy: la app se auto-recarga cuando detecta una versión distinta
+  const APP_VERSION = '2026-07-03-41';   // ⬆️ SUBIR en cada deploy: la app se auto-recarga cuando detecta una versión distinta
   const KEY = 'rayas-campestre-v2';
   const uid = () => Math.random().toString(36).slice(2,9);
   // Auto-actualización: revisa el index.html en vivo (sin caché); si la versión cambió, recarga a la versión fresca.
@@ -1164,12 +1164,13 @@ const App = (() => {
   // SKINS (gross): en cada hoyo (en ORDEN DE JUEGO) la bola más baja gana la bolsa; empate acarrea al siguiente.
   // El ganador cobra pot×rayas a CADA rival del alcance (pairwise → cuadra en cero). Sin ventajas ni doblar (v1).
   function computeSkins(d,players,cb,R,addP){
+    // por salida: cada grupo acarrea en SU orden de juego (respeta salidas de distinto hoyo).
     const groups = cb.alcance==='salida'
-      ? (d.salidas||[]).map(g=>(g||[]).filter(Boolean)).filter(g=>g.length>=2)
-      : [players];
-    groups.forEach(grp=>{
+      ? (d.salidas||[]).map((g,gi)=>({grp:(g||[]).filter(Boolean), ord:playOrderFrom(d,salidaStartOf(d,gi))})).filter(x=>x.grp.length>=2)
+      : [{grp:players, ord:playOrder(d)}];
+    groups.forEach(({grp,ord})=>{
       let pot=1;
-      playOrder(d).forEach(h=>{
+      ord.forEach(h=>{
         const withScore=grp.filter(p=>ensureScore(d,p).gross[h]>0);
         if(withScore.length<2) return;   // hoyo aún sin capturar: la bolsa no se mueve
         let best=Infinity; withScore.forEach(p=>{ const g=ensureScore(d,p).gross[h]; if(g<best)best=g; });
@@ -1222,14 +1223,26 @@ const App = (() => {
   }
   function orderIdx(d,h){ const s=dayStart(d); return s===10 ? (h>=9?h-9:h+9) : h; } // posición en orden de juego 0..17
   function isSecond(d,h){ return orderIdx(d,h)>=9; }
+  // ---- Salidas de distinto hoyo (start POR SALIDA, solo 18h). d.salidaStarts[gi] = 1|10; default = d.start ----
+  function salidaStartOf(d,gi){ if(isNine(d)) return dayStart(d); const v=(d.salidaStarts||[])[gi]; return (v===1||v===10)?v:dayStart(d); }
+  function salidaIdxOf(d,pid){ const S=d.salidas||[]; for(let i=0;i<S.length;i++){ if((S[i]||[]).indexOf(pid)>=0) return i; } return -1; }
+  function startOf(d,pid){ const gi=salidaIdxOf(d,pid); return gi>=0 ? salidaStartOf(d,gi) : dayStart(d); }   // hoyo de salida de un jugador
+  function pairSameStart(d,a,b){ return startOf(d,a)===startOf(d,b); }
+  function orderIdxFor(s,h){ return s===10 ? (h>=9?h-9:h+9) : h; }        // orden de juego desde un hoyo de salida dado
+  function isSecondFor(s,h){ return orderIdxFor(s,h)>=9; }
+  function playOrderFrom(d,s){ if(isNine(d)) return playOrder(d); return s===10 ? [9,10,11,12,13,14,15,16,17,0,1,2,3,4,5,6,7,8] : [0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17]; }
+  function curCaptureOrder(d){ return playOrderFrom(d, salidaStartOf(d, curScoreGroup)); }   // orden de captura de la salida activa (respeta su hoyo de salida)
+  // ¿el día tiene salidas de distinto hoyo? (solo 18h) → la doblada entre distinto hoyo se anula
+  function dayMixedStarts(d){ if(isNine(d)) return false; const S=d.salidas||[]; let seen=null;
+    for(let i=0;i<S.length;i++){ if(!(S[i]||[]).filter(Boolean).length) continue; const s=salidaStartOf(d,i); if(seen===null) seen=s; else if(seen!==s) return true; } return false; }
   function firstNineDone(d,a,b){
-    const sa=ensureScore(d,a), sb=ensureScore(d,b);
-    for(let h=0;h<18;h++){ if(orderIdx(d,h)<9 && (!sa.gross[h]||!sb.gross[h])) return false; }
+    const sa=ensureScore(d,a), sb=ensureScore(d,b), s=startOf(d,a);
+    for(let h=0;h<18;h++){ if(!isSecondFor(s,h) && (!sa.gross[h]||!sb.gross[h])) return false; }
     return true;
   }
   function pairKey(a,b){ return [a,b].sort().join('|'); }
   // doubles DIRECCIONAL en memoria: d.doubles[doubler][target]=true. isDoubled sigue siendo simétrico (el par está doblado).
-  function isDoubled(d,a,b){ if(!betOn(d,'doblar')) return false; const D=d.doubles||{}; return !!((D[a]&&D[a][b]) || (D[b]&&D[b][a])); }
+  function isDoubled(d,a,b){ if(!betOn(d,'doblar')) return false; if(!pairSameStart(d,a,b)) return false; const D=d.doubles||{}; return !!((D[a]&&D[a][b]) || (D[b]&&D[b][a])); }
   function toggleDouble(d,a,b){ d.doubles=d.doubles||{};   // a = el que dobla (perdedor de la 1ª vuelta)
     if(isDoubled(d,a,b)){ if(d.doubles[a]) delete d.doubles[a][b]; if(d.doubles[b]) delete d.doubles[b][a];
       if(d.doubles[a]&&!Object.keys(d.doubles[a]).length) delete d.doubles[a]; if(d.doubles[b]&&!Object.keys(d.doubles[b]).length) delete d.doubles[b]; }
@@ -1241,10 +1254,13 @@ const App = (() => {
     const auto=sc.gross[h]?autoUnits(sc.gross[h],h,sc.putts[h],H):[], man=validManual(sc,h,H);
     let t=0; new Set([...auto,...man]).forEach(u=>t+=unitRayaOf(u)); return t; }
   function sameGroup(d,a,b){ return d.salidas.some(g=>(g||[]).includes(a)&&(g||[]).includes(b)); }
-  // medal por orden de juego: primeros 9, segundos 9 (dobla), total 18 (no dobla)
+  // medal Nassau. MISMO hoyo de salida: nueves por ORDEN DE JUEGO (la 2ª puede doblar).
+  // DISTINTO hoyo de salida: nueves ABSOLUTOS (front 1-9 / back 10-18), sin doblar (isDoubled ya devuelve false).
   function medalSeg(d,a,b,allocA,allocB){
     const sa=ensureScore(d,a), sb=ensureScore(d,b), dbl=isDoubled(d,a,b);
-    const first=[], sec=[]; for(let h=0;h<18;h++){ (orderIdx(d,h)<9?first:sec).push(h); }
+    const same=pairSameStart(d,a,b), ps=startOf(d,a);
+    const isSec = same ? (h=>isSecondFor(ps,h)) : (h=>holesOf(d)[h].n>9);
+    const first=[], sec=[]; for(let h=0;h<18;h++){ (isSec(h)?sec:first).push(h); }
     const calc=(holes,mult)=>{ let ga=0,gb=0,da=0,db=0,ok=true;
       holes.forEach(h=>{ if(!sa.gross[h]||!sb.gross[h])ok=false; ga+=sa.gross[h];gb+=sb.gross[h];da+=allocA[h];db+=allocB[h]; });
       if(!ok) return null; const na=ga-da, nb=gb-db; return {winner: na<nb?'a':nb<na?'b':null, mult}; };
@@ -1254,11 +1270,11 @@ const App = (() => {
   function h2h(d,a,b){
     const sa=ensureScore(d,a), sb=ensureScore(d,b);
     const allocA=allocate(received(a,b),d), allocB=allocate(received(b,a),d);
-    const dbl=isDoubled(d,a,b), sg=sameGroup(d,a,b);
+    const dbl=isDoubled(d,a,b), sg=sameGroup(d,a,b), ps=startOf(d,a);
     const ON={hoyos:betOn(d,'hoyos'),medal:betOn(d,'medal'),unidades:betOn(d,'unidades'),oyes:betOn(d,'oyes')};   // mismo gateo que el motor
     let net=0, firstNet=0; const P={hoyos:0,unidades:0,oyes:0,medal:0};   // desglose por apuesta (persp. de a, con doblar ya incluido); NO altera net
     for(let h=0;h<18;h++){
-      const sec=isSecond(d,h), mult=(dbl&&sec)?2:1; let dd=0;
+      const sec=isSecondFor(ps,h), mult=(dbl&&sec)?2:1; let dd=0;
       if(ON.hoyos && sa.gross[h]&&sb.gross[h]){ const na=sa.gross[h]-allocA[h], nb=sb.gross[h]-allocB[h]; let hh=0; if(na<nb)hh=1; else if(nb<na)hh=-1; dd+=hh; P.hoyos+=hh*mult; }
       if(ON.unidades){ const uu=unitsOnHole(d,a,h)-unitsOnHole(d,b,h); dd+=uu; P.unidades+=uu*mult; }
       if(ON.oyes && sg && holesOf(d)[h].par===3){ const pa=sa.oyes[h]||0,pb=sb.oyes[h]||0; if(pa&&pb){ let oo=0; if(pa<pb)oo=1; else if(pb<pa)oo=-1; dd+=oo; P.oyes+=oo*mult; } }
@@ -1307,9 +1323,9 @@ const App = (() => {
       const a=players[i], b=players[j];
       const sa=ensureScore(d,a), sb=ensureScore(d,b);
       const allocA=allocate(received(a,b),d), allocB=allocate(received(b,a),d);
-      const dbl=isDoubled(d,a,b), sg=sameGroup(d,a,b);
+      const dbl=isDoubled(d,a,b), sg=sameGroup(d,a,b), ps=startOf(d,a);   // dbl ya exige mismo start → ps es compartido cuando dobla
       for(let h=0;h<18;h++){
-        const mult=(dbl && isSecond(d,h))?2:1;
+        const mult=(dbl && isSecondFor(ps,h))?2:1;
         if(ON.hoyos && sa.gross[h] && sb.gross[h]){
           const na=sa.gross[h]-allocA[h], nb=sb.gross[h]-allocB[h];
           if(na<nb){R[a].hoyos+=mult;R[b].hoyos-=mult;addP(a,b,mult);} else if(nb<na){R[b].hoyos+=mult;R[a].hoyos-=mult;addP(b,a,mult);}
@@ -2196,6 +2212,7 @@ const App = (() => {
     if(!_devUser){ toast('Elige usuario primero'); loginModal(); return; }
     if(captureLocked()){ toast('Día cerrado · solo el admin puede editar'); return; }
     if(!isAdmin() && !(isRegular() && myPid()===a)){ toast('Solo puedes doblar tú (o el admin)'); return; }
+    if(!pairSameStart(d,a,b)){ toast('No se puede doblar: salen de distinto hoyo'); return; }
     const was=isDoubled(d,a,b);
     if(was && !isAdmin()){ toast('Doblado ya hecho · solo el admin/súper puede quitarlo'); return; }   // no se deshace (evita quitarlo si va perdiendo la 2ª)
     if(!was){   // al DOBLAR: ambos deben tener capturados los 9 de la 1ª vuelta, y solo dobla quien va perdiendo al turn
@@ -2587,13 +2604,18 @@ const App = (() => {
     for(let s=0;s<nShow;s++){
       const ids=(d.salidas[s]||[]).filter(id=>d.playing.includes(id));
       const next=(s+1)%nShow;
-      html+=`<div style="margin-top:14px"><div style="font-family:'Newsreader',serif;font-weight:600;font-size:15px;color:${gColors[s%gColors.length]};margin-bottom:8px">Salida ${s+1} · <input class="timeinp" value="${(d.salidaTimes&&d.salidaTimes[s])||''}" placeholder="hora" onchange="App.setSalidaTime(${s},this.value)"> · <span style="color:var(--muted);font-weight:500">${ids.length}/${cap}</span></div><div class="assign">`;
+      const sStart=salidaStartOf(d,s);
+      const startCtl = (d.holes!==9) ? ` · <span class="startsel" style="font-size:11px">sale del
+          <button class="${sStart===1?'on':''}" onclick="App.setSalidaStart(${s},1)">1</button>
+          <button class="${sStart===10?'on':''}" onclick="App.setSalidaStart(${s},10)">10</button></span>` : '';
+      html+=`<div style="margin-top:14px"><div style="font-family:'Newsreader',serif;font-weight:600;font-size:15px;color:${gColors[s%gColors.length]};margin-bottom:8px">Salida ${s+1} · <input class="timeinp" value="${(d.salidaTimes&&d.salidaTimes[s])||''}" placeholder="hora" onchange="App.setSalidaTime(${s},this.value)"> · <span style="color:var(--muted);font-weight:500">${ids.length}/${cap}</span>${startCtl}</div><div class="assign">`;
       if(ids.length===0) html+=`<span class="hint" style="margin:0">—</span>`;
       ids.forEach(id=>{ const p=player(id);
         html+=`<button class="chip ${s===1?'s2':''} on" onclick="App.moveGroup('${id}',${next})">${p?pname(p.id):'—'}${nShow>1?' ↔':''}</button>`;
       });
       html+=`</div></div>`;
     }
+    if(dayMixedStarts(d)) html+=`<div class="hint" style="margin-top:8px;color:var(--gold-deep)">✌️ Doblada desactivada entre salidas de distinto hoyo (no comparten el turn). El medal de esos pares se juega por nueves 1-9 / 10-18.</div>`;
     if(sinGrupo.length){
       html+=`<div style="margin-top:12px"><div style="font-weight:700;font-size:13px;color:var(--muted);margin-bottom:6px">Sin salida</div><div class="assign">`;
       sinGrupo.forEach(id=>{ const p=player(id);
@@ -2808,7 +2830,7 @@ const App = (() => {
     if(groups.length===0){ box.innerHTML=seg+emptyState('⛳','Sin salidas','Sortea en “Salidas”.','App.go(\'day\')','Ir a Salidas'); return; }
     if(!groups.includes(curScoreGroup)) curScoreGroup=groups[0];
     const gids=(d.salidas[curScoreGroup]||[]).filter(Boolean);
-    const order = playOrder(d); const last=order.length-1;
+    const order = curCaptureOrder(d); const last=order.length-1;
     if(curHoleNav<0)curHoleNav=0; if(curHoleNav>last)curHoleNav=last;
     const hi=order[curHoleNav]; const h=holesOf(d)[hi];
 
@@ -2882,7 +2904,7 @@ const App = (() => {
     box.innerHTML=html;
   }
   function gotoPlayerPending(id){ const d=curDay(); if(!d) return;
-    const order=playOrder(d); const sc=ensureScore(d,id); const pos=order.findIndex(o=>!sc.gross[o]);
+    const order=curCaptureOrder(d); const sc=ensureScore(d,id); const pos=order.findIndex(o=>!sc.gross[o]);
     if(pos>=0){ const prev=order[curHoleNav]; curHoleNav=pos; scoreTab='cap'; if(order[curHoleNav]!==prev) commitHole(d,prev); renderScore(); } else toast('Ya tiene sus hoyos capturados');
   }
   function pendingHoles(d){
@@ -2895,25 +2917,25 @@ const App = (() => {
     return out;
   }
   function gotoPending(){
-    const d=curDay(); if(!d) return; const order=holesOrder(d); const pend=pendingHoles(d);
+    const d=curDay(); if(!d) return; const order=curCaptureOrder(d); const pend=pendingHoles(d).filter(h=>order.indexOf(h)>=0);
     if(!pend.length){ toast('¡Todo capturado! ✓'); return; }
     const prev=order[curHoleNav];
-    const next=pend[0];   // siempre al hoyo incompleto MÁS BAJO (orden de juego); avanza solo al irse completando
+    const next=pend.sort((x,y)=>order.indexOf(x)-order.indexOf(y))[0];   // hoyo incompleto MÁS BAJO en el orden de ESTA salida
     curHoleNav=order.indexOf(next); scoreTab='cap';
     if(order[curHoleNav]!==prev) commitHole(d,prev);
     renderScore();
   }
   // ace diferido: el ace del hoyo que se está capturando no se celebra hasta avanzar de hoyo
-  function isActiveCaptureHole(d,h){ return scoreTab==='cap' && !!d && playOrder(d)[curHoleNav]===h; }
+  function isActiveCaptureHole(d,h){ return scoreTab==='cap' && !!d && curCaptureOrder(d)[curHoleNav]===h; }
   function commitHole(d,hi){ if(!d || hi==null) return; (d.salidas[curScoreGroup]||[]).filter(Boolean).forEach(pid=>checkCelebrate(pid,hi)); }
   // Cambio 4: raya neta en vivo del día, excluyendo SOLO la raya del ace del hoyo que se está capturando
   function aceUnitRayaOnHole(d,pid,h){ const sc=ensureScore(d,pid); if(sc.gross[h]!==1) return 0;
     let t=0; autoUnits(1,h,sc.putts[h],holesOf(d)).forEach(u=>t+=unitRayaOf(u)); return t; }
   function activeAceNet(d,pid,h){ const ap=aceUnitRayaOnHole(d,pid,h); let s=0;
-    dayPlayers(d).filter(o=>o&&o!==pid).forEach(o=>{ const ao=aceUnitRayaOnHole(d,o,h); const mult=(isDoubled(d,pid,o)&&isSecond(d,h))?2:1; s+=(ap-ao)*mult; });
+    dayPlayers(d).filter(o=>o&&o!==pid).forEach(o=>{ const ao=aceUnitRayaOnHole(d,o,h); const mult=(isDoubled(d,pid,o)&&isSecondFor(startOf(d,pid),h))?2:1; s+=(ap-ao)*mult; });
     return s; }
   function captureRay(d,pid){ const res=computeDay(d); const r=res&&res.rows.find(x=>x.id===pid); let t=r?r.total:0;
-    if(scoreTab==='cap'){ const h=playOrder(d)[curHoleNav]; if(h!=null) t-=activeAceNet(d,pid,h); }
+    if(scoreTab==='cap'){ const h=curCaptureOrder(d)[curHoleNav]; if(h!=null) t-=activeAceNet(d,pid,h); }
     return t; }
   function navHole(delta){ const d=curDay(); const last=d?playOrder(d).length-1:17;
     const prev=d?playOrder(d)[curHoleNav]:null;
@@ -2921,7 +2943,10 @@ const App = (() => {
     if(d && playOrder(d)[curHoleNav]!==prev) commitHole(d,prev);
     renderScore(); }
   function setScoreGroup(g){ curScoreGroup=g; renderScore(); }
-  function setStart(v){ if(!isAdmin())return; const d=curDay(); d.start=v; save(); renderDay(); }
+  function setStart(v){ if(!isAdmin())return; const d=curDay(); d.start=v; d.salidaStarts=null; save(); clearStatCache(); renderDay(); }   // toggle global: todas salen del mismo hoyo (limpia overrides)
+  function setSalidaStart(gi,v){ if(!isAdmin())return; const d=curDay(); if(!d||d.holes===9) return;
+    d.salidaStarts=d.salidaStarts||[]; while(d.salidaStarts.length<(d.salidas||[]).length) d.salidaStarts.push(d.start||1);
+    d.salidaStarts[gi]=(v===10?10:1); save(); clearStatCache(); renderDay(); if(curView==='liq') renderLiq(); }
   function setHoles(v){ if(!isAdmin())return; const d=curDay(); d.holes=(v===9?9:18); curHoleNav=0; save(); renderDay(); }
   function setCourse(id){ if(!isAdmin())return; const d=curDay(); if(!d||!state.courses.find(c=>c.id===id))return; d.courseId=id; curHoleNav=0; save(); renderDay(); }
   function toggleSound(){ state.sound=!state.sound; save(); if(state.sound) playSound('mini'); renderCfg(); }
@@ -4649,7 +4674,7 @@ const App = (() => {
 
   return { init,loginModal,doLogin,signInGoogle,signOutAuth,joinRegister,shareInvite,copyInvite,regenJoinCode,createMyPlayer,approveVent,rejectVent,btnApplyVentSeed,confirmVentMatch,dismissVentMatch,createLeague,renameLeague,switchLeague,deleteLeague,setMaxGroup,go,switchDay,daysModal,editDayModal,saveDayEdit,delDay,clearHole,clearCard,removeFromDay,playerAdminModal,newDayModal,createDay,
     toggleAssign:null,togglePlaying,cancelPlayer,moveGroup,confirmMove,sorteo,cycleParejas,setSalidaTime,addGuestModal,
-    pickScore,score,putt,setOyes,quick,toggleUnit,toggleCast,navHole,gotoPending,gotoPlayerPending,setScoreGroup,setStart,setHoles,setCourse,
+    pickScore,score,putt,setOyes,quick,toggleUnit,toggleCast,navHole,gotoPending,gotoPlayerPending,setScoreGroup,setStart,setSalidaStart,setHoles,setCourse,
     setVentFocus,pickVent,openBet,openH2H,setLiqTab,setScoreTab,setCmp,setVentPick,
     setDblPlayer,toggleDbl,closeDay,historyModal,exportImage,exportHigh,exportProfile,exportSalidas,exportSeasonTable,exportCompare,exportScorecard,toggleSound,
     setRaya,submitRayaPair,approveRayaReq,rejectRayaReq,removeRayaPair,createPlayer,editPlayerModal,savePlayer,delPlayer,toggleFav,
@@ -4658,7 +4683,7 @@ const App = (() => {
     exportData,renderCfg,renderVent,renderDay,closeModal,confirmYes,renderHigh,setHighTab,openProfile,rulesModal,editRulesModal,saveRules,
     exportComprobante,cmpPrint,cmpClose,photosModal,onPhotoPick,delPhoto,viewPhoto,forceUpdate,clearCacheReload,
     // Gancho de PRUEBAS (tests.html): acceso directo al motor con estado sintético. NO usar desde la UI.
-    __test:{ computeDay,_computeDayRaw,medalSeg,h2h,allocate,received,playOrder,orderIdx,isSecond,autoUnits,validManual,unitsOnHole,inferOyes,autoCast,dayStats,seasonStats,careerStats,clearStatCache,intHcp,intHcpOf,playerDiffs,COURSE_SEED,courseSlug,mostRecentDayId,autoPickDay,resetOpenedFresh:function(){_openedFresh=true;},
+    __test:{ computeDay,_computeDayRaw,medalSeg,h2h,allocate,received,playOrder,orderIdx,isSecond,autoUnits,validManual,unitsOnHole,inferOyes,autoCast,dayStats,seasonStats,careerStats,clearStatCache,intHcp,intHcpOf,playerDiffs,COURSE_SEED,courseSlug,mostRecentDayId,autoPickDay,resetOpenedFresh:function(){_openedFresh=true;},startOf,pairSameStart,dayMixedStarts,salidaStartOf,firstNineDone,
       setState:function(st){ state=Object.assign(state,st); clearStatCache(); },
       getState:function(){ return state; } } };
 })();

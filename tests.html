@@ -427,6 +427,75 @@ async function main(){
     });
   }
 
+  // ============ F20 · Salidas de distinto hoyo (start por salida) ============
+  sec('F20 salidas mixtas (S1 del 1, S2 del 10): doblada anulada entre distinto hoyo');
+  {
+    // 4 jugadores: pa,pb en S1 (del 1); pc,pd en S2 (del 10). salidaStarts=[1,10]
+    const mk=()=>day({playing:['pa','pb','pc','pd'],salidas:[['pa','pb'],['pc','pd']],salidaStarts:[1,10],
+      scores:{pa:sc(),pb:sc(),pc:sc(),pd:sc()}});
+    let d=mk();
+    reset({players:[P('pa','A'),P('pb','B'),P('pc','C'),P('pd','D')],days:[d],currentDayId:d.id});
+    t('startOf: pa=1, pc=10',T.startOf(d,'pa')===1&&T.startOf(d,'pc')===10,T.startOf(d,'pa')+'/'+T.startOf(d,'pc'));
+    t('pairSameStart: pa-pb sí, pa-pc no',T.pairSameStart(d,'pa','pb')&&!T.pairSameStart(d,'pa','pc'),'');
+    t('dayMixedStarts = true',T.dayMixedStarts(d)===true,T.dayMixedStarts(d));
+    // doblada entre pa(S1) y pc(S2): aunque se registre, isDoubled la ignora
+    d=mk(); d.doubles={pc:{pa:true}};
+    reset({players:[P('pa','A'),P('pb','B'),P('pc','C'),P('pd','D')],days:[d],currentDayId:d.id});
+    // pc birdie en hoyo 10 (idx9) que para pc es su 1ª vuelta; sin doblar debe valer ×1
+    d.scores.pc=sc({gross:gross({9:3})});
+    T.clearStatCache();
+    const res=T.computeDay(d);
+    t('h2h(pc,pa).doubled === false (distinto hoyo anula la doblada)',T.h2h(d,'pc','pa').doubled===false,T.h2h(d,'pc','pa').doubled);
+    t('birdie ×1 no ×2: pc +4 vs pa (hoyo+unidad+medal back+medal total, medal por nueves absolutos)',T.h2h(d,'pc','pa').net===4,T.h2h(d,'pc','pa').net);
+    t('cuadra en cero',res.sum===0,res.sum);
+  }
+
+  // ============ F21 · doblada SÍ vale entre mismo hoyo dentro de día mixto ============
+  sec('F21 mismo hoyo en día mixto: la doblada funciona normal');
+  {
+    // S1 (pa,pb del 1) y S2 (pc,pd del 10). pa dobla a pb (mismo hoyo=1). pb birdie en su 2ª vuelta (idx9)
+    const d=day({playing:['pa','pb','pc','pd'],salidas:[['pa','pb'],['pc','pd']],salidaStarts:[1,10],doubles:{pa:{pb:true}},
+      scores:{pa:sc(),pb:sc({gross:gross({9:3})}),pc:sc(),pd:sc()}});
+    reset({players:[P('pa','A'),P('pb','B'),P('pc','C'),P('pd','D')],days:[d],currentDayId:d.id});
+    t('pa-pb mismo hoyo → doubled true',T.h2h(d,'pa','pb').doubled===true,T.h2h(d,'pa','pb').doubled);
+    // pb birdie en idx9: para start=1 idx9 ES 2ª vuelta → ×2. pb gana hoyo(2)+unidad(2)+medal 2ª9(2)+medal total(1)=+7 vs pa
+    const res=T.computeDay(d);
+    t('doblada mismo hoyo: pb +7 vs pa (2ª vuelta ×2)',T.h2h(d,'pb','pa').net===7,T.h2h(d,'pb','pa').net);
+    t('cuadra en cero',res.sum===0,res.sum);
+  }
+
+  // ============ F22 · medal por nueves absolutos entre distinto hoyo ============
+  sec('F22 medal cross-start = nueves absolutos (front 1-9 / back 10-18)');
+  {
+    // pa (S1 del 1) vs pc (S2 del 10). pa juega mejor el FRONT absoluto (1-9), pc mejor el BACK (10-18)
+    const gpa=PARS.slice(); [0,1].forEach(i=>gpa[i]--);           // pa −2 en front (idx0,1)
+    const gpc=PARS.slice(); [9,10].forEach(i=>gpc[i]--);          // pc −2 en back (idx9,10)
+    const d=day({playing:['pa','pc'],salidas:[['pa'],['pc']],salidaStarts:[1,10],
+      scores:{pa:sc({gross:gpa}),pc:sc({gross:gpc})}});
+    reset({players:[P('pa','A'),P('pc','C')],days:[d],currentDayId:d.id});
+    const ms=T.medalSeg(d,'pa','pc',Z,Z);
+    // first = front absoluto (1-9): pa gana. second = back absoluto (10-18): pc gana. total: empate (ambos −2)
+    t('medal cross: front(1-9) lo gana pa',ms.first&&ms.first.winner==='a',JSON.stringify(ms.first));
+    t('medal cross: back(10-18) lo gana pc',ms.second&&ms.second.winner==='b',JSON.stringify(ms.second));
+    t('medal cross: total empate (ambos −2)',ms.total&&ms.total.winner===null,JSON.stringify(ms.total));
+    t('medal cross: 2ª mitad NO dobla (mult 1)',ms.second.mult===1,ms.second.mult);
+    t('cuadra en cero',T.computeDay(d).sum===0,T.computeDay(d).sum);
+  }
+
+  // ============ F23 · skins acarrea en el orden de CADA salida ============
+  sec('F23 skins por salida respeta el hoyo de salida de cada una');
+  {
+    const sk={id:'sk',name:'Skins',emoji:'💰',template:'skins',alcance:'salida',rayas:1,on:true};
+    // S2 del 10: pc birdie en el hoyo 1 (idx0), que para el 10 es el ÚLTIMO → 9 empates acarrean, bolsa 10
+    const d=day({playing:['pa','pb','pc','pd'],salidas:[['pa','pb'],['pc','pd']],salidaStarts:[1,10],customBets:[sk],
+      scores:{pa:sc({gross:gross({0:3})}),pb:sc(),pc:sc({gross:gross({0:3})}),pd:sc()}});
+    reset({players:[P('pa','A'),P('pb','B'),P('pc','C'),P('pd','D')],days:[d],currentDayId:d.id});
+    const res=T.computeDay(d);
+    t('S1 del 1: pa gana la bolsa en el hoyo 1 (bolsa 1) → +1',row(res,'pa').sk===1,row(res,'pa').sk);
+    t('S2 del 10: pc birdie en hoyo1 = último jugado → acarreo de 9, bolsa 10 → +10',row(res,'pc').sk===10,row(res,'pc').sk);
+    t('cuadra en cero',res.sum===0,res.sum);
+  }
+
   window.__RESULTS__.ready=true;
   flush();
 }
