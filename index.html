@@ -611,7 +611,7 @@
 
 <script>
 const App = (() => {
-  const APP_VERSION = '2026-07-03-42';   // ⬆️ SUBIR en cada deploy: la app se auto-recarga cuando detecta una versión distinta
+  const APP_VERSION = '2026-07-03-43';   // ⬆️ SUBIR en cada deploy: la app se auto-recarga cuando detecta una versión distinta
   const KEY = 'rayas-campestre-v2';
   const uid = () => Math.random().toString(36).slice(2,9);
   // Auto-actualización: revisa el index.html en vivo (sin caché); si la versión cambió, recarga a la versión fresca.
@@ -1428,9 +1428,12 @@ const App = (() => {
   }
 
   // ---- Estado del día: en vivo (provisional) vs final ----
-  function dayThru(d,pid){ const order=playOrder(d), sc=ensureScore(d,pid); return order.reduce((n,h)=>n+(sc.gross[h]?1:0),0); }
+  function dayThru(d,pid){ const order=playOrderFrom(d,startOf(d,pid)), sc=ensureScore(d,pid); return order.reduce((n,h)=>n+(sc.gross[h]?1:0),0); }
   function dayAnyScores(d){ const order=playOrder(d); return dayPlayers(d).filter(Boolean).some(pid=>{ const sc=ensureScore(d,pid); return order.some(h=>sc.gross[h]); }); }
-  function dayAllFinished(d){ const ids=dayPlayers(d).filter(Boolean); if(!ids.length) return false; const order=playOrder(d); return ids.every(pid=>{ const sc=ensureScore(d,pid); return order.every(h=>sc.gross[h]); }); }
+  // Un jugador RETIRADO cerró su jugada en N hoyos: solo aplican las apuestas de lo que jugó, y ya no se le esperan más hoyos.
+  function isRetired(d,pid){ return !!(d && d.retired && d.retired[pid]); }
+  function dayAllFinished(d){ const ids=dayPlayers(d).filter(Boolean); if(!ids.length) return false; const order=playOrder(d);
+    return ids.every(pid=>{ if(isRetired(d,pid)) return true; const sc=ensureScore(d,pid); return order.every(h=>sc.gross[h]); }); }
   // FINAL = todos capturaron sus hoyos, O el día está cerrado (lo que pase primero)
   function isFinalDay(d){ return !!(d.closed || dayAllFinished(d)); }
 
@@ -1482,8 +1485,8 @@ const App = (() => {
       <div class="lb-head"><div class="c1">POS</div><div class="c2">JUGADOR</div><div class="c3">PESOS</div><div class="c4">RAYAS</div></div>
       <div class="lb-sub">HOY · ${courseOf(d).name.toUpperCase()} · ${holesLabel(d).toUpperCase()} · RAYA $${state.rayaValue}${anyRayaPair()?' · PAREJAS CON OTRO VALOR':''}</div>`;
     const nHoles=playOrder(d).length;
-    res.rows.forEach((r,i)=>{ const p=player(r.id); const th=dayThru(d,r.id);
-      const thru = fin ? '' : (th>=nHoles ? ' <span class="thru done">✓ terminó</span>' : ` <span class="thru">thru ${th}</span>`);
+    res.rows.forEach((r,i)=>{ const p=player(r.id); const th=dayThru(d,r.id); const ret=isRetired(d,r.id);
+      const thru = ret ? ` <span class="thru done">⏹ cerró en ${th}</span>` : (fin ? '' : (th>=nHoles ? ' <span class="thru done">✓ terminó</span>' : ` <span class="thru">thru ${th}</span>`));
       html+=`<div class="lb-row" onclick="App.openBet('${r.id}')">
         <div class="pos">${i+1}</div>
         <div class="nm">${pname(r.id)}${i===0?' <span class="star">★</span>':''}${p&&p.guest?' <span style="font-size:10px;color:var(--muted-2)">·inv</span>':''}${thru}</div>
@@ -1942,6 +1945,7 @@ const App = (() => {
       const sc=ensureScore(d,id);
       const got=ord.filter(i=>sc.gross[i]>0).length;
       const p=player(id), nm=p?pname(p.id):'—';
+      if(isRetired(d,id)){ if(got===0) issues.push({name:nm,msg:'retirado sin capturar'}); return; }   // retirado: cerró en N hoyos, no se le esperan más
       if(got===0) issues.push({name:nm,msg:'sin capturar'});
       else if(got===ord.length){}                    // vuelta completa (9 o 18)
       else { const miss=ord.filter(i=>!sc.gross[i]).map(i=>holesOf(d)[i].n);
@@ -2215,6 +2219,7 @@ const App = (() => {
     if(captureLocked()){ toast('Día cerrado · solo el admin puede editar'); return; }
     if(!isAdmin() && !(isRegular() && myPid()===a)){ toast('Solo puedes doblar tú (o el admin)'); return; }
     if(!pairSameStart(d,a,b)){ toast('No se puede doblar: salen de distinto hoyo'); return; }
+    if(isRetired(d,a)||isRetired(d,b)){ toast('No se puede doblar: alguien ya cerró su jugada'); return; }
     const was=isDoubled(d,a,b);
     if(was && !isAdmin()){ toast('Doblado ya hecho · solo el admin/súper puede quitarlo'); return; }   // no se deshace (evita quitarlo si va perdiendo la 2ª)
     if(!was){   // al DOBLAR: ambos deben tener capturados los 9 de la 1ª vuelta, y solo dobla quien va perdiendo al turn
@@ -2911,8 +2916,9 @@ const App = (() => {
   }
   function pendingHoles(d){
     const ids=dayPlayers(d).filter(Boolean); const order=holesOrder(d); const out=[];
+    const act=ids.filter(id=>!isRetired(d,id));   // a los retirados no se les esperan hoyos
     order.forEach(hi=>{ const h=holesOf(d)[hi]; let pend=false;
-      ids.forEach(id=>{ if(!ensureScore(d,id).gross[hi]) pend=true; });
+      act.forEach(id=>{ if(!ensureScore(d,id).gross[hi]) pend=true; });
       if(h.par===3){ ids.filter(id=>ensureScore(d,id).gross[hi]>0).forEach(id=>{ if(!(ensureScore(d,id).oyes[hi]||0)) pend=true; }); }
       if(pend) out.push(hi);
     });
@@ -3705,11 +3711,21 @@ const App = (() => {
       clearStatCache(); save(); closeModal(); render(); toast(pname(pid)+' fuera del día');
     });
   }
+  // Retirar: el jugador cerró su jugada en N hoyos (típico: se fue tras la 1ª vuelta). Solo aplican las apuestas de lo que jugó;
+  // el motor ya ignora los hoyos sin score, y esto además finaliza el día sin marcarlo incompleto. Reversible (reabrir).
+  function retirePlayer(pid){ if(!isAdmin()){ toast('Solo el admin'); return; } const d=curDay(); if(!d) return;
+    if(isRetired(d,pid)){ delete d.retired[pid]; if(!Object.keys(d.retired).length) d.retired=null; save(); clearStatCache(); closeModal(); render(); toast('Jugada reabierta'); return; }
+    const thru=dayThru(d,pid);
+    if(thru<1){ toast('Aún no captura ningún hoyo'); return; }
+    confirmModal(`¿Cerrar la jugada de <b>${pname(pid)}</b> en <b>${thru} hoyos</b>? Solo aplican las apuestas de lo que jugó (no se le esperan más hoyos).`, 'Cerrar jugada', ()=>{
+      d.retired=d.retired||{}; d.retired[pid]=true; save(); clearStatCache(); closeModal(); render(); toast(`${pname(pid)} cerró en ${thru} hoyos`); });
+  }
   function playerAdminModal(pid){ if(!isAdmin()) return; const d=curDay(); if(!d) return;
-    const hn=holesOf(d)[playOrder(d)[curHoleNav]].n;
+    const hn=holesOf(d)[playOrder(d)[curHoleNav]].n; const ret=isRetired(d,pid), thru=dayThru(d,pid);
     modal(`<h3>Administrar a ${_esc(pname(pid))}</h3>
       <div class="hint" style="margin-bottom:12px">Acciones de admin para “${_esc(d.label||'')}”.</div>
-      <button class="btn outline block" onclick="App.clearHole('${pid}')">Borrar el hoyo ${hn} de su tarjeta</button>
+      <button class="btn ${ret?'':'outline'} block" onclick="App.retirePlayer('${pid}')">${ret?'↩︎ Reabrir su jugada':'⏹ Cerró su jugada (se retiró en '+thru+')'}</button>
+      <button class="btn outline block" style="margin-top:8px" onclick="App.clearHole('${pid}')">Borrar el hoyo ${hn} de su tarjeta</button>
       <button class="btn outline block" style="margin-top:8px" onclick="App.clearCard('${pid}')">Borrar TODA su tarjeta del día</button>
       <button class="btn clay outline block" style="margin-top:8px" onclick="App.removeFromDay('${pid}')">Quitar del día (sin carrilla)</button>
       <button class="btn ghost block" style="margin-top:10px" onclick="App.closeModal()">Cerrar</button>`);
@@ -4674,7 +4690,7 @@ const App = (() => {
   function viewPhoto(dayId,id){ const v=(_photoCache[dayId]||{})[id]; if(!v) return;
     modal(`<img src="${v.img}" style="width:100%;border-radius:8px;display:block">${v.pid?`<div class="hint" style="text-align:center;margin-top:8px">${_esc(pname(v.pid))}</div>`:''}<button class="btn block" style="margin-top:10px" onclick="App.photosModal()">← Volver a las fotos</button>`); }
 
-  return { init,loginModal,doLogin,signInGoogle,signOutAuth,joinRegister,shareInvite,copyInvite,regenJoinCode,createMyPlayer,approveVent,rejectVent,btnApplyVentSeed,confirmVentMatch,dismissVentMatch,createLeague,renameLeague,switchLeague,deleteLeague,setMaxGroup,go,switchDay,daysModal,editDayModal,saveDayEdit,delDay,clearHole,clearCard,removeFromDay,playerAdminModal,newDayModal,createDay,
+  return { init,loginModal,doLogin,signInGoogle,signOutAuth,joinRegister,shareInvite,copyInvite,regenJoinCode,createMyPlayer,approveVent,rejectVent,btnApplyVentSeed,confirmVentMatch,dismissVentMatch,createLeague,renameLeague,switchLeague,deleteLeague,setMaxGroup,go,switchDay,daysModal,editDayModal,saveDayEdit,delDay,clearHole,clearCard,removeFromDay,playerAdminModal,retirePlayer,newDayModal,createDay,
     toggleAssign:null,togglePlaying,cancelPlayer,moveGroup,confirmMove,sorteo,cycleParejas,setSalidaTime,addGuestModal,
     pickScore,score,putt,setOyes,quick,toggleUnit,toggleCast,navHole,gotoPending,gotoPlayerPending,setScoreGroup,setStart,setSalidaStart,setHoles,setCourse,
     setVentFocus,pickVent,openBet,openH2H,setLiqTab,setScoreTab,setCmp,setVentPick,
@@ -4685,7 +4701,7 @@ const App = (() => {
     exportData,renderCfg,renderVent,renderDay,closeModal,confirmYes,renderHigh,setHighTab,openProfile,rulesModal,editRulesModal,saveRules,
     exportComprobante,cmpPrint,cmpClose,photosModal,onPhotoPick,delPhoto,viewPhoto,forceUpdate,clearCacheReload,
     // Gancho de PRUEBAS (tests.html): acceso directo al motor con estado sintético. NO usar desde la UI.
-    __test:{ computeDay,_computeDayRaw,medalSeg,h2h,allocate,received,playOrder,orderIdx,isSecond,autoUnits,validManual,unitsOnHole,inferOyes,autoCast,dayStats,seasonStats,careerStats,clearStatCache,intHcp,intHcpOf,playerDiffs,COURSE_SEED,courseSlug,mostRecentDayId,autoPickDay,resetOpenedFresh:function(){_openedFresh=true;},startOf,pairSameStart,dayMixedStarts,salidaStartOf,firstNineDone,
+    __test:{ computeDay,_computeDayRaw,medalSeg,h2h,allocate,received,playOrder,orderIdx,isSecond,autoUnits,validManual,unitsOnHole,inferOyes,autoCast,dayStats,seasonStats,careerStats,clearStatCache,intHcp,intHcpOf,playerDiffs,COURSE_SEED,courseSlug,mostRecentDayId,autoPickDay,resetOpenedFresh:function(){_openedFresh=true;},startOf,pairSameStart,dayMixedStarts,salidaStartOf,firstNineDone,isRetired,dayAllFinished,validateDay,dayThru,
       setState:function(st){ state=Object.assign(state,st); clearStatCache(); },
       getState:function(){ return state; } } };
 })();

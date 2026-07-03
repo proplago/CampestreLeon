@@ -511,6 +511,32 @@ async function main(){
     t('careerStats NO truena con día vacío',e3===null,e3);
   }
 
+  // ============ F25 · retiro tras 9 hoyos: solo aplican las apuestas de la 1ª vuelta ============
+  sec('F25 jugador se retira en 9 (solo bets del primer 9; el día puede finalizar)');
+  {
+    // pa juega 18, pb SOLO el front (1-9), pc juega 18. pb birdie h1, pero deja el back en 0.
+    const g9=PARS.slice(); g9[0]--; for(let i=9;i<18;i++)g9[i]=0;   // pb: front con birdie, back sin jugar
+    const d=day({playing:['pa','pb','pc'],salidas:[['pa','pb','pc']],
+      scores:{pa:sc(),pb:sc({gross:g9}),pc:sc()}, retired:{pb:true}});
+    reset({players:[P('pa','Ana'),P('pb','Beto'),P('pc','Caro')],days:[d],currentDayId:d.id});
+    const res=T.computeDay(d);
+    t('cuadra en cero',res.sum===0,res.sum);
+    // pb vs pa: SOLO front. hoyos: pb gana h1 (+1). unidad birdie h1 (+1). medal: front(1-9) pb gana (+1); back y total NULL (a pb le falta) → +3
+    const hba=T.h2h(d,'pb','pa');
+    t('pb vs pa neto = +3 (hoyo+unidad+medal front; back y total no cuentan)',hba.net===3,hba.net);
+    t('medal: solo el primer segmento cuenta (pb=a gana front; back y total null)',(function(){ const ms=T.medalSeg(d,'pb','pa',Z,Z); return ms.first&&ms.first.winner==='a'&&ms.second===null&&ms.total===null; })(),'');
+    // pa vs pc (ambos 18) juegan normal entre ellos (empate → 0)
+    t('pa vs pc (ambos 18) no se afecta: neto 0',T.h2h(d,'pa','pc').net===0,T.h2h(d,'pa','pc').net);
+    // finalización: con pb retirado, si pa y pc completaron 18 → día terminado
+    t('dayAllFinished = true con el retirado',T.dayAllFinished(d)===true,T.dayAllFinished(d));
+    t('validateDay NO marca al retirado como incompleto (solo pueden quedar issues de oyes)',!T.validateDay(d).issues.some(i=>/faltan|sin capturar/.test(i.msg)),JSON.stringify(T.validateDay(d).issues));
+    // sin la marca de retiro: el mismo día estaría incompleto (control)
+    const d2=day({playing:['pa','pb','pc'],salidas:[['pa','pb','pc']],scores:{pa:sc(),pb:sc({gross:g9}),pc:sc()}});   // sin retired
+    reset({players:[P('pa','Ana'),P('pb','Beto'),P('pc','Caro')],days:[d2],currentDayId:d2.id});
+    t('control: sin retiro, dayAllFinished = false',T.dayAllFinished(d2)===false,T.dayAllFinished(d2));
+    t('control: el motor da el MISMO neto (retiro no cambia el cálculo, solo la finalización)',T.h2h(d2,'pb','pa').net===3,T.h2h(d2,'pb','pa').net);
+  }
+
   window.__RESULTS__.ready=true;
   flush();
 }
