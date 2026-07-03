@@ -611,7 +611,7 @@
 
 <script>
 const App = (() => {
-  const APP_VERSION = '2026-07-03-48';   // ⬆️ SUBIR en cada deploy: la app se auto-recarga cuando detecta una versión distinta
+  const APP_VERSION = '2026-07-03-49';   // ⬆️ SUBIR en cada deploy: la app se auto-recarga cuando detecta una versión distinta
   const KEY = 'rayas-campestre-v2';
   const uid = () => Math.random().toString(36).slice(2,9);
   // Auto-actualización: revisa el index.html en vivo (sin caché); si la versión cambió, recarga a la versión fresca.
@@ -1800,13 +1800,13 @@ const App = (() => {
   // Trofeos de "iba ganando y no cobró" (la lluvia le quitó el billete) — [emoji, título, sufijo del monto]. Voz de la app.
   const MISSED_TROPHIES=[
     ['😤','Para la otra','que se le fue'],
-    ['🌧️','Se lo llevó la lluvia','que iba ganando'],
+    ['🌂','Se lo lavó la lluvia','que iba ganando'],
     ['😮‍💨','Tan cerca del billete','que se esfumó'],
-    ['🥲','Iba cobrando','que le llovió'],
-    ['💨','Se le fue el cobro','que no vio'],
-    ['⛈️','Le llovió la ganancia','que dejó ir'],
+    ['🥲','Se quedó con las ganas','que no cobró'],
+    ['💨','Se le fue el cobro','que ya saboreaba'],
+    ['⛈️','La tormenta le cortó el cobro','que dejó ir'],
     ['🎣','Se le soltó el pez','que ya tenía'],
-    ['😫','Ni modo, campeón','que quedó en veremos'],
+    ['😫','Ni modo, campeón','que quedó pendiente'],
   ];
   function dayHighlights(st){ const {S,ids}=st; const wash=st.washout; const out=[]; const push=(e,t,n,v,c)=>out.push({e,t,n,v,c});
     const played=ids.map(id=>S[id]).filter(s=>s.played>0); if(!played.length) return out;
@@ -1844,7 +1844,7 @@ const App = (() => {
     if(bot&&bot.pesos<0) push('💸','El que más paga',bot.name,_money(bot.pesos),'bad');
     const worst=ids.map(id=>A[id]).filter(a=>a.worstDay!=null).sort((a,b)=>a.worstDay-b.worstDay)[0]; if(worst&&worst.worstDay<0) push('📉','Peor viernes',worst.name,_money(worst.worstDay),'bad');
     const svd=ids.map(id=>A[id]).filter(a=>a.saved>0).sort((a,b)=>b.saved-a.saved)[0]; if(svd) push('🛟','Salvado por el clima',svd.name,_money(svd.saved)+' 🌂','gold');   // La Acapulqueña: lo que esquivó de pagar
-    const msd=ids.map(id=>A[id]).filter(a=>a.missed>0).sort((a,b)=>b.missed-a.missed)[0]; if(msd) push('🌧️','Al que más le llovió',msd.name,_money(msd.missed)+' sin cobrar','bad');   // iba ganando y el clima le quitó el cobro
+    const msd=ids.map(id=>A[id]).filter(a=>a.missed>0).sort((a,b)=>b.missed-a.missed)[0]; if(msd) push('🌂','El que más dejó de cobrar',msd.name,_money(msd.missed)+' que borró la lluvia','bad');   // iba ganando y el clima le quitó el cobro
     state.castigos.forEach(c=>{ const t=topCast(A,ids,c.id); if(t) push(c.emoji||'🍺','Rey del '+((c.name||'castigo').split(' ')[0]),t.name,'×'+t.val,'bad'); });
     if((x=topBy(A,ids,'cancels'))) push('🐔','Rey de las canceladas',x.name,'×'+x.val,'bad');
     if((x=topBy(A,ids,'noshows'))) push('👻','Fantasma del viernes',x.name,'×'+x.val,'bad');

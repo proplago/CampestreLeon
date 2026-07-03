@@ -600,7 +600,7 @@ async function main(){
     const ssW=T.seasonStats(); const xA=ssW.A.x;
     t('temporada: el ganador acumula "missed" (lo que no cobró)',xA.missed>0 && xA.pesos===0,xA.missed+'/'+xA.pesos);
     const seasonTr=T.seasonHighlights(ssW).map(h=>h.e+' '+h.t);
-    t('trofeo de temporada "Al que más le llovió" existe',seasonTr.some(s=>/llovió/i.test(s)),JSON.stringify(seasonTr));
+    t('trofeo de temporada del que dejó de cobrar existe',seasonTr.some(s=>/dejó de cobrar/i.test(s)),JSON.stringify(seasonTr));
     // control: sin washout, sí cuenta y es cajero
     const d2=day({playing:['pa','pb'],salidas:[['pa','pb']],scores:{pa:sc({gross:gross({0:3})}),pb:sc()}});
     reset({players:[P('pa','Ana'),P('pb','Beto')],days:[d2],currentDayId:d2.id});
