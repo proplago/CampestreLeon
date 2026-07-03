@@ -576,8 +576,18 @@ async function main(){
     const hl=T.dayHighlights(T.dayStats(d));
     t('dayHighlights incluye 🛟 Salvavidas',hl.some(h=>/Salvavidas/.test(h.t)),JSON.stringify(hl.map(h=>h.t)));
     t('dayHighlights NO da "Cajero del día" en clima',!hl.some(h=>/Cajero/.test(h.t)),'');
+    // TODOS los que iban abajo reciben salvavidas (aquí solo pb, con 2 jugadores)
+    const nLosers=res.rows.filter(r=>r.pesos<0).length, nSalva=hl.filter(h=>/Salvavidas/.test(h.t)).length;
+    t('un 🛟 Salvavidas por CADA jugador que iba abajo',nSalva===nLosers && nLosers>0,nSalva+'/'+nLosers);
     const car=T.dayCarrilla(T.dayStats(d));
     t('la carrilla menciona La Acapulqueña / se salvó',car.some(l=>/ACAPULQUEÑA|salvó|salvo|lluvia/i.test(l)),JSON.stringify(car).slice(0,120));
+    // 3 jugadores, 2 iban abajo → 2 salvavidas
+    const d3=day({playing:['x','y','z'],salidas:[['x','y','z']],washout:true,
+      scores:{x:sc({gross:gross({0:3})}),y:sc({gross:gross({0:5,1:5})}),z:sc({gross:gross({0:5,1:5,2:6})})}});
+    reset({players:[P('x','X'),P('y','Y'),P('z','Z')],days:[d3],currentDayId:d3.id});
+    const r3=T.computeDay(d3), hl3=T.dayHighlights(T.dayStats(d3));
+    const losers3=r3.rows.filter(rr=>rr.pesos<0).length, salva3=hl3.filter(h=>/Salvavidas/.test(h.t)).length;
+    t('3 jugadores: un 🛟 por cada uno de los 2 que iban abajo',salva3===losers3 && losers3>=2,salva3+'/'+losers3);
     // control: sin washout, sí cuenta y es cajero
     const d2=day({playing:['pa','pb'],salidas:[['pa','pb']],scores:{pa:sc({gross:gross({0:3})}),pb:sc()}});
     reset({players:[P('pa','Ana'),P('pb','Beto')],days:[d2],currentDayId:d2.id});

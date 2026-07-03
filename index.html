@@ -611,7 +611,7 @@
 
 <script>
 const App = (() => {
-  const APP_VERSION = '2026-07-03-45';   // ⬆️ SUBIR en cada deploy: la app se auto-recarga cuando detecta una versión distinta
+  const APP_VERSION = '2026-07-03-46';   // ⬆️ SUBIR en cada deploy: la app se auto-recarga cuando detecta una versión distinta
   const KEY = 'rayas-campestre-v2';
   const uid = () => Math.random().toString(36).slice(2,9);
   // Auto-actualización: revisa el index.html en vivo (sin caché); si la versión cambió, recarga a la versión fresca.
@@ -1797,8 +1797,8 @@ const App = (() => {
     if((x=topBy(S,ids,'hotStreak'))&&x.val>=2) push('🔥','Racha caliente',x.name,x.val+' hoyos','fire');
     if((x=topBy(S,ids,'birdieStreak'))&&x.val>=2) push('🐦‍🔥','Racha de pajaritos',x.name,'×'+x.val,'fire');
     if((x=topBy(S,ids,'holeouts'))) push('🕳️','Hole out',x.name,'×'+x.val,'good');
-    if(bot&&bot.pesos<0){ if(wash) push('🛟','Salvavidas',bot.name,_money(-bot.pesos)+' que no pagó 🌂','gold'); else push('💸','Cajero del día',bot.name,_money(bot.pesos),'bad'); }
-    if(wash) played.filter(s=>s.pesos<0 && s!==bot).forEach(s=>push('🌂','Salvado por la lluvia',s.name,_money(-s.pesos)+' que no pagó','gold'));   // carrilla: todos los que iban perdiendo se salvaron
+    if(wash) played.filter(s=>s.pesos<0).sort((a,b)=>a.pesos-b.pesos).forEach(s=>push('🛟','Salvavidas',s.name,_money(-s.pesos)+' que no pagó 🌂','gold'));   // TODOS los que iban abajo se salvaron
+    else if(bot&&bot.pesos<0) push('💸','Cajero del día',bot.name,_money(bot.pesos),'bad');
     if((x=topBy(S,ids,'coldStreak'))&&x.val>=2) push('🧊','Racha fría',x.name,x.val+' hoyos','bad');
     if((x=topBy(S,ids,'zopilotes'))) push('🦃','Zopilotero',x.name,'×'+x.val,'bad');
     state.castigos.forEach(c=>{ const t=topCast(S,ids,c.id); if(t) push(c.emoji||'🍺','Rey del '+((c.name||'castigo').split(' ')[0]),t.name,'×'+t.val,'bad'); });
