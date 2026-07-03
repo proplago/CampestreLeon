@@ -537,6 +537,27 @@ async function main(){
     t('control: el motor da el MISMO neto (retiro no cambia el cálculo, solo la finalización)',T.h2h(d2,'pb','pa').net===3,T.h2h(d2,'pb','pa').net);
   }
 
+  // ============ F26 · llegar TARDE a la 2ª vuelta (front vacío) + clasificación de validateDay ============
+  sec('F26 tarde a la 2ª vuelta: solo cuenta el 2º nueve; validateDay lo marca "no jugó", no incompleto');
+  {
+    // pb SOLO juega el back (10-18), front en 0. birdie en hoyo 10 (idx9). pa juega 18. pc juega solo 5 hoyos del front (incompleto real)
+    const gBack=PARS.map((p,i)=>i<9?0:(i===9?p-1:p));   // front vacío, back con birdie h10
+    const gInc=PARS.map((p,i)=>i<5?p:0);                 // pc: solo hoyos 1-5 (1ª vuelta a medias = incompleto)
+    const d=day({playing:['pa','pb','pc'],salidas:[['pa','pb','pc']],scores:{pa:sc(),pb:sc({gross:gBack}),pc:sc({gross:gInc})}});
+    reset({players:[P('pa','Ana'),P('pb','Beto'),P('pc','Caro')],days:[d],currentDayId:d.id});
+    const res=T.computeDay(d);
+    t('cuadra en cero',res.sum===0,res.sum);
+    const hba=T.h2h(d,'pb','pa');
+    t('pb (tarde) vs pa = +3: solo el 2º nueve (hoyo10 + birdie + medal back)',hba.net===3,hba.net);
+    const ms=T.medalSeg(d,'pb','pa',Z,Z);
+    t('medal de pb: 1er nueve y total NULL (le falta el front), 2º nueve cuenta',ms.first===null&&ms.second&&ms.second.winner==='a'&&ms.total===null,JSON.stringify({f:ms.first,s:ms.second,t:ms.total}));
+    // validateDay: pb = skipped "no jugó la 1ª vuelta"; pc = issue incompleto (1ª v. a medias)
+    const v=T.validateDay(d);
+    t('pb en skipped como "no jugó la 1ª vuelta"',v.skipped.some(s=>/1ª vuelta/.test(s.msg)),JSON.stringify(v.skipped));
+    t('pc (5 de 9 del front) sí es issue incompleto',v.issues.some(i=>/faltan/.test(i.msg)),JSON.stringify(v.issues));
+    t('pb NO aparece como incompleto',!v.issues.some(i=>i.name===T.getState().players.find(p=>p.id==='pb').name && /faltan/.test(i.msg)),'');
+  }
+
   window.__RESULTS__.ready=true;
   flush();
 }

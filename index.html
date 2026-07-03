@@ -611,7 +611,7 @@
 
 <script>
 const App = (() => {
-  const APP_VERSION = '2026-07-03-43';   // ⬆️ SUBIR en cada deploy: la app se auto-recarga cuando detecta una versión distinta
+  const APP_VERSION = '2026-07-03-44';   // ⬆️ SUBIR en cada deploy: la app se auto-recarga cuando detecta una versión distinta
   const KEY = 'rayas-campestre-v2';
   const uid = () => Math.random().toString(36).slice(2,9);
   // Auto-actualización: revisa el index.html en vivo (sin caché); si la versión cambió, recarga a la versión fresca.
@@ -1454,9 +1454,13 @@ const App = (() => {
 
     const val=validateDay(d);
     // El aviso de validación solo aplica antes de cerrar; en un día cerrado se omite (ya hay banner de "Día cerrado").
-    const valBanner = d.closed ? '' : (val.allOk
-      ? `<div class="valbar ok">✓ Tarjetas completas, listo para cerrar</div>`
-      : `<div class="valbar warn"><b>⚠ Revisa antes de cerrar</b><div class="valdet">${val.issues.map(x=>x.name+': '+x.msg).join(' · ')}</div></div>`);
+    const skTxt=(val.skipped||[]).map(x=>x.name+' '+x.msg).join(' · ');
+    const valBanner = d.closed ? '' : (
+      val.issues.length
+        ? `<div class="valbar warn"><b>⚠ Revisa antes de cerrar</b><div class="valdet">${val.issues.map(x=>x.name+': '+x.msg).join(' · ')}${skTxt?' · '+skTxt:''}</div></div>`
+        : skTxt
+          ? `<div class="valbar ok">✓ Listo para cerrar <span style="font-weight:400">· ${skTxt} (solo cuenta lo jugado)</span></div>`
+          : `<div class="valbar ok">✓ Tarjetas completas, listo para cerrar</div>`);
 
     const ini=s=>(s||'').trim().split(/\s+/).slice(0,2).map(w=>w[0]||'').join('').toUpperCase();
     const fmtP=n=> n>0?'+'+n.toLocaleString('es-MX') : n<0?'−'+Math.abs(n).toLocaleString('es-MX') : '0';
@@ -1939,17 +1943,24 @@ const App = (() => {
     modal(h);
   }
   // ---- Validación antes de cerrar ----
+  // issues = incompletos DE VERDAD (una vuelta a medias). skipped = vueltas completas en cero (no jugó esa vuelta:
+  //          se fue tras la 1ª, o llegó tarde a la 2ª) → el motor calcula solo lo jugado, así que basta confirmar.
   function validateDay(d){
-    const ids=dayPlayers(d).filter(Boolean), issues=[]; const ord=playOrder(d);
+    const ids=dayPlayers(d).filter(Boolean), issues=[], skipped=[]; const nine=isNine(d);
     ids.forEach(id=>{
-      const sc=ensureScore(d,id);
-      const got=ord.filter(i=>sc.gross[i]>0).length;
+      const sc=ensureScore(d,id); const ord=playOrderFrom(d,startOf(d,id));   // orden de juego de ESTE jugador
       const p=player(id), nm=p?pname(p.id):'—';
-      if(isRetired(d,id)){ if(got===0) issues.push({name:nm,msg:'retirado sin capturar'}); return; }   // retirado: cerró en N hoyos, no se le esperan más
-      if(got===0) issues.push({name:nm,msg:'sin capturar'});
-      else if(got===ord.length){}                    // vuelta completa (9 o 18)
-      else { const miss=ord.filter(i=>!sc.gross[i]).map(i=>holesOf(d)[i].n);
-        issues.push({name:nm,msg:'faltan '+miss.slice(0,6).join(',')+(miss.length>6?'…':'')}); }
+      const missN=hs=>hs.filter(h=>!sc.gross[h]).map(h=>holesOf(d)[h].n);
+      const partial=(label,miss)=>issues.push({name:nm,msg:'faltan'+label+' '+miss.slice(0,5).join(',')+(miss.length>5?'…':'')});
+      if(nine){ const miss=missN(ord);
+        if(miss.length===ord.length) skipped.push({name:nm,msg:'no jugó'});
+        else if(miss.length) partial('',miss);
+        return; }
+      const first=ord.slice(0,9), second=ord.slice(9,18);
+      const mf=missN(first), ms=missN(second);
+      if(mf.length===9 && ms.length===9){ skipped.push({name:nm,msg:'no se presentó'}); return; }
+      if(mf.length===9) skipped.push({name:nm,msg:'no jugó la 1ª vuelta'}); else if(mf.length) partial(' (1ª v.)',mf);
+      if(ms.length===9) skipped.push({name:nm,msg:'no jugó la 2ª vuelta'}); else if(ms.length) partial(' (2ª v.)',ms);
     });
     // oyes en par 3: TODOS los del grupo que jugaron el hoyo deben tener lugar asignado
     (d.salidas||[]).forEach((grp,gi)=>{ const members=(grp||[]).filter(Boolean); if(members.length<2) return;
@@ -1960,7 +1971,7 @@ const App = (() => {
         if(missing.length) issues.push({name:'G'+(gi+1)+'·H'+h.n, msg:'oyes 🎯 ('+missing.length+' sin lugar)'});
       });
     });
-    return {allOk:issues.length===0, issues};
+    return {allOk:issues.length===0 && skipped.length===0, issues, skipped};
   }
 
   // ---- Comparar dos jugadores ----
@@ -2241,11 +2252,21 @@ const App = (() => {
     if(!isAdmin()){ toast('Solo el admin cierra el día'); return; }
     if(d.closed){ toast('Este día ya está cerrado'); return; }
     const val=validateDay(d);
-    const proceed=()=>confirmModal('Cerrar el día ajusta las ventajas (sliding) según quién ganó el head-to-head. ¿Continuar?','Cerrar y ajustar',()=>doCloseDay(d));
-    if(!val.allOk){
+    const sliding='Al cerrar se ajustan las ventajas (sliding) según el head-to-head.';
+    const skMsg=(val.skipped||[]).map(s=>'<b>'+s.name+'</b> '+s.msg).join(' · ');
+    // 1) incompletos DE VERDAD (una vuelta a medias) → aviso fuerte, doble confirmación
+    if(val.issues.length){
       const list=val.issues.slice(0,6).map(i=>i.name+' '+i.msg).join(' · ')+(val.issues.length>6?' …':'');
-      confirmModal('Hay capturas incompletas:<br><b>'+list+'</b><br>¿Cerrar de todas formas?','Sí, cerrar igual',proceed);
-    } else proceed();
+      confirmModal('Hay capturas incompletas:<br><b>'+list+'</b>'+(skMsg?'<br>'+skMsg+' — solo cuenta lo que jugaron.':'')+'<br><br>'+sliding+'<br>¿Cerrar de todas formas?','Sí, cerrar igual',()=>doCloseDay(d));
+      return;
+    }
+    // 2) alguien no jugó una vuelta completa → asumir que no la jugó, solo confirmar
+    if(val.skipped.length){
+      confirmModal(skMsg+'.<br>Se calcularán <b>solo las vueltas que sí jugaron</b>. '+sliding+'<br>¿Cerrar?','Cerrar y ajustar',()=>doCloseDay(d));
+      return;
+    }
+    // 3) todo completo
+    confirmModal(sliding+' ¿Continuar?','Cerrar y ajustar',()=>doCloseDay(d));
   }
   function doCloseDay(d){
     const ids=dayPlayers(d).filter(Boolean);
