@@ -611,7 +611,7 @@
 
 <script>
 const App = (() => {
-  const APP_VERSION = '2026-07-03-46';   // ⬆️ SUBIR en cada deploy: la app se auto-recarga cuando detecta una versión distinta
+  const APP_VERSION = '2026-07-03-47';   // ⬆️ SUBIR en cada deploy: la app se auto-recarga cuando detecta una versión distinta
   const KEY = 'rayas-campestre-v2';
   const uid = () => Math.random().toString(36).slice(2,9);
   // Auto-actualización: revisa el index.html en vivo (sin caché); si la versión cambió, recarga a la versión fresca.
@@ -1786,6 +1786,17 @@ const App = (() => {
     return L.slice(0,7);
   }
 
+  // Trofeos de "se salvó por el clima" (La Acapulqueña) — [emoji, título, sufijo del monto]. Voz de la app; uno distinto por jugador.
+  const SAVED_TROPHIES=[
+    ['🛟','Salvavidas','que no pagó'],
+    ['☔','Bendita la lluvia','que se ahorró'],
+    ['🍀','Suertudo del cielo','que le perdonaron'],
+    ['🙏','Se lo mandó el de arriba','que no soltó'],
+    ['😅','La libró por el agua','que iba palmando'],
+    ['🌂','Lo tapó la Acapulqueña','que zafó'],
+    ['⛅','Le llovió del cielo','que no pagó'],
+    ['🎰','Se sacó la del clima','que se salvó'],
+  ];
   function dayHighlights(st){ const {S,ids}=st; const wash=st.washout; const out=[]; const push=(e,t,n,v,c)=>out.push({e,t,n,v,c});
     const played=ids.map(id=>S[id]).filter(s=>s.played>0); if(!played.length) return out;
     const sorted=[...played].sort((a,b)=>b.pesos-a.pesos); const top=sorted[0], bot=sorted[sorted.length-1]; let x;
@@ -1797,7 +1808,9 @@ const App = (() => {
     if((x=topBy(S,ids,'hotStreak'))&&x.val>=2) push('🔥','Racha caliente',x.name,x.val+' hoyos','fire');
     if((x=topBy(S,ids,'birdieStreak'))&&x.val>=2) push('🐦‍🔥','Racha de pajaritos',x.name,'×'+x.val,'fire');
     if((x=topBy(S,ids,'holeouts'))) push('🕳️','Hole out',x.name,'×'+x.val,'good');
-    if(wash) played.filter(s=>s.pesos<0).sort((a,b)=>a.pesos-b.pesos).forEach(s=>push('🛟','Salvavidas',s.name,_money(-s.pesos)+' que no pagó 🌂','gold'));   // TODOS los que iban abajo se salvaron
+    // TODOS los que iban abajo se salvaron por el clima — título variado (con la voz de la app), uno distinto por jugador
+    if(wash){ const savers=played.filter(s=>s.pesos<0).sort((a,b)=>a.pesos-b.pesos);
+      savers.forEach((s,i)=>{ const T=SAVED_TROPHIES[i%SAVED_TROPHIES.length]; push(T[0],T[1],s.name,_money(-s.pesos)+' '+(T[2]||'que no pagó'),'gold'); }); }
     else if(bot&&bot.pesos<0) push('💸','Cajero del día',bot.name,_money(bot.pesos),'bad');
     if((x=topBy(S,ids,'coldStreak'))&&x.val>=2) push('🧊','Racha fría',x.name,x.val+' hoyos','bad');
     if((x=topBy(S,ids,'zopilotes'))) push('🦃','Zopilotero',x.name,'×'+x.val,'bad');
@@ -4743,7 +4756,7 @@ const App = (() => {
     exportData,renderCfg,renderVent,renderDay,closeModal,confirmYes,renderHigh,setHighTab,openProfile,rulesModal,editRulesModal,saveRules,
     exportComprobante,cmpPrint,cmpClose,photosModal,onPhotoPick,delPhoto,viewPhoto,forceUpdate,clearCacheReload,
     // Gancho de PRUEBAS (tests.html): acceso directo al motor con estado sintético. NO usar desde la UI.
-    __test:{ computeDay,_computeDayRaw,medalSeg,h2h,allocate,received,playOrder,orderIdx,isSecond,autoUnits,validManual,unitsOnHole,inferOyes,autoCast,dayStats,seasonStats,careerStats,clearStatCache,intHcp,intHcpOf,playerDiffs,COURSE_SEED,courseSlug,mostRecentDayId,autoPickDay,resetOpenedFresh:function(){_openedFresh=true;},startOf,pairSameStart,dayMixedStarts,salidaStartOf,firstNineDone,isRetired,dayAllFinished,validateDay,dayThru,dayHighlights,dayCarrilla,
+    __test:{ computeDay,_computeDayRaw,medalSeg,h2h,allocate,received,playOrder,orderIdx,isSecond,autoUnits,validManual,unitsOnHole,inferOyes,autoCast,dayStats,seasonStats,careerStats,clearStatCache,intHcp,intHcpOf,playerDiffs,COURSE_SEED,courseSlug,mostRecentDayId,autoPickDay,resetOpenedFresh:function(){_openedFresh=true;},startOf,pairSameStart,dayMixedStarts,salidaStartOf,firstNineDone,isRetired,dayAllFinished,validateDay,dayThru,dayHighlights,dayCarrilla,SAVED_TROPHIES,
       setState:function(st){ state=Object.assign(state,st); clearStatCache(); },
       getState:function(){ return state; } } };
 })();
