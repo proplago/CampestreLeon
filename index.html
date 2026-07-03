@@ -611,7 +611,7 @@
 
 <script>
 const App = (() => {
-  const APP_VERSION = '2026-07-03-41';   // ⬆️ SUBIR en cada deploy: la app se auto-recarga cuando detecta una versión distinta
+  const APP_VERSION = '2026-07-03-42';   // ⬆️ SUBIR en cada deploy: la app se auto-recarga cuando detecta una versión distinta
   const KEY = 'rayas-campestre-v2';
   const uid = () => Math.random().toString(36).slice(2,9);
   // Auto-actualización: revisa el index.html en vivo (sin caché); si la versión cambió, recarga a la versión fresca.
@@ -1658,7 +1658,8 @@ const App = (() => {
   function dayStats(d){ if(!d) return {S:{},ids:[],res:null,order:[]}; if(_dsCache.has(d.id)) return _dsCache.get(d.id); const out=_dayStatsRaw(d); _dsCache.set(d.id,out); return out; }
   function _dayStatsRaw(d){
     const ids=dayPlayers(d).filter(Boolean);
-    const res=computeDay(d); const byId={}; res.rows.forEach(r=>byId[r.id]=r);
+    const res=computeDay(d); if(!res){ return {S:{},ids:[],res:null,order:[]}; }   // día vacío (sin jugadores, p.ej. la salida auto-creada) → sin stats
+    const byId={}; res.rows.forEach(r=>byId[r.id]=r);
     const order=holesOrder(d); const S={};
     ids.forEach(id=>{ const sc=ensureScore(d,id);
       const st={id,name:pname(id),birdies:0,eagles:0,aces:0,holeouts:0,sandies:0,aquas:0,oyesWon:0,calacas:0,zopilotes:0,castigos:0,castById:{},overPar:0,played:0,
@@ -1690,16 +1691,17 @@ const App = (() => {
     const PM={}; const chrono=[...state.days].reverse();
     chrono.forEach(d=>{ const st=dayStats(d);
       (d.cancels||[]).forEach(cc=>{ const a=A[cc.pid]; if(!a) return; if(cc.type==='noshow')a.noshows++; else a.cancels++; });
+      const resPM=(st.res&&st.res.pm)||{};   // día vacío (salida auto-creada sin jugadores) → matriz vacía, no truena
       st.ids.forEach(id=>{ if(!A[id]) return; const s=st.S[id]; if(s.played===0) return; const a=A[id];
         // saldo de temporada: SOLO vs internos (lo jugado vs invitados no se acumula)
-        const pmRow=(st.res.pm||{})[id]||{}; let ipesos=0; Object.keys(pmRow).forEach(o=>{ const op=player(o); if(op && !op.guest) ipesos+=pmRow[o]*pairRaya(id,o); });
+        const pmRow=resPM[id]||{}; let ipesos=0; Object.keys(pmRow).forEach(o=>{ const op=player(o); if(op && !op.guest) ipesos+=pmRow[o]*pairRaya(id,o); });
         a.pesos+=ipesos;a.birdies+=s.birdies;a.eagles+=s.eagles;a.aces+=s.aces;a.oyesWon+=s.oyesWon;a.calacas+=s.calacas;a.sandies+=s.sandies;a.castigos+=s.castigos;a.days++;
         Object.keys(s.castById||{}).forEach(k=>a.castById[k]=(a.castById[k]||0)+s.castById[k]);
         if(a.bestDay===null||ipesos>a.bestDay)a.bestDay=ipesos; if(a.worstDay===null||ipesos<a.worstDay)a.worstDay=ipesos;
         a._run=ipesos>0?a._run+1:0; if(a._run>a.fridayStreak)a.fridayStreak=a._run;
         if(d.date && (!a.lastDate || d.date>a.lastDate)) a.lastDate=d.date;
       });
-      const pm=st.res.pm||{}; Object.keys(pm).forEach(a=>{ PM[a]=PM[a]||{}; Object.keys(pm[a]).forEach(b=>{ PM[a][b]=(PM[a][b]||0)+pm[a][b]; }); });
+      Object.keys(resPM).forEach(a=>{ PM[a]=PM[a]||{}; Object.keys(resPM[a]).forEach(b=>{ PM[a][b]=(PM[a][b]||0)+resPM[a][b]; }); });
     });
     let nem=null; Object.keys(PM).forEach(a=>Object.keys(PM[a]).forEach(b=>{ const v=PM[a][b]; if(v>0 && A[a] && A[b] && (!nem||v>nem.val)) nem={a,b,val:v}; }));   // sin invitados
     return {A, ids: ids.filter(id=>A[id].days>0 || A[id].cancels>0 || A[id].noshows>0), nem};

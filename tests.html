@@ -496,6 +496,21 @@ async function main(){
     t('cuadra en cero',res.sum===0,res.sum);
   }
 
+  // ============ F24 · día vacío no truena stats (bug de la salida auto-creada) ============
+  sec('F24 día sin jugadores (salida auto-creada) no rompe seasonStats/careerStats/dayStats');
+  {
+    // un día real jugado + un día VACÍO (playing/salidas vacíos, como el que closeDay genera para la próxima)
+    const dJug=day({playing:['pa','pb'],salidas:[['pa','pb']],scores:{pa:sc({gross:gross({0:3})}),pb:sc()}});
+    const dVacio=day({playing:[],salidas:[[],[]],scores:{}});
+    reset({players:[P('pa','Ana'),P('pb','Beto')],days:[dVacio,dJug],currentDayId:dVacio.id});   // el vacío primero (más reciente)
+    let e1=null,e2=null,e3=null;
+    try{ T.dayStats(dVacio); }catch(e){ e1=e.message; }
+    try{ const ss=T.seasonStats(); t('seasonStats NO truena con día vacío',true); t('season sigue contando el día jugado (Ana pesos)',ss.A.pa.pesos!==0,ss.A.pa.pesos); }catch(e){ e2=e.message; t('seasonStats NO truena con día vacío',false,e.message); }
+    try{ T.careerStats(); }catch(e){ e3=e.message; }
+    t('dayStats(día vacío) NO truena',e1===null,e1);
+    t('careerStats NO truena con día vacío',e3===null,e3);
+  }
+
   window.__RESULTS__.ready=true;
   flush();
 }
