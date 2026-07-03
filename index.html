@@ -611,7 +611,7 @@
 
 <script>
 const App = (() => {
-  const APP_VERSION = '2026-07-03-47';   // ⬆️ SUBIR en cada deploy: la app se auto-recarga cuando detecta una versión distinta
+  const APP_VERSION = '2026-07-03-48';   // ⬆️ SUBIR en cada deploy: la app se auto-recarga cuando detecta una versión distinta
   const KEY = 'rayas-campestre-v2';
   const uid = () => Math.random().toString(36).slice(2,9);
   // Auto-actualización: revisa el index.html en vivo (sin caché); si la versión cambió, recarga a la versión fresca.
@@ -1699,7 +1699,7 @@ const App = (() => {
 
   function seasonStats(){
     const ids=state.players.filter(p=>!p.guest).map(p=>p.id);   // invitados fuera de los trofeos de temporada
-    const A={}; ids.forEach(id=>A[id]={id,name:pname(id),pesos:0,saved:0,washouts:0,birdies:0,eagles:0,aces:0,oyesWon:0,calacas:0,sandies:0,castigos:0,castById:{},days:0,fridayStreak:0,_run:0,cancels:0,noshows:0,lastDate:null,bestDay:null,worstDay:null});
+    const A={}; ids.forEach(id=>A[id]={id,name:pname(id),pesos:0,saved:0,missed:0,washouts:0,birdies:0,eagles:0,aces:0,oyesWon:0,calacas:0,sandies:0,castigos:0,castById:{},days:0,fridayStreak:0,_run:0,cancels:0,noshows:0,lastDate:null,bestDay:null,worstDay:null});
     const PM={}; const chrono=[...state.days].reverse();
     chrono.forEach(d=>{ const st=dayStats(d); const wash=!!d.washout;   // La Acapulqueña: día cancelado por clima, no mueve dinero
       (d.cancels||[]).forEach(cc=>{ const a=A[cc.pid]; if(!a) return; if(cc.type==='noshow')a.noshows++; else a.cancels++; });
@@ -1709,7 +1709,7 @@ const App = (() => {
         const pmRow=resPM[id]||{}; let ipesos=0; Object.keys(pmRow).forEach(o=>{ const op=player(o); if(op && !op.guest) ipesos+=pmRow[o]*pairRaya(id,o); });
         a.birdies+=s.birdies;a.eagles+=s.eagles;a.aces+=s.aces;a.oyesWon+=s.oyesWon;a.calacas+=s.calacas;a.sandies+=s.sandies;a.castigos+=s.castigos;a.days++;
         Object.keys(s.castById||{}).forEach(k=>a.castById[k]=(a.castById[k]||0)+s.castById[k]);
-        if(wash){ a.washouts++; if(ipesos<0) a.saved+=(-ipesos); if(d.date && (!a.lastDate || d.date>a.lastDate)) a.lastDate=d.date; return; }   // 🌂 clima: NO cuenta dinero, guarda lo que "se salvó"
+        if(wash){ a.washouts++; if(ipesos<0) a.saved+=(-ipesos); else if(ipesos>0) a.missed+=ipesos; if(d.date && (!a.lastDate || d.date>a.lastDate)) a.lastDate=d.date; return; }   // 🌂 clima: NO cuenta dinero; guarda lo que "se salvó" (perdedores) y lo que "no cobró" (ganadores)
         a.pesos+=ipesos;
         if(a.bestDay===null||ipesos>a.bestDay)a.bestDay=ipesos; if(a.worstDay===null||ipesos<a.worstDay)a.worstDay=ipesos;
         a._run=ipesos>0?a._run+1:0; if(a._run>a.fridayStreak)a.fridayStreak=a._run;
@@ -1797,6 +1797,17 @@ const App = (() => {
     ['⛅','Le llovió del cielo','que no pagó'],
     ['🎰','Se sacó la del clima','que se salvó'],
   ];
+  // Trofeos de "iba ganando y no cobró" (la lluvia le quitó el billete) — [emoji, título, sufijo del monto]. Voz de la app.
+  const MISSED_TROPHIES=[
+    ['😤','Para la otra','que se le fue'],
+    ['🌧️','Se lo llevó la lluvia','que iba ganando'],
+    ['😮‍💨','Tan cerca del billete','que se esfumó'],
+    ['🥲','Iba cobrando','que le llovió'],
+    ['💨','Se le fue el cobro','que no vio'],
+    ['⛈️','Le llovió la ganancia','que dejó ir'],
+    ['🎣','Se le soltó el pez','que ya tenía'],
+    ['😫','Ni modo, campeón','que quedó en veremos'],
+  ];
   function dayHighlights(st){ const {S,ids}=st; const wash=st.washout; const out=[]; const push=(e,t,n,v,c)=>out.push({e,t,n,v,c});
     const played=ids.map(id=>S[id]).filter(s=>s.played>0); if(!played.length) return out;
     const sorted=[...played].sort((a,b)=>b.pesos-a.pesos); const top=sorted[0], bot=sorted[sorted.length-1]; let x;
@@ -1810,7 +1821,9 @@ const App = (() => {
     if((x=topBy(S,ids,'holeouts'))) push('🕳️','Hole out',x.name,'×'+x.val,'good');
     // TODOS los que iban abajo se salvaron por el clima — título variado (con la voz de la app), uno distinto por jugador
     if(wash){ const savers=played.filter(s=>s.pesos<0).sort((a,b)=>a.pesos-b.pesos);
-      savers.forEach((s,i)=>{ const T=SAVED_TROPHIES[i%SAVED_TROPHIES.length]; push(T[0],T[1],s.name,_money(-s.pesos)+' '+(T[2]||'que no pagó'),'gold'); }); }
+      savers.forEach((s,i)=>{ const T=SAVED_TROPHIES[i%SAVED_TROPHIES.length]; push(T[0],T[1],s.name,_money(-s.pesos)+' '+(T[2]||'que no pagó'),'gold'); });
+      const robbed=played.filter(s=>s.pesos>0).sort((a,b)=>b.pesos-a.pesos);   // iban ganando y la lluvia les quitó el cobro
+      robbed.forEach((s,i)=>{ const M=MISSED_TROPHIES[i%MISSED_TROPHIES.length]; push(M[0],M[1],s.name,_money(s.pesos)+' '+(M[2]||'que no cobró'),''); }); }
     else if(bot&&bot.pesos<0) push('💸','Cajero del día',bot.name,_money(bot.pesos),'bad');
     if((x=topBy(S,ids,'coldStreak'))&&x.val>=2) push('🧊','Racha fría',x.name,x.val+' hoyos','bad');
     if((x=topBy(S,ids,'zopilotes'))) push('🦃','Zopilotero',x.name,'×'+x.val,'bad');
@@ -1831,6 +1844,7 @@ const App = (() => {
     if(bot&&bot.pesos<0) push('💸','El que más paga',bot.name,_money(bot.pesos),'bad');
     const worst=ids.map(id=>A[id]).filter(a=>a.worstDay!=null).sort((a,b)=>a.worstDay-b.worstDay)[0]; if(worst&&worst.worstDay<0) push('📉','Peor viernes',worst.name,_money(worst.worstDay),'bad');
     const svd=ids.map(id=>A[id]).filter(a=>a.saved>0).sort((a,b)=>b.saved-a.saved)[0]; if(svd) push('🛟','Salvado por el clima',svd.name,_money(svd.saved)+' 🌂','gold');   // La Acapulqueña: lo que esquivó de pagar
+    const msd=ids.map(id=>A[id]).filter(a=>a.missed>0).sort((a,b)=>b.missed-a.missed)[0]; if(msd) push('🌧️','Al que más le llovió',msd.name,_money(msd.missed)+' sin cobrar','bad');   // iba ganando y el clima le quitó el cobro
     state.castigos.forEach(c=>{ const t=topCast(A,ids,c.id); if(t) push(c.emoji||'🍺','Rey del '+((c.name||'castigo').split(' ')[0]),t.name,'×'+t.val,'bad'); });
     if((x=topBy(A,ids,'cancels'))) push('🐔','Rey de las canceladas',x.name,'×'+x.val,'bad');
     if((x=topBy(A,ids,'noshows'))) push('👻','Fantasma del viernes',x.name,'×'+x.val,'bad');
@@ -4756,7 +4770,7 @@ const App = (() => {
     exportData,renderCfg,renderVent,renderDay,closeModal,confirmYes,renderHigh,setHighTab,openProfile,rulesModal,editRulesModal,saveRules,
     exportComprobante,cmpPrint,cmpClose,photosModal,onPhotoPick,delPhoto,viewPhoto,forceUpdate,clearCacheReload,
     // Gancho de PRUEBAS (tests.html): acceso directo al motor con estado sintético. NO usar desde la UI.
-    __test:{ computeDay,_computeDayRaw,medalSeg,h2h,allocate,received,playOrder,orderIdx,isSecond,autoUnits,validManual,unitsOnHole,inferOyes,autoCast,dayStats,seasonStats,careerStats,clearStatCache,intHcp,intHcpOf,playerDiffs,COURSE_SEED,courseSlug,mostRecentDayId,autoPickDay,resetOpenedFresh:function(){_openedFresh=true;},startOf,pairSameStart,dayMixedStarts,salidaStartOf,firstNineDone,isRetired,dayAllFinished,validateDay,dayThru,dayHighlights,dayCarrilla,SAVED_TROPHIES,
+    __test:{ computeDay,_computeDayRaw,medalSeg,h2h,allocate,received,playOrder,orderIdx,isSecond,autoUnits,validManual,unitsOnHole,inferOyes,autoCast,dayStats,seasonStats,careerStats,clearStatCache,intHcp,intHcpOf,playerDiffs,COURSE_SEED,courseSlug,mostRecentDayId,autoPickDay,resetOpenedFresh:function(){_openedFresh=true;},startOf,pairSameStart,dayMixedStarts,salidaStartOf,firstNineDone,isRetired,dayAllFinished,validateDay,dayThru,dayHighlights,dayCarrilla,SAVED_TROPHIES,MISSED_TROPHIES,seasonHighlights,
       setState:function(st){ state=Object.assign(state,st); clearStatCache(); },
       getState:function(){ return state; } } };
 })();

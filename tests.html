@@ -591,6 +591,16 @@ async function main(){
     const losers3=r3.rows.filter(rr=>rr.pesos<0).length, salva3=hl3.filter(isSave).length;
     t('3 jugadores: un trofeo por cada uno de los 2 que iban abajo',salva3===losers3 && losers3>=2,salva3+'/'+losers3);
     t('los 2 trofeos de salvado tienen TÍTULOS distintos (variedad)',(function(){ const ts=hl3.filter(isSave).map(h=>h.t); return new Set(ts).size===ts.length; })(),'');
+    // "para la otra": el que iba GANANDO (x) recibe su trofeo de consolación
+    const msEmo=T.MISSED_TROPHIES.map(m=>m[0]); const isMiss=h=>msEmo.indexOf(h.e)>=0;
+    const winners3=r3.rows.filter(rr=>rr.pesos>0).length;
+    t('el que iba ganando recibe trofeo "para la otra"',hl3.filter(isMiss).length===winners3 && winners3>=1,hl3.filter(isMiss).length+'/'+winners3);
+    // temporada: guarda saved (perdedores) y missed (ganadores)
+    reset({players:[P('x','X'),P('y','Y'),P('z','Z')],days:[JSON.parse(JSON.stringify(d3))],currentDayId:d3.id});
+    const ssW=T.seasonStats(); const xA=ssW.A.x;
+    t('temporada: el ganador acumula "missed" (lo que no cobró)',xA.missed>0 && xA.pesos===0,xA.missed+'/'+xA.pesos);
+    const seasonTr=T.seasonHighlights(ssW).map(h=>h.e+' '+h.t);
+    t('trofeo de temporada "Al que más le llovió" existe',seasonTr.some(s=>/llovió/i.test(s)),JSON.stringify(seasonTr));
     // control: sin washout, sí cuenta y es cajero
     const d2=day({playing:['pa','pb'],salidas:[['pa','pb']],scores:{pa:sc({gross:gross({0:3})}),pb:sc()}});
     reset({players:[P('pa','Ana'),P('pb','Beto')],days:[d2],currentDayId:d2.id});
