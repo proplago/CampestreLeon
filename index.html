@@ -611,7 +611,7 @@
 
 <script>
 const App = (() => {
-  const APP_VERSION = '2026-07-02-39';   // ⬆️ SUBIR en cada deploy: la app se auto-recarga cuando detecta una versión distinta
+  const APP_VERSION = '2026-07-03-40';   // ⬆️ SUBIR en cada deploy: la app se auto-recarga cuando detecta una versión distinta
   const KEY = 'rayas-campestre-v2';
   const uid = () => Math.random().toString(36).slice(2,9);
   // Auto-actualización: revisa el index.html en vivo (sin caché); si la versión cambió, recarga a la versión fresca.
@@ -710,6 +710,7 @@ const App = (() => {
     currentDayId:null,
   };
   let curView='liq', curScorePlayer=null, curScoreSalida=0, liqTab='hoy', scoreTab='cap', highTab='hoy';
+  let _openedFresh=true;   // al abrir, saltar a la salida MÁS RECIENTE la 1ª vez que existan días (aunque el sync tarde)
   let curScoreGroup=0, curHoleNav=0, cmpA=null, cmpB=null, dblPlayer=null, cfgCourseId='campestre';
   let saveTimer=null, dirty=false, _saveDenied=false;
 
@@ -866,7 +867,7 @@ const App = (() => {
     });
     if(!peerChanged) return;
     const ns=rebuildFromShards(merged);
-    if(ns){ state=Object.assign(state,ns); _shardCache=_cloneShards(merged); clearStatCache(); if(_loadedOnce) render(); }
+    if(ns){ state=Object.assign(state,ns); _shardCache=_cloneShards(merged); clearStatCache(); autoPickDay(); if(_loadedOnce) render(); }
   }
   // (Re)engancha el sync de Firebase DESPUÉS de tener sesión. Las reglas exigen auth != null, y un listener enganchado
   // SIN sesión se cancela (permission_denied) y nunca vuelve a entregar datos → por eso no cargaban los jugadores.
@@ -898,7 +899,7 @@ const App = (() => {
           if(!done){
             const ns=rebuildFromShards(flattenTree(root)); if(ns) state=Object.assign(state,ns);
             _shardCache=_cloneShards(flattenTree(root));   // cache = lo que REALMENTE hay en la base (migrate luego escribe su diff)
-            hydratePlayers(); fin();
+            hydratePlayers(); autoPickDay(); fin();
           } else { applyRemoteTree(root); hydratePlayers(); }
         }, ()=>fin());   // permiso/conexión denegada → no bloquear el arranque
         setTimeout(fin, 4000);   // si la red tarda, no bloquear el arranque
@@ -1090,6 +1091,14 @@ const App = (() => {
   }
   function pname(id){ const m=labelMap(); return m[id] || (player(id)?player(id).name:'?'); }
   const curDay = () => state.days.find(d=>d.id===state.currentDayId);
+  // El día MÁS RECIENTE por fecha (empate → el creado más reciente, que es state.days[0]). Cubre "la pasada o la que viene si ya está creada".
+  function mostRecentDayId(){ if(!state.days||!state.days.length) return null;
+    let best=state.days[0]; state.days.forEach(d=>{ if((d.date||'')>(best.date||'')) best=d; }); return best.id; }
+  // Al abrir (o la 1ª vez que bajan días por sync) cae en la salida más reciente para TODOS; también repara si el día actual ya no existe.
+  // NO pisa la navegación manual del usuario a mitad de sesión (solo la 1ª vez, o si su día se borró).
+  function autoPickDay(){ if(!state.days||!state.days.length) return;
+    const valid=state.days.some(d=>d.id===state.currentDayId);
+    if(_openedFresh || !valid){ state.currentDayId=mostRecentDayId(); _openedFresh=false; } }
   function dayPlayers(d){ if(d.playing) return [...d.playing]; return (d.salidas||[]).reduce((a,g)=>a.concat(g||[]),[]); }
   // Cap de salida por día de la semana: sáb/dom máx 5 (fivesome), entre semana máx 6 (sixsome).
   function dayOfWeek(d){ if(!d||!d.date) return null; const m=/^(\d{4})-(\d{2})-(\d{2})/.exec(d.date); if(!m) return null; return new Date(+m[1],+m[2]-1,+m[3]).getDay(); }
@@ -4405,7 +4414,7 @@ const App = (() => {
     window.addEventListener('touchend',end,{passive:true});
     window.addEventListener('touchcancel',()=>{ pulling=false; hide(); },{passive:true});
   }
-  async function init(){ try{ if(document.fonts&&document.fonts.load){ document.fonts.load("600 40px Newsreader"); document.fonts.load("700 16px 'Hanken Grotesk'"); } }catch(e){} loadDevUser(); await load(); if(!state.currentDayId && state.days[0]) state.currentDayId=state.days[0].id; render();
+  async function init(){ try{ if(document.fonts&&document.fonts.load){ document.fonts.load("600 40px Newsreader"); document.fonts.load("700 16px 'Hanken Grotesk'"); } }catch(e){} loadDevUser(); await load(); autoPickDay(); render();
     try{ const sv=localStorage.getItem('cl_view'); if(sv && ['liq','day','score','vent','high','cfg'].indexOf(sv)>=0 && sv!==curView) go(sv); }catch(e){}   // restaura la última vista (no desorientar al recargar)
     initPullRefresh(); startAuth(); if(!_devUser) loginModal();
     checkForUpdate();   // ¿hay versión nueva? recarga sola
@@ -4649,7 +4658,7 @@ const App = (() => {
     exportData,renderCfg,renderVent,renderDay,closeModal,confirmYes,renderHigh,setHighTab,openProfile,rulesModal,editRulesModal,saveRules,
     exportComprobante,cmpPrint,cmpClose,photosModal,onPhotoPick,delPhoto,viewPhoto,forceUpdate,clearCacheReload,
     // Gancho de PRUEBAS (tests.html): acceso directo al motor con estado sintético. NO usar desde la UI.
-    __test:{ computeDay,_computeDayRaw,medalSeg,h2h,allocate,received,playOrder,orderIdx,isSecond,autoUnits,validManual,unitsOnHole,inferOyes,autoCast,dayStats,seasonStats,careerStats,clearStatCache,intHcp,intHcpOf,playerDiffs,COURSE_SEED,courseSlug,
+    __test:{ computeDay,_computeDayRaw,medalSeg,h2h,allocate,received,playOrder,orderIdx,isSecond,autoUnits,validManual,unitsOnHole,inferOyes,autoCast,dayStats,seasonStats,careerStats,clearStatCache,intHcp,intHcpOf,playerDiffs,COURSE_SEED,courseSlug,mostRecentDayId,autoPickDay,resetOpenedFresh:function(){_openedFresh=true;},
       setState:function(st){ state=Object.assign(state,st); clearStatCache(); },
       getState:function(){ return state; } } };
 })();
