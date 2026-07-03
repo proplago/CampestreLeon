@@ -611,7 +611,7 @@
 
 <script>
 const App = (() => {
-  const APP_VERSION = '2026-07-03-49';   // ⬆️ SUBIR en cada deploy: la app se auto-recarga cuando detecta una versión distinta
+  const APP_VERSION = '2026-07-03-50';   // ⬆️ SUBIR en cada deploy: la app se auto-recarga cuando detecta una versión distinta
   const KEY = 'rayas-campestre-v2';
   const uid = () => Math.random().toString(36).slice(2,9);
   // Auto-actualización: revisa el index.html en vivo (sin caché); si la versión cambió, recarga a la versión fresca.
@@ -1800,12 +1800,12 @@ const App = (() => {
   // Trofeos de "iba ganando y no cobró" (la lluvia le quitó el billete) — [emoji, título, sufijo del monto]. Voz de la app.
   const MISSED_TROPHIES=[
     ['😤','Para la otra','que se le fue'],
-    ['🌂','Se lo lavó la lluvia','que iba ganando'],
+    ['🌂','Se le aguó la fiesta','que iba ganando'],
     ['😮‍💨','Tan cerca del billete','que se esfumó'],
     ['🥲','Se quedó con las ganas','que no cobró'],
-    ['💨','Se le fue el cobro','que ya saboreaba'],
-    ['⛈️','La tormenta le cortó el cobro','que dejó ir'],
-    ['🎣','Se le soltó el pez','que ya tenía'],
+    ['🤑','Ya contaba el billete','que voló'],
+    ['🫤','Vestido y alborotado','que no cobró'],
+    ['🎒','Ya lo tenía en la bolsa','que se le salió'],
     ['😫','Ni modo, campeón','que quedó pendiente'],
   ];
   function dayHighlights(st){ const {S,ids}=st; const wash=st.washout; const out=[]; const push=(e,t,n,v,c)=>out.push({e,t,n,v,c});
