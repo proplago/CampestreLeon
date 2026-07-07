@@ -593,6 +593,12 @@
     <p class="lead">Jugadores, campos, valor de raya, unidades y castigos.</p>
     <div id="cfgContent"></div>
   </section>
+  <section class="view" id="v-super">
+    <div class="eyebrow">Solo súper admin</div>
+    <h2 class="vtitle">Panel de súper</h2>
+    <p class="lead">Administra todas las ligas, miembros y datos sin cambiar de grupo.</p>
+    <div id="superContent"></div>
+  </section>
 </main>
 
 <nav>
@@ -611,7 +617,7 @@
 
 <script>
 const App = (() => {
-  const APP_VERSION = '2026-07-03-52';   // ⬆️ SUBIR en cada deploy: la app se auto-recarga cuando detecta una versión distinta
+  const APP_VERSION = '2026-07-03-53';   // ⬆️ SUBIR en cada deploy: la app se auto-recarga cuando detecta una versión distinta
   const KEY = 'rayas-campestre-v2';
   const uid = () => Math.random().toString(36).slice(2,9);
   // Auto-actualización: revisa el index.html en vivo (sin caché); si la versión cambió, recarga a la versión fresca.
@@ -710,6 +716,7 @@ const App = (() => {
     currentDayId:null,
   };
   let curView='liq', curScorePlayer=null, curScoreSalida=0, liqTab='hoy', scoreTab='cap', highTab='hoy';
+  let superLid=null, _superData={};   // Panel de súper: liga seleccionada a administrar + caché de datos remotos por liga
   let _openedFresh=true;   // al abrir, saltar a la salida MÁS RECIENTE la 1ª vez que existan días (aunque el sync tarde)
   let curScoreGroup=0, curHoleNav=0, cmpA=null, cmpB=null, dblPlayer=null, cfgCourseId='campestre';
   let saveTimer=null, dirty=false, _saveDenied=false;
@@ -1421,6 +1428,7 @@ const App = (() => {
     if(curView==='vent') renderVent();
     if(curView==='high') renderHigh();
     if(curView==='cfg') renderCfg();
+    if(curView==='super') renderSuper();
   }
 
   function renderDaySelect(){
@@ -3500,6 +3508,11 @@ const App = (() => {
     const box=document.getElementById('cfgContent');
     if(!isAdmin()){ return renderCfgRegular(box); }
     let html='';
+    if(isSuper()){
+      html+=`<div class="card"><div class="row" style="justify-content:space-between;align-items:center">
+        <div><h3 style="margin:0">🛡 Panel de súper</h3><div class="hint" style="margin-top:2px">Ligas, miembros y datos de todos los grupos, sin cambiarte.</div></div>
+        <button class="btn sm" onclick="App.go('super')">Abrir</button></div></div>`;
+    }
     html+=cfgLeaguesHtml();   // Liga + selector
     html+=cfgInviteHtml();    // Código/link para invitar al grupo (admin/super)
     html+=cfgAuthUsersHtml(); // Tu jugador (súper)
@@ -4383,8 +4396,8 @@ const App = (() => {
       });
     }).catch(function(){});
   }
-  function createLeague(){ if(!isAdmin()){ toast('Solo admin/súper crea grupos'); return; }
-    const el=document.getElementById('lg_name'); const name=(el?el.value:'').trim(); if(!name){ toast('Ponle nombre al grupo'); return; }
+  function createLeague(nameArg){ if(!isAdmin()){ toast('Solo admin/súper crea grupos'); return; }
+    const el=document.getElementById('lg_name'); const name=((nameArg!=null?String(nameArg):(el?el.value:''))||'').trim(); if(!name){ toast('Ponle nombre al grupo'); return; }
     const base=name.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'').slice(0,24)||'liga';
     let L=loadLeagues(), id=base, n=1; while(L.find(x=>x.id===id)) id=base+'-'+(++n);
     L.push({id,name}); saveLeagues(L);
@@ -4404,7 +4417,7 @@ const App = (() => {
       }
     }
     try{ firebase.database().ref().update(updates); }catch(e){}
-    renderCfg(); toast('Grupo creado: '+name+'. Cámbiate a él para empezar.'); }
+    (curView==='super'?renderSuper():renderCfg()); toast('Grupo creado: '+name+'. Cámbiate a él para empezar.'); }
   function renameLeague(){ if(!isAdmin()){ toast('Sin permiso para renombrar'); return; }
     const el=document.getElementById('lg_rename'); const name=(el?el.value:'').trim(); if(!name){ toast('Pon un nombre'); return; }
     let L=loadLeagues(); const x=L.find(l=>l.id===ACTIVE_LEAGUE); if(x) x.name=name; else L.push({id:ACTIVE_LEAGUE,name}); saveLeagues(L);
@@ -4440,12 +4453,13 @@ const App = (() => {
         firebase.database().ref().update(updates).catch(function(){});
         let L=loadLeagues().filter(function(l){return l.id!==id;}); saveLeagues(L);
         if(myuid && _users[myuid] && _users[myuid].leagues){ delete _users[myuid].leagues[id]; }
+        delete _superData[id];
         toast('Grupo "'+nm+'" borrado');
         if(id===ACTIVE_LEAGUE){
           const next=(L[0]&&L[0].id)||DEFAULT_LEAGUE.id;
           try{ localStorage.setItem('cl_active_league', next); }catch(e){}
           setTimeout(function(){ location.href=location.origin+location.pathname; }, 600);
-        } else { renderCfg(); }
+        } else { if(superLid===id) superLid=ACTIVE_LEAGUE; (curView==='super'?renderSuper():renderCfg()); }
       });
     });
   }
@@ -4476,6 +4490,130 @@ const App = (() => {
         <div class="hint" style="margin-top:6px">Renombra tu grupo o crea uno nuevo (nace vacío y quedas como su admin). Cambiar de grupo recarga la app.</div></div>`;
     }
     return h;
+  }
+
+  // ============================================================================
+  //  PANEL DE SÚPER  ·  vista 'super' (solo isSuper): administra CUALQUIER liga
+  //  sin cambiar de grupo. Remote-first (once()+update() directo; las reglas dan
+  //  al súper write en todo). Para la liga ACTIVA usa el estado local (coherente).
+  // ============================================================================
+  function superLeagueData(lid){
+    if(lid===ACTIVE_LEAGUE){
+      const players={}; (state.players||[]).forEach(p=>{ if(p&&p.id) players[p.id]=p; });
+      return { loaded:true, isActive:true, members:(_members||{}), players, order:(state.days||[]).map(d=>d.id) };
+    }
+    return _superData[lid] || { loading:true };
+  }
+  function ensureSuperData(lid){
+    if(!lid || lid===ACTIVE_LEAGUE || !fbConfigured()) return;
+    const c=_superData[lid]; if(c && (c.loaded||c.loading)) return;
+    _superData[lid]={loading:true};
+    const db=firebase.database();
+    Promise.all([
+      db.ref('leagueMembers/'+lid).once('value').then(s=>s.val()||{}).catch(()=>({})),
+      db.ref('leagues/'+lid+'/players').once('value').then(s=>s.val()||{}).catch(()=>({})),
+      db.ref('leagues/'+lid+'/order').once('value').then(s=>s.val()||[]).catch(()=>([]))
+    ]).then(r=>{
+      const members=r[0], players=r[1], order=_arr(r[2]);
+      const uids=Object.keys(members).filter(u=>!(_users[u]&&_users[u].name));
+      Promise.all(uids.map(u=> db.ref('users/'+u+'/name').once('value').then(s=>{ const nm=s.val(); if(nm) _users[u]=Object.assign({},_users[u],{name:nm}); }).catch(()=>{}) ))
+        .then(()=>{ _superData[lid]={loaded:true,members,players,order}; if(curView==='super' && superLid===lid) renderSuper(); });
+    }).catch(()=>{ _superData[lid]={loaded:true,members:{},players:{},order:[]}; if(curView==='super' && superLid===lid) renderSuper(); });
+  }
+  function superMemberName(uid,pid,players){
+    return (_users[uid]&&_users[uid].name) || (players&&players[pid]&&players[pid].name) || pid || uid;
+  }
+  function renderSuper(){
+    const box=document.getElementById('superContent'); if(!box) return;
+    if(!isSuper()){ box.innerHTML='<div class="card"><h3>Solo para súper admin</h3><button class="btn outline sm block" style="margin-top:10px" onclick="App.go(\'cfg\')">← Ajustes</button></div>'; return; }
+    if(!superLid) superLid=ACTIVE_LEAGUE;
+    const lids=myLeagueIds();
+    if(lids.indexOf(superLid)<0) superLid=ACTIVE_LEAGUE;
+    let h=`<button class="btn outline sm" onclick="App.go('cfg')">← Ajustes</button>`;
+    h+=`<div class="card" style="margin-top:10px"><h3>Grupo a administrar</h3>
+      <select class="txt" style="margin-top:6px" onchange="App.superPick(this.value)">
+        ${lids.map(id=>`<option value="${_esc(id)}" ${id===superLid?'selected':''}>${_esc(leagueName(id))}${id===ACTIVE_LEAGUE?' · (activo)':''}</option>`).join('')}
+      </select>
+      <div class="hint" style="margin-top:6px">Grupo activo: <b>${_esc(leagueName(ACTIVE_LEAGUE))}</b>. Aquí administras cualquiera sin cambiarte.</div></div>`;
+    h+=superLeaguesHtml();
+    h+=superMembersHtml();
+    box.innerHTML=h;
+  }
+  function superPick(id){ superLid=id; try{ localStorage.setItem('cl_super_lid',id); }catch(e){} ensureSuperData(id); renderSuper(); }
+  function superLeaguesHtml(){
+    const lids=myLeagueIds();
+    let h=`<div class="cfg-sect">Ligas (${lids.length})</div><div class="card">`;
+    lids.forEach(id=>{
+      if(id!==ACTIVE_LEAGUE) ensureSuperData(id);
+      const d=superLeagueData(id);
+      const info = d.loaded ? `${Object.keys(d.members||{}).length} miembros · ${(d.order||[]).length} días` : (d.loading?'cargando…':'—');
+      h+=`<div class="vrow"><div><div class="who">${_esc(leagueName(id))}${id===ACTIVE_LEAGUE?' <span style="color:var(--fairway);font-size:11px">·activo</span>':''}${id===superLid?' <span style="color:var(--muted-2);font-size:11px">·viendo</span>':''}</div>
+        <div class="desc">${info} <span style="color:var(--muted-2);font-family:monospace;font-size:10px">${_esc(id)}</span></div></div>
+        <div class="row" style="gap:4px">
+          <button class="flag" onclick="App.superPick('${_esc(id)}')">Ver</button>
+          <button class="flag" onclick="App.superRenameLeague('${_esc(id)}')">✏️</button>
+          ${id===ACTIVE_LEAGUE?'':`<button class="flag" onclick="App.switchLeague('${_esc(id)}')">Ir</button>`}
+          <button class="flag" style="color:var(--clay)" onclick="App.deleteLeague('${_esc(id)}')">🗑</button></div></div>`;
+    });
+    h+=`<div class="row" style="gap:8px;margin-top:10px">
+      <input id="sup_lg_name" class="txt" placeholder="Nombre de nuevo grupo">
+      <button class="btn sm" onclick="App.superCreateLeague()">Crear</button></div></div>`;
+    return h;
+  }
+  function superCreateLeague(){ const el=document.getElementById('sup_lg_name'); createLeague(el?el.value:''); }
+  function superRenameLeague(id){
+    if(!isSuper()) return;
+    modal(`<h3>Renombrar grupo</h3>
+      <label class="fl">Nombre</label><input id="sup_rn" class="txt" value="${_esc(leagueName(id)).replace(/"/g,'&quot;')}">
+      <button class="btn block" style="margin-top:14px" onclick="App.superRenameLeagueSave('${_esc(id)}')">Guardar</button>`);
+  }
+  function superRenameLeagueSave(id){
+    if(!isSuper()) return;
+    const el=document.getElementById('sup_rn'); const name=(el?el.value:'').trim(); if(!name){ toast('Pon un nombre'); return; }
+    let L=loadLeagues(); const x=L.find(l=>l.id===id); if(x) x.name=name; else L.push({id,name}); saveLeagues(L);
+    if(id===ACTIVE_LEAGUE){ state._leagueMeta=state._leagueMeta||{schema:2}; state._leagueMeta.name=name; save(); updateBrand(); }
+    else { try{ firebase.database().ref('leagues/'+id+'/meta/name').set(name); }catch(e){} }
+    closeModal(); toast('Nombre: '+name); renderSuper();
+  }
+  function superMembersHtml(){
+    const lid=superLid, d=superLeagueData(lid);
+    let h=`<div class="cfg-sect">Miembros · ${_esc(leagueName(lid))}</div>`;
+    if(!d.loaded) return h+`<div class="card"><div class="hint">${d.loading?'Cargando miembros…':'Sin datos'}</div></div>`;
+    const members=d.members||{}, uids=Object.keys(members);
+    if(!uids.length) return h+`<div class="card"><div class="hint">Este grupo no tiene miembros con cuenta todavía.</div></div>`;
+    h+=`<div class="card">`;
+    uids.sort((a,b)=> superMemberName(a,members[a].pid,d.players).localeCompare(superMemberName(b,members[b].pid,d.players)));
+    uids.forEach(u=>{
+      const m=members[u]||{}, role=(m.role==='admin')?'admin':'regular';
+      const nm=superMemberName(u,m.pid,d.players);
+      h+=`<div class="vrow"><div><div class="who">${_esc(nm)} ${role==='admin'?'<span style="color:var(--fairway);font-size:11px">ADMIN</span>':''}</div>
+        <div class="desc" style="font-family:monospace;font-size:10px">${_esc(u)}</div></div>
+        <div class="row" style="gap:4px">
+          <button class="flag" onclick="App.superSetRole('${_esc(lid)}','${_esc(u)}','${role==='admin'?'regular':'admin'}')">${role==='admin'?'↓ regular':'↑ admin'}</button>
+          <button class="flag" style="color:var(--clay)" onclick="App.superRemoveMember('${_esc(lid)}','${_esc(u)}')">Quitar</button></div></div>`;
+    });
+    h+=`</div>`;
+    return h;
+  }
+  function superSetRole(lid,uid,role){
+    if(!isSuper()) return;
+    role=(role==='admin')?'admin':'regular';
+    const d=superLeagueData(lid), pid=(d.members&&d.members[uid]&&d.members[uid].pid)||null;
+    const upd={role:role}; if(pid) upd.pid=pid;
+    try{ firebase.database().ref('leagueMembers/'+lid+'/'+uid).update(upd); }catch(e){}
+    if(lid===ACTIVE_LEAGUE){ _members[uid]=Object.assign({},_members[uid],upd); }
+    else if(_superData[lid]&&_superData[lid].members){ _superData[lid].members[uid]=Object.assign({},_superData[lid].members[uid],upd); }
+    toast('Rol: '+role); renderSuper();
+  }
+  function superRemoveMember(lid,uid){
+    if(!isSuper()) return;
+    confirmModal('¿Quitar a este miembro del grupo? Su tarjeta y su historial se quedan; solo pierde acceso de escritura. Puede volver a entrar con el link de invitación.','Quitar',()=>{
+      try{ firebase.database().ref('leagueMembers/'+lid+'/'+uid).remove(); }catch(e){}
+      try{ firebase.database().ref('users/'+uid+'/leagues/'+lid).remove(); }catch(e){}
+      if(lid===ACTIVE_LEAGUE){ delete _members[uid]; }
+      else if(_superData[lid]&&_superData[lid].members){ delete _superData[lid].members[uid]; }
+      closeModal(); toast('Miembro quitado'); renderSuper();
+    });
   }
 
   // ---- "El jugador ES la cuenta": el súper se administra a sí mismo en cada liga (jugar o solo administrar). ----
@@ -4763,6 +4901,7 @@ const App = (() => {
     modal(`<img src="${v.img}" style="width:100%;border-radius:8px;display:block">${v.pid?`<div class="hint" style="text-align:center;margin-top:8px">${_esc(pname(v.pid))}</div>`:''}<button class="btn block" style="margin-top:10px" onclick="App.photosModal()">← Volver a las fotos</button>`); }
 
   return { init,loginModal,doLogin,signInGoogle,signOutAuth,joinRegister,shareInvite,copyInvite,regenJoinCode,createMyPlayer,approveVent,rejectVent,btnApplyVentSeed,confirmVentMatch,dismissVentMatch,createLeague,renameLeague,switchLeague,deleteLeague,setMaxGroup,go,switchDay,daysModal,editDayModal,saveDayEdit,delDay,clearHole,clearCard,removeFromDay,playerAdminModal,retirePlayer,newDayModal,createDay,
+    superPick,superCreateLeague,superRenameLeague,superRenameLeagueSave,superSetRole,superRemoveMember,
     toggleAssign:null,togglePlaying,cancelPlayer,moveGroup,confirmMove,sorteo,cycleParejas,setSalidaTime,addGuestModal,
     pickScore,score,putt,setOyes,quick,toggleUnit,toggleCast,navHole,gotoPending,gotoPlayerPending,setScoreGroup,setStart,setSalidaStart,setHoles,setCourse,
     setVentFocus,pickVent,openBet,openH2H,setLiqTab,setScoreTab,setCmp,setVentPick,
