@@ -4162,11 +4162,25 @@ const App = (() => {
     }catch(e){}
   }
   function resolveAuthIdentity(u){
-    _authPending=false; _authDiag='';
+    _authPending=false; _authDiag=''; var _superErr=null;
     // Tu identidad = el jugador de ESTA liga cuyo uid === el tuyo. Único dato global: users/{uid}/super.
+    // OJO: tras onAuthStateChanged la conexión RTDB tarda un instante en autenticarse; una lectura inmediata de
+    // users/{uid}/super puede dar permission_denied AUNQUE las reglas sí permitan. Reintentamos esa lectura clave
+    // (es el ÚNICO dato que distingue al súper: los jugadores normales se resuelven desde el roster de /leagues).
+    function readSuper(tries){
+      return firebase.database().ref('users/'+u.uid+'/super').once('value')
+        .then(function(s){ return s.val()===true; })
+        .catch(function(e){
+          var code=(e&&e.code)||(e&&e.message)||'error';
+          if(tries>0 && /permission|denied|unavailable|network|disconnect/i.test(String(code))){
+            return new Promise(function(r){ setTimeout(r,700); }).then(function(){ return readSuper(tries-1); });
+          }
+          _superErr=String(code); return false;
+        });
+    }
     return (u.getIdToken?u.getIdToken().catch(function(){}):Promise.resolve()).then(function(){
       return Promise.all([
-        firebase.database().ref('users/'+u.uid+'/super').once('value').then(function(s){ return s.val()===true; }).catch(function(){ return false; }),
+        readSuper(4),
         firebase.database().ref('leagueMembers/'+ACTIVE_LEAGUE+'/'+u.uid+'/role').once('value').then(function(s){ return s.val()||null; }).catch(function(){ return null; })
       ]);
     }).then(function(res){
@@ -4177,11 +4191,12 @@ const App = (() => {
       if(mine){ _devUser={playerId:mine.id, role:roleFor(), uid:u.uid, email:u.email, real:true}; return; }
       // 2) fallback: lee el grupo directo (por si el estado aún no cargó)
       return firebase.database().ref('leagues/'+ACTIVE_LEAGUE+'/players').once('value').then(function(s){ return s.val()||{}; }).catch(function(){ return null; }).then(function(players){
-        if(players===null){ if(isSup){ _devUser={playerId:null, role:'super', uid:u.uid, email:u.email, real:true}; } else { _authPending=true; _authDiag='no pude leer el grupo (permiso/conexión)'; } return; }
+        if(players===null){ if(isSup){ _devUser={playerId:null, role:'super', uid:u.uid, email:u.email, real:true}; } else { _authPending=true; _authDiag='no pude leer el grupo (permiso/conexión)'+(_superErr?' · users/super: '+_superErr:''); } return; }
         let myPid=null;
         Object.keys(players).forEach(function(pid){ const p=players[pid]; if(p && p.uid===u.uid){ myPid=pid; } });
         if(myPid){ _devUser={playerId:myPid, role:roleFor(), uid:u.uid, email:u.email, real:true}; }
         else if(isSup){ _devUser={playerId:null, role:'super', uid:u.uid, email:u.email, real:true}; }   // súper sin jugador aquí = operador
+        else if(_superErr){ _authPending=true; _authDiag='no pude leer users/'+u.uid+'/super → '+_superErr+' · revisa que las reglas dejen leer /users'; }   // súper bloqueado por reglas: dilo tal cual
         else { _authPending=true; _canSelfRegister=true; _authDiag=Object.keys(players).length?'no estás en este grupo':'eres el primero en este grupo'; }
       });
     });
