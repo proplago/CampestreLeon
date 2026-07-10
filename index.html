@@ -3484,6 +3484,7 @@ const App = (() => {
       <div class="card"><div class="row" style="justify-content:space-between;align-items:center">
         <div><h3 style="margin:0">👤 ${myPid()?pname(myPid()):(isSuper()?'Administrador':'Jugador')}</h3><div class="hint" style="margin:2px 0 0">${curUserLabel()}</div></div>
         <button class="btn outline sm" onclick="App.loginModal()">Cambiar usuario</button></div></div>
+      ${cfgSessionHtml()}
       ${cfgMyLeaguesHtml()}
       ${cfgMembersHtml()}
       <div class="cfg-sect">Reglas de la casa</div>
@@ -3516,6 +3517,7 @@ const App = (() => {
     html+=cfgLeaguesHtml();   // Liga + selector
     html+=cfgInviteHtml();    // Código/link para invitar al grupo (admin/super)
     html+=cfgAuthUsersHtml(); // Tu jugador (súper)
+    html+=cfgSessionHtml();   // Cerrar sesión de Google (cualquier usuario logueado)
     html+=cfgPlayersHtml();   // Jugadores del grupo — arriba, junto a la identidad
 
     // ===================== REGLAS DE LA CASA =====================
@@ -4660,6 +4662,15 @@ const App = (() => {
   }
 
   // ---- "El jugador ES la cuenta": el súper se administra a sí mismo en cada liga (jugar o solo administrar). ----
+  // Botón de cerrar sesión, visible en Ajustes para cualquier usuario con sesión de Google real
+  // (en modo prueba no hay sesión que cerrar). signOutAuth() ya hace: firebase signOut → limpia → login.
+  function cfgSessionHtml(){
+    if(!isRealAuth()) return '';
+    const em=(_authUser&&_authUser.email)||(_devUser&&_devUser.email)||'';
+    return `<div class="card"><div class="row" style="justify-content:space-between;align-items:center">
+      <div><h3 style="margin:0">🔑 Sesión de Google</h3><div class="hint" style="margin:2px 0 0">${_esc(em)}</div></div>
+      <button class="btn outline sm" onclick="App.signOutAuth()">Cerrar sesión</button></div></div>`;
+  }
   function cfgAuthUsersHtml(){
     if(!isSuper() || !authAvailable()) return '';   // los admin del grupo ya son jugadores (salen en la lista); esta tarjeta es solo del súper
     const me=myPid();
