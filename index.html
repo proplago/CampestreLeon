@@ -4601,9 +4601,11 @@ const App = (() => {
     uids.forEach(u=>{
       const m=members[u]||{}, role=(m.role==='admin')?'admin':'regular';
       const nm=superMemberName(u,m.pid,d.players);
-      h+=`<div class="vrow"><div><div class="who">${_esc(nm)} ${role==='admin'?'<span style="color:var(--fairway);font-size:11px">ADMIN</span>':''}</div>
+      const hasPlayer=!!(m.pid && d.players && d.players[m.pid]);   // miembro con cuenta pero sin tarjeta en el roster
+      h+=`<div class="vrow"><div><div class="who">${_esc(nm)} ${role==='admin'?'<span style="color:var(--fairway);font-size:11px">ADMIN</span>':''}${hasPlayer?'':' <span style="color:var(--clay);font-size:11px">SIN JUGADOR</span>'}</div>
         <div class="desc" style="font-family:monospace;font-size:10px">${_esc(u)}</div></div>
         <div class="row" style="gap:4px">
+          ${hasPlayer?'':`<button class="flag" style="color:var(--fairway)" onclick="App.superCreatePlayer('${_esc(lid)}','${_esc(u)}')">+ Jugador</button>`}
           <button class="flag" onclick="App.superSetRole('${_esc(lid)}','${_esc(u)}','${role==='admin'?'regular':'admin'}')">${role==='admin'?'↓ regular':'↑ admin'}</button>
           <button class="flag" style="color:var(--clay)" onclick="App.superRemoveMember('${_esc(lid)}','${_esc(u)}')">Quitar</button></div></div>`;
     });
@@ -4629,6 +4631,32 @@ const App = (() => {
       else if(_superData[lid]&&_superData[lid].members){ delete _superData[lid].members[uid]; }
       closeModal(); toast('Miembro quitado'); renderSuper();
     });
+  }
+  // Miembro con cuenta pero SIN jugador en el roster (se unió por un camino que no creó tarjeta, o quedó a medias).
+  // Le crea una tarjeta básica: nombre desde users/{uid}/name, apodo vacío, no invitado, ventaja se rellena por seed.
+  function superCreatePlayer(lid,auid){
+    if(!isSuper()) return;
+    const d=superLeagueData(lid);
+    // idempotente: si YA existe un jugador con este uid, no dupliques — solo religa el pid del miembro.
+    let existing=null; const pmap=(d&&d.players)||{};
+    Object.keys(pmap).forEach(function(pid){ const p=pmap[pid]; if(p && p.uid===auid) existing=pid; });
+    const nm=(_users[auid]&&_users[auid].name)||'', em=(_users[auid]&&_users[auid].email)||'';
+    const pid=existing||uid();
+    const prow={apodo:'', fav:true, guest:false, uid:auid};   // el nombre vive en users/{uid}/name; el roster lo hidrata
+    try{ firebase.database().ref().update({
+      ['leagues/'+lid+'/players/'+pid]: prow,
+      ['leagueMembers/'+lid+'/'+auid+'/pid']: pid
+    }); }catch(e){}
+    if(lid===ACTIVE_LEAGUE){
+      if(!existing){ state.players.push({id:pid, name:nm, apodo:'', guest:false, fav:true, uid:auid, email:em}); }
+      _members[auid]=Object.assign({}, _members[auid], {pid:pid});
+      save();
+      try{ if(state.ventSeedOn) applyVentSeed({silent:true}); }catch(e){}   // rellena su ventaja guardada (por nombre)
+    } else if(_superData[lid]){
+      _superData[lid].players=Object.assign({}, _superData[lid].players); _superData[lid].players[pid]=prow;
+      _superData[lid].members=Object.assign({}, _superData[lid].members); _superData[lid].members[auid]=Object.assign({}, _superData[lid].members[auid], {pid:pid});
+    }
+    toast(nm?('Tarjeta creada: '+nm):'Tarjeta creada'); renderSuper();
   }
 
   // ---- "El jugador ES la cuenta": el súper se administra a sí mismo en cada liga (jugar o solo administrar). ----
@@ -4916,7 +4944,7 @@ const App = (() => {
     modal(`<img src="${v.img}" style="width:100%;border-radius:8px;display:block">${v.pid?`<div class="hint" style="text-align:center;margin-top:8px">${_esc(pname(v.pid))}</div>`:''}<button class="btn block" style="margin-top:10px" onclick="App.photosModal()">← Volver a las fotos</button>`); }
 
   return { init,loginModal,doLogin,signInGoogle,signOutAuth,joinRegister,shareInvite,copyInvite,regenJoinCode,createMyPlayer,approveVent,rejectVent,btnApplyVentSeed,confirmVentMatch,dismissVentMatch,createLeague,renameLeague,switchLeague,deleteLeague,setMaxGroup,go,switchDay,daysModal,editDayModal,saveDayEdit,delDay,clearHole,clearCard,removeFromDay,playerAdminModal,retirePlayer,newDayModal,createDay,
-    superPick,superCreateLeague,superRenameLeague,superRenameLeagueSave,superSetRole,superRemoveMember,
+    superPick,superCreateLeague,superRenameLeague,superRenameLeagueSave,superSetRole,superRemoveMember,superCreatePlayer,
     toggleAssign:null,togglePlaying,cancelPlayer,moveGroup,confirmMove,sorteo,cycleParejas,setSalidaTime,addGuestModal,
     pickScore,score,putt,setOyes,quick,toggleUnit,toggleCast,navHole,gotoPending,gotoPlayerPending,setScoreGroup,setStart,setSalidaStart,setHoles,setCourse,
     setVentFocus,pickVent,openBet,openH2H,setLiqTab,setScoreTab,setCmp,setVentPick,
