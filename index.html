@@ -4159,6 +4159,7 @@ const App = (() => {
         _authUser=u||null;
         if(!u){ _authPending=false; if(_devUser&&_devUser.real){ _devUser=null; } render(); if(!_devUser) loginModal(); return; }
         attachFbSync();   // YA hay sesión → (re)engancha el sync del grupo (el de load() pudo cancelarse por leer sin auth)
+        if(_devUser && !_devUser.real){ _devUser=null; }   // hay sesión de Google: la identidad REAL manda; tira cualquier "modo prueba" viejo (p.ej. un súper local rancio de localStorage)
         resolveAuthIdentity(u).then(function(){ if(isRealAuth()){ closeModal(); cleanUrl(); } hydrateLeaguesFromFirebase(); render(); if(_authPending){ _canSelfRegister?joinRegisterModal():loginModal(); } });
       });
     }catch(e){}
@@ -4294,7 +4295,7 @@ const App = (() => {
   function loginModal(){
     const ps=[...state.players].sort((a,b)=>(a.guest?1:0)-(b.guest?1:0)||(a.name||'').localeCompare(b.name||''));
     const signedIn = isRealAuth() || _authPending;
-    const devMode = isSuper() || !authAvailable();   // escoger jugador/rol: SOLO el súper (ya logueado), o en local sin Firebase
+    const devMode = !authAvailable();   // "modo prueba" (escoger jugador/rol a mano) SOLO en local sin Firebase; en producción TODOS (incl. el súper) entran con Google y el rol se resuelve desde users/{uid}/super
     let top='';
     if(signedIn){
       top=`<div class="hint" style="margin-bottom:8px">Sesión de Google: <b>${_esc((_authUser&&_authUser.email)||'')}</b>${_authPending?' · <span style="color:var(--clay)">pendiente de que el admin te asigne</span>':''}</div>`;
