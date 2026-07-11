@@ -2,10 +2,9 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<!-- No-caché: que el navegador siempre revalide y baje la versión nueva (evita quedarse con código viejo en GitHub Pages). -->
-<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
-<meta http-equiv="Pragma" content="no-cache">
-<meta http-equiv="Expires" content="0">
+<!-- Caché normal del navegador (permite bfcache y servir de caché si la red falla en un cold load). La frescura la
+     garantiza APP_VERSION + checkForUpdate() (fetch con cache-bust que auto-recarga si hay versión nueva). Antes había
+     "no-store": obligaba a re-bajar ~382KB de red en CADA pestaña nueva y hacía fallar los cold loads en red móvil inestable. -->
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#0a6a3a">
 <meta name="mobile-web-app-capable" content="yes">
@@ -617,7 +616,7 @@
 
 <script>
 const App = (() => {
-  const APP_VERSION = '2026-07-10-54';   // ⬆️ SUBIR en cada deploy: la app se auto-recarga cuando detecta una versión distinta
+  const APP_VERSION = '2026-07-10-55';   // ⬆️ SUBIR en cada deploy: la app se auto-recarga cuando detecta una versión distinta
   const KEY = 'rayas-campestre-v2';
   const uid = () => Math.random().toString(36).slice(2,9);
   // Auto-actualización: revisa el index.html en vivo (sin caché); si la versión cambió, recarga a la versión fresca.
