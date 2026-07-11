@@ -617,7 +617,7 @@
 
 <script>
 const App = (() => {
-  const APP_VERSION = '2026-07-03-53';   // ⬆️ SUBIR en cada deploy: la app se auto-recarga cuando detecta una versión distinta
+  const APP_VERSION = '2026-07-10-54';   // ⬆️ SUBIR en cada deploy: la app se auto-recarga cuando detecta una versión distinta
   const KEY = 'rayas-campestre-v2';
   const uid = () => Math.random().toString(36).slice(2,9);
   // Auto-actualización: revisa el index.html en vivo (sin caché); si la versión cambió, recarga a la versión fresca.
@@ -4145,27 +4145,6 @@ const App = (() => {
   // ===================== AUTH REAL (Google) — fase login =====================
   // Coexiste con el "modo prueba": si hay sesión de Google y /users/{uid} resuelve, manda la identidad real.
   let _authUser=null, _authPending=false, _canSelfRegister=false, _authDiag='';
-  // ===== PANEL DE DEBUG DE AUTH (TEMPORAL — para ver EXACTAMENTE en qué paso se atora el súper) =====
-  let _authTrace={};
-  function _dbgSet(o){ try{ Object.assign(_authTrace,o); renderAuthDebug(); }catch(e){} }
-  function renderAuthDebug(){
-    if(typeof document==='undefined'||!document.body) return;
-    let el=document.getElementById('authdbg');
-    if(!el){ el=document.createElement('div'); el.id='authdbg';
-      el.style.cssText='position:fixed;left:6px;right:6px;bottom:6px;z-index:2147483647;background:#0a1f14;color:#b9f6ca;font:11px/1.5 monospace;padding:14px 12px 10px;border:1px solid #2e7d52;border-radius:10px;max-height:48vh;overflow:auto;box-shadow:0 8px 30px rgba(0,0,0,.5);white-space:pre-wrap;word-break:break-all';
-      document.body.appendChild(el);
-    }
-    const t=_authTrace;
-    const fmt=function(v){ return (v===undefined||v===null)?'—':(typeof v==='object'?JSON.stringify(v):String(v)); };
-    const rows=[['backend',t.backend],['authAvailable',t.authAvailable],['liga (ACTIVE_LEAGUE)',t.league],['onAuthStateChanged disparó',t.fired],['hay usuario (u)',t.hasUser],['uid',t.uid],['email',t.email],['readSuper: intentos',t.superTries],['users/{uid}/super =',t.superVal],['super: ERROR',t.superErr],['memberRole (leagueMembers)',t.memberRole],['jugador en roster por uid',t.rosterHit],['leagues/players (fallback)',t.playersRead],['DECISION → role',t.finalRole],['DECISION → playerId',t.finalPid],['DECISION → real',t.finalReal],['_authPending (¿atorado?)',t.pending],['_authDiag',t.diag],['ULTIMO PASO',t.step]];
-    let html='<b style="color:#fff">🐞 DEBUG AUTH (temporal) — mándale captura a tu dev</b>\n';
-    rows.forEach(function(r){ html+=r[0]+': '+fmt(r[1])+'\n'; });
-    el.innerHTML=html;
-    const x=document.createElement('span'); x.textContent='cerrar ✕';
-    x.style.cssText='position:absolute;top:8px;right:10px;cursor:pointer;color:#ff8a80;font-size:12px';
-    x.onclick=function(){ try{ el.remove(); }catch(e){} };
-    el.appendChild(x);
-  }
   function genJoinCode(){ const a='ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; let s=''; for(let i=0;i<6;i++) s+=a[Math.floor(Math.random()*a.length)]; return s; }
   function ensureJoinCode(){ state._leagueMeta=state._leagueMeta||{}; if(!state._leagueMeta.joinCode){ state._leagueMeta.joinCode=genJoinCode(); save(); } return state._leagueMeta.joinCode; }
   function inviteLink(){ return location.origin+location.pathname+'?liga='+encodeURIComponent(ACTIVE_LEAGUE)+'&code='+encodeURIComponent(ensureJoinCode()); }
@@ -4178,13 +4157,10 @@ const App = (() => {
       firebase.auth().getRedirectResult().catch(function(err){ if(err&&err.message) toast('Login: '+err.message); });
       firebase.auth().onAuthStateChanged(function(u){
         _authUser=u||null;
-        _dbgSet({backend:_backend, authAvailable:authAvailable(), league:ACTIVE_LEAGUE, fired:true, hasUser:!!u, uid:u&&u.uid, email:u&&u.email,
-          superTries:undefined, superVal:undefined, superErr:undefined, memberRole:undefined, rosterHit:undefined, playersRead:undefined, finalRole:undefined, finalPid:undefined, finalReal:undefined, pending:undefined, diag:undefined,
-          step:u?'sesión de Google detectada → resolviendo identidad…':'sin sesión de Google'});
         if(!u){ _authPending=false; if(_devUser&&_devUser.real){ _devUser=null; } render(); if(!_devUser) loginModal(); return; }
         attachFbSync();   // YA hay sesión → (re)engancha el sync del grupo (el de load() pudo cancelarse por leer sin auth)
         if(_devUser && !_devUser.real){ _devUser=null; }   // hay sesión de Google: la identidad REAL manda; tira cualquier "modo prueba" viejo (p.ej. un súper local rancio de localStorage)
-        resolveAuthIdentity(u).then(function(){ if(isRealAuth()){ closeModal(); cleanUrl(); } hydrateLeaguesFromFirebase(); render(); if(_authPending){ _canSelfRegister?joinRegisterModal():loginModal(); } _dbgSet({step:(_authPending?('⛔ FIN: ATORADO (pending) — '+(_authDiag||'')):'✅ FIN: adentro como '+((_devUser&&_devUser.role)||'?'))}); });
+        resolveAuthIdentity(u).then(function(){ if(isRealAuth()){ closeModal(); cleanUrl(); } hydrateLeaguesFromFirebase(); render(); if(_authPending){ _canSelfRegister?joinRegisterModal():loginModal(); } });
       });
     }catch(e){}
   }
@@ -4194,14 +4170,11 @@ const App = (() => {
     // OJO: tras onAuthStateChanged la conexión RTDB tarda un instante en autenticarse; una lectura inmediata de
     // users/{uid}/super puede dar permission_denied AUNQUE las reglas sí permitan. Reintentamos esa lectura clave
     // (es el ÚNICO dato que distingue al súper: los jugadores normales se resuelven desde el roster de /leagues).
-    var _superTries=0;
     function readSuper(tries){
-      _superTries++; _dbgSet({superTries:_superTries, step:'leyendo users/'+u.uid+'/super (intento '+_superTries+')'});
       return firebase.database().ref('users/'+u.uid+'/super').once('value')
-        .then(function(s){ _dbgSet({superVal:s.val(), step:'super leído OK = '+JSON.stringify(s.val())}); return s.val()===true; })
+        .then(function(s){ return s.val()===true; })
         .catch(function(e){
           var code=(e&&e.code)||(e&&e.message)||'error';
-          _dbgSet({superErr:String(code), step:'super ERROR ('+_superTries+'): '+String(code)});
           if(tries>0 && /permission|denied|unavailable|network|disconnect/i.test(String(code))){
             return new Promise(function(r){ setTimeout(r,700); }).then(function(){ return readSuper(tries-1); });
           }
@@ -4215,22 +4188,19 @@ const App = (() => {
       ]);
     }).then(function(res){
       const isSup=res[0], memberRole=res[1];
-      _dbgSet({superVal:isSup, memberRole:memberRole, step:'reads terminaron: isSup='+isSup+' memberRole='+JSON.stringify(memberRole)});
       const roleFor=function(){ return isSup?'super':(memberRole||'regular'); };   // rol = súper global, o el de leagueMembers, o regular
       // 1) busca en el estado YA cargado (fuente viva)
       const mine=(state.players||[]).find(function(p){ return p && p.uid===u.uid; });
-      _dbgSet({rosterHit: mine?('sí ('+mine.id+')'):'no'});
-      if(mine){ _devUser={playerId:mine.id, role:roleFor(), uid:u.uid, email:u.email, real:true}; _dbgSet({finalRole:_devUser.role, finalPid:_devUser.playerId, finalReal:true, pending:false, diag:'', step:'✅ ENTRÓ por roster (jugador con su uid)'}); return; }
+      if(mine){ _devUser={playerId:mine.id, role:roleFor(), uid:u.uid, email:u.email, real:true}; return; }
       // 2) fallback: lee el grupo directo (por si el estado aún no cargó)
-      return firebase.database().ref('leagues/'+ACTIVE_LEAGUE+'/players').once('value').then(function(s){ return s.val()||{}; }).catch(function(e){ _dbgSet({playersRead:'ERROR: '+((e&&e.code)||(e&&e.message)||'error')}); return null; }).then(function(players){
-        if(players===null){ if(isSup){ _devUser={playerId:null, role:'super', uid:u.uid, email:u.email, real:true}; _dbgSet({finalRole:'super',finalPid:null,finalReal:true,pending:false,step:'✅ ENTRÓ como súper (no pudo leer el grupo pero super=true)'}); } else { _authPending=true; _authDiag='no pude leer el grupo (permiso/conexión)'+(_superErr?' · users/super: '+_superErr:''); _dbgSet({pending:true,diag:_authDiag,step:'⛔ ATORADO: no leyó el grupo y no es súper'}); } return; }
-        _dbgSet({playersRead:'ok ('+Object.keys(players).length+' jugadores)'});
+      return firebase.database().ref('leagues/'+ACTIVE_LEAGUE+'/players').once('value').then(function(s){ return s.val()||{}; }).catch(function(){ return null; }).then(function(players){
+        if(players===null){ if(isSup){ _devUser={playerId:null, role:'super', uid:u.uid, email:u.email, real:true}; } else { _authPending=true; _authDiag='no pude leer el grupo (permiso/conexión)'+(_superErr?' · users/super: '+_superErr:''); } return; }
         let myPid=null;
         Object.keys(players).forEach(function(pid){ const p=players[pid]; if(p && p.uid===u.uid){ myPid=pid; } });
-        if(myPid){ _devUser={playerId:myPid, role:roleFor(), uid:u.uid, email:u.email, real:true}; _dbgSet({rosterHit:'sí en fallback ('+myPid+')',finalRole:_devUser.role,finalPid:myPid,finalReal:true,pending:false,step:'✅ ENTRÓ por fallback del grupo'}); }
-        else if(isSup){ _devUser={playerId:null, role:'super', uid:u.uid, email:u.email, real:true}; _dbgSet({finalRole:'super',finalPid:null,finalReal:true,pending:false,step:'✅ ENTRÓ como súper (operador, sin jugador en este grupo)'}); }   // súper sin jugador aquí = operador
-        else if(_superErr){ _authPending=true; _authDiag='no pude leer users/'+u.uid+'/super → '+_superErr+' · revisa que las reglas dejen leer /users'; _dbgSet({pending:true,diag:_authDiag,step:'⛔ ATORADO: lectura de users/super DENEGADA → '+_superErr}); }   // súper bloqueado por reglas: dilo tal cual
-        else { _authPending=true; _canSelfRegister=true; _authDiag=Object.keys(players).length?'no estás en este grupo':'eres el primero en este grupo'; _dbgSet({pending:true,diag:_authDiag,step:'⛔ ATORADO: super=false y sin jugador (se ofrece registro)'}); }
+        if(myPid){ _devUser={playerId:myPid, role:roleFor(), uid:u.uid, email:u.email, real:true}; }
+        else if(isSup){ _devUser={playerId:null, role:'super', uid:u.uid, email:u.email, real:true}; }   // súper sin jugador aquí = operador
+        else if(_superErr){ _authPending=true; _authDiag='no pude leer users/'+u.uid+'/super → '+_superErr+' · revisa que las reglas dejen leer /users'; }   // súper bloqueado por reglas: dilo tal cual
+        else { _authPending=true; _canSelfRegister=true; _authDiag=Object.keys(players).length?'no estás en este grupo':'eres el primero en este grupo'; }
       });
     });
   }
@@ -4755,7 +4725,6 @@ const App = (() => {
   async function init(){ try{ if(document.fonts&&document.fonts.load){ document.fonts.load("600 40px Newsreader"); document.fonts.load("700 16px 'Hanken Grotesk'"); } }catch(e){} loadDevUser(); await load(); autoPickDay(); render();
     try{ const sv=localStorage.getItem('cl_view'); if(sv && ['liq','day','score','vent','high','cfg'].indexOf(sv)>=0 && sv!==curView) go(sv); }catch(e){}   // restaura la última vista (no desorientar al recargar)
     initPullRefresh(); startAuth(); if(!_devUser) loginModal();
-    try{ _dbgSet({backend:_backend, authAvailable:authAvailable(), league:ACTIVE_LEAGUE, fired:_authTrace.fired||false, step:_authTrace.step||('init listo · authAvailable='+authAvailable()+(authAvailable()?' · esperando onAuthStateChanged…':' · SIN Firebase Auth (no dispara login real)'))}); }catch(e){}
     checkForUpdate();   // ¿hay versión nueva? recarga sola
     document.addEventListener('visibilitychange', ()=>{ if(!document.hidden) checkForUpdate(); });   // y cada vez que vuelves a la app
   }   // muestra la entrada al instante; si hay sesión de Google, se cierra sola al resolver
