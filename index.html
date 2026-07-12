@@ -2,9 +2,6 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<!-- ⚠️ TEMPORAL — DEBUG en mobile (eruda). Consola de DevTools con botón flotante. QUITAR cuando terminemos de diagnosticar el cold load de Fernando. -->
-<script src="https://cdn.jsdelivr.net/npm/eruda"></script>
-<script>try{ if(window.eruda) eruda.init(); }catch(e){}</script>
 <!-- Caché normal del navegador (permite bfcache y servir de caché si la red falla en un cold load). La frescura la
      garantiza APP_VERSION + checkForUpdate() (fetch con cache-bust que auto-recarga si hay versión nueva). Antes había
      "no-store": obligaba a re-bajar ~382KB de red en CADA pestaña nueva y hacía fallar los cold loads en red móvil inestable. -->
@@ -619,7 +616,7 @@
 
 <script>
 const App = (() => {
-  const APP_VERSION = '2026-07-10-56';   // ⬆️ SUBIR en cada deploy: la app se auto-recarga cuando detecta una versión distinta
+  const APP_VERSION = '2026-07-10-57';   // ⬆️ SUBIR en cada deploy: la app se auto-recarga cuando detecta una versión distinta
   const KEY = 'rayas-campestre-v2';
   const uid = () => Math.random().toString(36).slice(2,9);
   // Auto-actualización: revisa el index.html en vivo (sin caché); si la versión cambió, recarga a la versión fresca.
