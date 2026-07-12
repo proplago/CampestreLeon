@@ -616,7 +616,8 @@
 
 <script>
 const App = (() => {
-  const APP_VERSION = '2026-07-10-57';   // ⬆️ SUBIR en cada deploy: la app se auto-recarga cuando detecta una versión distinta
+  const APP_VERSION = '2026-07-10-58';   // ⬆️ SUBIR en cada deploy: la app se auto-recarga cuando detecta una versión distinta
+  const APP_URL = 'https://app.plagolf.com/';   // dominio canónico: los links de invitación y códigos SIEMPRE usan éste
   const KEY = 'rayas-campestre-v2';
   const uid = () => Math.random().toString(36).slice(2,9);
   // Auto-actualización: revisa el index.html en vivo (sin caché); si la versión cambió, recarga a la versión fresca.
@@ -730,6 +731,9 @@ const App = (() => {
   try{ const _p=new URLSearchParams(location.search); const _jl=_p.get('liga');
     if(_jl){ ACTIVE_LEAGUE=_jl; try{localStorage.setItem('cl_active_league',_jl);}catch(e){} }
     _joinCode=_p.get('code')||null; }catch(e){}
+  // Limpia ?liga&code de la barra de inmediato (la liga ya quedó guardada arriba): así, si agregan la app a inicio,
+  // el ícono abre el dominio LIMPIO, sin clavarse a un grupo. Multi-grupo: al abrir el PWA entra a su último grupo.
+  try{ if(location.search){ history.replaceState({},'',location.pathname); } }catch(e){}
   let _backend='memory', _fbRef=null, _shardCache={}, _loadedOnce=false;
   let _users={};   // identidad GLOBAL por cuenta: users/{uid} = {name, email, super, leagues}. El jugador de cada liga solo referencia el uid.
   let _members={};  // AUTORIZACIÓN por grupo: leagueMembers/{ACTIVE_LEAGUE}/{uid} = {role, pid}. Las reglas leen el rol de aquí (indexado por uid).
@@ -4146,7 +4150,7 @@ const App = (() => {
   let _authUser=null, _authPending=false, _canSelfRegister=false, _authDiag='';
   function genJoinCode(){ const a='ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; let s=''; for(let i=0;i<6;i++) s+=a[Math.floor(Math.random()*a.length)]; return s; }
   function ensureJoinCode(){ state._leagueMeta=state._leagueMeta||{}; if(!state._leagueMeta.joinCode){ state._leagueMeta.joinCode=genJoinCode(); save(); } return state._leagueMeta.joinCode; }
-  function inviteLink(){ return location.origin+location.pathname+'?liga='+encodeURIComponent(ACTIVE_LEAGUE)+'&code='+encodeURIComponent(ensureJoinCode()); }
+  function inviteLink(){ return APP_URL+'?liga='+encodeURIComponent(ACTIVE_LEAGUE)+'&code='+encodeURIComponent(ensureJoinCode()); }
   function authAvailable(){ return _backend==='fb' && typeof firebase!=='undefined' && !!firebase.auth; }
   function isRealAuth(){ return !!(_devUser&&_devUser.real); }
   function cleanUrl(){ try{ if(location.search) history.replaceState({},'',location.pathname); }catch(e){} }
@@ -4199,9 +4203,27 @@ const App = (() => {
         if(myPid){ _devUser={playerId:myPid, role:roleFor(), uid:u.uid, email:u.email, real:true}; }
         else if(isSup){ _devUser={playerId:null, role:'super', uid:u.uid, email:u.email, real:true}; }   // súper sin jugador aquí = operador
         else if(_superErr){ _authPending=true; _authDiag='no pude leer users/'+u.uid+'/super → '+_superErr+' · revisa que las reglas dejen leer /users'; }   // súper bloqueado por reglas: dilo tal cual
+        else if(memberRole){ autoHealPlayer(u, roleFor()); }   // YA es miembro (leagueMembers) pero sin jugador → alta a medias: créaselo automáticamente en ESTE grupo
         else { _authPending=true; _canSelfRegister=true; _authDiag=Object.keys(players).length?'no estás en este grupo':'eres el primero en este grupo'; }
       });
     });
+  }
+  // Crea el jugador que faltó cuando alguien se dio de alta pero NO se le creó (alta a medias, p.ej. por reglas inestables).
+  // El jugador lleva su uid, así que la próxima vez se resuelve directo. El pid en leagueMembers es best-effort
+  // (admin/súper sí pueden; un regular con membresía existente quizá no — no importa, se resuelve por uid).
+  function autoHealPlayer(u, role){
+    const nm=(((_users[u.uid]&&_users[u.uid].name)||u.displayName||((u.email||'').split('@')[0])||'Jugador')+'').trim();
+    const npid=uid(), em=(u.email||'');
+    state.players.push({id:npid, name:nm, apodo:'', guest:false, fav:true, uid:u.uid, email:em});
+    _users[u.uid]=Object.assign({}, _users[u.uid], {name:nm, email:em});
+    _devUser={playerId:npid, role:role, uid:u.uid, email:em, real:true};
+    try{ firebase.database().ref().update({
+      ['leagues/'+ACTIVE_LEAGUE+'/players/'+npid]: {apodo:'', fav:true, guest:false, uid:u.uid},
+      ['users/'+u.uid+'/name']: nm,
+      ['users/'+u.uid+'/email']: em,
+      ['users/'+u.uid+'/leagues/'+ACTIVE_LEAGUE]: true
+    }); }catch(e){}
+    try{ firebase.database().ref('leagueMembers/'+ACTIVE_LEAGUE+'/'+u.uid+'/pid').set(npid); }catch(e){}
   }
   function signInGoogle(){
     if(!authAvailable()){ toast('Falta habilitar Google en Firebase'); return; }
