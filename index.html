@@ -619,7 +619,7 @@
 
 <script>
 const App = (() => {
-  const APP_VERSION = '2026-07-10-69';   // ⬆️ SUBIR en cada deploy: la app se auto-recarga cuando detecta una versión distinta
+  const APP_VERSION = '2026-07-10-70';   // ⬆️ SUBIR en cada deploy: la app se auto-recarga cuando detecta una versión distinta
   const APP_URL = 'https://app.plagolf.com/';   // dominio canónico: los links de invitación y códigos SIEMPRE usan éste
   const KEY = 'rayas-campestre-v2';
   const uid = () => Math.random().toString(36).slice(2,9);
@@ -2541,7 +2541,7 @@ const App = (() => {
     const H=bodyH+70;
     const cv=document.createElement('canvas'); cv.width=W*S; cv.height=H*S; const g=cv.getContext('2d'); g.scale(S,S);
     const ink='#1b211d', muted='#6e776f', goldc='#b98a2e', green='#0a6a3a', red='#c1272d', miss='#b8bfb9';
-    const rr=(x,yy,w,h,rad)=>{ g.beginPath(); if(g.roundRect){ g.roundRect(x,yy,w,h,rad); } else { g.moveTo(x+rad,yy); g.arcTo(x+w,yy,x+w,yy+h,rad); g.arcTo(x+w,yy+h,x,yy+h,rad); g.arcTo(x,yy+h,x,yy,rad); g.arcTo(x,yy,x+w,yy,rad); g.closePath(); } g.stroke(); };
+    function rrect(x,yy,w,h,rad){ g.beginPath(); if(g.roundRect){ g.roundRect(x,yy,w,h,rad); } else { g.moveTo(x+rad,yy); g.arcTo(x+w,yy,x+w,yy+h,rad); g.arcTo(x+w,yy+h,x,yy+h,rad); g.arcTo(x,yy+h,x,yy,rad); g.arcTo(x,yy,x+w,yy,rad); g.closePath(); } g.stroke(); }
     g.fillStyle='#ffffff'; g.fillRect(0,0,W,H);
     g.fillStyle='#0a6a3a'; g.fillRect(0,0,W,124);   // banda verde
     g.textAlign='center'; g.fillStyle='#e3c878'; g.font='600 22px "Hanken Grotesk",system-ui,sans-serif'; g.fillText('GOLF VIERNES · CAMPESTRE LEÓN', W/2, 48);
@@ -2566,7 +2566,7 @@ const App = (() => {
             else { const df=gv-par, col=df<=-1?green:df===0?ink:df===1?goldc:red;
               g.strokeStyle=col; g.lineWidth=1.6;
               if(df<=-1){ g.beginPath(); g.arc(cx,ncy,12,0,Math.PI*2); g.stroke(); if(df<=-2){ g.beginPath(); g.arc(cx,ncy,15,0,Math.PI*2); g.stroke(); } }
-              else if(df>=1){ rr(cx-12,ncy-12,24,24,4); if(df>=2){ rr(cx-15,ncy-15,30,30,5); } }
+              else if(df>=1){ rrect(cx-12,ncy-12,24,24,4); if(df>=2){ rrect(cx-15,ncy-15,30,30,5); } }
               g.fillStyle=col; g.font='700 20px "Patrick Hand",system-ui,sans-serif'; g.fillText(String(gv), cx, ncy);
               const stu=new Set([...autoUnits(gv,c.h,sc.putts[c.h],holes),...validManual(sc,c.h,holes)]); let em=''; stu.forEach(u=>{ const uu=state.units.find(z=>z.id===u); if(uu&&uu.emoji)em+=uu.emoji; });
               if(em){ g.font='14px "Patrick Hand",system-ui,sans-serif'; g.fillText(em, cx, ncy+22); }
