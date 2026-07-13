@@ -399,9 +399,9 @@
   .gcell .gnum{display:inline-flex;align-items:center;justify-content:center;line-height:1}
   .ue{display:block;line-height:1;min-height:11px}
   .cmp .ue{font-size:11px;min-height:12px}
-  .sccard .ue{font-size:9px;min-height:10px;margin-top:1px}
+  .sccard .ue{font-size:9px;min-height:0;margin-top:0}
   .sccard td:not(.pn):not(.tt):not(.sub){position:relative}
-  .oyc{position:absolute;top:2px;right:2px;font-size:8px;font-weight:800;line-height:1;color:var(--muted-2)}
+  .oyc{position:absolute;top:0;right:1px;font-size:7px;font-weight:800;line-height:1.1;color:var(--muted-2)}
   .oyc.oyw{color:var(--fairway)}
   .cmpme{font-weight:700;font-size:14px;color:var(--ink);padding:6px 4px}
   select.vsel{font-weight:800;font-variant-numeric:tabular-nums}
@@ -619,7 +619,7 @@
 
 <script>
 const App = (() => {
-  const APP_VERSION = '2026-07-10-60';   // ⬆️ SUBIR en cada deploy: la app se auto-recarga cuando detecta una versión distinta
+  const APP_VERSION = '2026-07-10-61';   // ⬆️ SUBIR en cada deploy: la app se auto-recarga cuando detecta una versión distinta
   const APP_URL = 'https://app.plagolf.com/';   // dominio canónico: los links de invitación y códigos SIEMPRE usan éste
   const KEY = 'rayas-campestre-v2';
   const uid = () => Math.random().toString(36).slice(2,9);
