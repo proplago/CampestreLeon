@@ -2450,18 +2450,32 @@ const App = (() => {
   // Llama al sistema para Compartir/Guardar en Fotos. DEBE correr síncrono dentro del tap
   // (sin await previo) para que iOS respete el gesto y abra la hoja con "Guardar imagen".
   function saveCanvas(cv, fname, shareTitle){
-    let blob=null;
+    let blob=null, dataUrl='';
     try{
-      const url=cv.toDataURL('image/png'); const bin=atob(url.split(',')[1]); const arr=new Uint8Array(bin.length);
+      dataUrl=cv.toDataURL('image/png'); const bin=atob(dataUrl.split(',')[1]); const arr=new Uint8Array(bin.length);
       for(let i=0;i<bin.length;i++) arr[i]=bin.charCodeAt(i);
       blob=new Blob([arr],{type:'image/png'});
     }catch(e){ toast('No se pudo generar la imagen'); return; }
     const file=new File([blob],fname,{type:'image/png'});
     if(navigator.canShare && navigator.canShare({files:[file]})){
-      navigator.share({files:[file], title:shareTitle}).catch(err=>{ if(err&&err.name==='AbortError') return; downloadBlob(blob,fname); });
+      navigator.share({files:[file], title:shareTitle}).catch(err=>{ if(err&&err.name==='AbortError') return; imgSaveOverlay(dataUrl, blob, fname); });
     } else {
-      downloadBlob(blob,fname);
+      imgSaveOverlay(dataUrl, blob, fname);
     }
+  }
+  // Fallback para GUARDAR EN FOTOS sin la hoja de compartir: muestra la imagen a pantalla completa
+  // para hacer "mantener presionado → Guardar en Fotos" (iOS/Android). Con botón de descarga por si acaso.
+  function imgSaveOverlay(dataUrl, blob, fname){
+    const ov=document.createElement('div');
+    ov.style.cssText='position:fixed;inset:0;z-index:99999;background:rgba(10,20,14,.94);display:flex;flex-direction:column;align-items:center;gap:14px;padding:18px;overflow:auto';
+    ov.innerHTML='<div style="color:#e3c878;font-weight:800;font-size:14px;text-align:center;max-width:340px;line-height:1.4">Mantén presionada la imagen y toca <b>Guardar en Fotos</b></div>'
+      +'<img alt="tarjeta" style="max-width:100%;border-radius:12px;box-shadow:0 12px 44px rgba(0,0,0,.5)">'
+      +'<div style="display:flex;gap:10px"><button class="ovdl" style="background:#0a6a3a;color:#fff;border:0;border-radius:10px;padding:11px 20px;font-weight:700;font-family:inherit">Descargar</button>'
+      +'<button class="ovcl" style="background:#fff;color:#0a6a3a;border:0;border-radius:10px;padding:11px 20px;font-weight:700;font-family:inherit">Cerrar</button></div>';
+    ov.querySelector('img').src=dataUrl;
+    ov.querySelector('.ovdl').onclick=function(){ downloadBlob(blob,fname); };
+    ov.querySelector('.ovcl').onclick=function(){ ov.remove(); };
+    document.body.appendChild(ov);
   }
   function exportBoard(title, subtitle, sections){
     sections=(sections||[]).filter(s=>s && ((s.rows&&s.rows.length)||(s.lines&&s.lines.length)));
