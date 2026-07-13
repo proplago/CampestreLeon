@@ -619,7 +619,7 @@
 
 <script>
 const App = (() => {
-  const APP_VERSION = '2026-07-10-66';   // ⬆️ SUBIR en cada deploy: la app se auto-recarga cuando detecta una versión distinta
+  const APP_VERSION = '2026-07-10-67';   // ⬆️ SUBIR en cada deploy: la app se auto-recarga cuando detecta una versión distinta
   const APP_URL = 'https://app.plagolf.com/';   // dominio canónico: los links de invitación y códigos SIEMPRE usan éste
   const KEY = 'rayas-campestre-v2';
   const uid = () => Math.random().toString(36).slice(2,9);
@@ -2536,7 +2536,7 @@ const App = (() => {
     const groups=d.salidas.map((g,i)=>({gi:i, ids:(g||[]).filter(Boolean)})).filter(g=>g.ids.length);
     if(!groups.length){ toast('Sin salidas'); return; }
     const S=2, padX=40, nameW=210, cW=46, totW=72, rayW=72;
-    const tableW=nameW+nC*cW+totW+rayW, W=padX*2+tableW, rowH=42, headH=44;
+    const tableW=nameW+nC*cW+totW+rayW, W=padX*2+tableW, rowH=54, headH=44;
     let bodyH=130; groups.forEach(gr=>{ bodyH += 34 + headH*2 + gr.ids.length*rowH + 24; });
     const H=bodyH+70;
     const cv=document.createElement('canvas'); cv.width=W*S; cv.height=H*S; const g=cv.getContext('2d'); g.scale(S,S);
@@ -2555,13 +2555,27 @@ const App = (() => {
       g.textAlign='left'; g.fillStyle=muted; g.fillText('Par', padX, y+20);
       g.textAlign='center'; cols.forEach((c,k)=>{ g.fillStyle=c.sub?goldc:muted; g.fillText(c.sub?c.seg.reduce((a,i)=>a+holes[i].par,0):holes[c.h].par, colX(k), y+20); }); g.fillStyle=muted; g.fillText(parTot, totX, y+20); y+=headH-4;
       gr.ids.forEach(id=>{ const sc=ensureScore(d,id), tot=ord.reduce((a,i)=>a+(sc.gross[i]||0),0); const r=res?res.rows.find(x=>x.id===id):null, rr=r?r.total:0;
-        g.textAlign='left'; g.fillStyle=ink; g.font='700 18px "Hanken Grotesk",system-ui,sans-serif'; g.fillText(pname(id), padX, y+22);
-        g.textAlign='center'; g.font='600 18px "Hanken Grotesk",system-ui,sans-serif';
-        cols.forEach((c,k)=>{ if(c.sub){ const s=c.seg.reduce((a,i)=>a+(sc.gross[i]||0),0); g.fillStyle=goldc; g.font='700 18px "Hanken Grotesk",system-ui,sans-serif'; g.fillText(s||'·', colX(k), y+22); g.font='600 18px "Hanken Grotesk",system-ui,sans-serif'; }
-          else { const gv=sc.gross[c.h]; if(gv>0){ const df=gv-holes[c.h].par; g.fillStyle=df<=-1?green:df===0?ink:df===1?goldc:red; } else g.fillStyle=miss; g.fillText(gv||'·', colX(k), y+22); } });
-        g.fillStyle=ink; g.font='700 18px "Hanken Grotesk",system-ui,sans-serif'; g.fillText(tot||'—', totX, y+22);
-        g.fillStyle=rr>0?green:rr<0?red:muted; g.fillText((rr>0?'+':'')+(rr||0), rayX, y+22); y+=rowH;
+        const ncy=y+20; g.textBaseline='middle';
+        g.textAlign='left'; g.fillStyle=ink; g.font='700 19px "Hanken Grotesk",system-ui,sans-serif'; g.fillText(pname(id), padX, ncy);
+        g.textAlign='center';
+        cols.forEach((c,k)=>{ const cx=colX(k);
+          if(c.sub){ const s=c.seg.reduce((a,i)=>a+(sc.gross[i]||0),0); g.fillStyle=goldc; g.font='700 18px "Hanken Grotesk",system-ui,sans-serif'; g.fillText(s||'·', cx, ncy); }
+          else { const gv=sc.gross[c.h], par=holes[c.h].par;
+            if(!gv){ g.fillStyle=miss; g.font='600 18px "Hanken Grotesk",system-ui,sans-serif'; g.fillText('·', cx, ncy); }
+            else { const df=gv-par, col=df<=-1?green:df===0?ink:df===1?goldc:red;
+              g.strokeStyle=col; g.lineWidth=1.6;
+              if(df<=-1){ g.beginPath(); g.arc(cx,ncy,12,0,Math.PI*2); g.stroke(); if(df<=-2){ g.beginPath(); g.arc(cx,ncy,15,0,Math.PI*2); g.stroke(); } }
+              else if(df>=1){ g.strokeRect(cx-12,ncy-12,24,24); if(df>=2){ g.strokeRect(cx-15,ncy-15,30,30); } }
+              g.fillStyle=col; g.font='700 20px "Hanken Grotesk",system-ui,sans-serif'; g.fillText(String(gv), cx, ncy);
+              const stu=new Set([...autoUnits(gv,c.h,sc.putts[c.h],holes),...validManual(sc,c.h,holes)]); let em=''; stu.forEach(u=>{ const uu=state.units.find(z=>z.id===u); if(uu&&uu.emoji)em+=uu.emoji; });
+              if(em){ g.font='14px "Hanken Grotesk",system-ui,sans-serif'; g.fillText(em, cx, ncy+22); }
+              if(par===3){ const o=sc.oyes[c.h]||0; if(o){ g.fillStyle=o===1?green:muted; g.font='800 12px "Hanken Grotesk",system-ui,sans-serif'; g.fillText(String(o), cx+16, ncy-12); } }
+            } } });
+        g.fillStyle=ink; g.font='700 19px "Hanken Grotesk",system-ui,sans-serif'; g.fillText(tot||'—', totX, ncy);
+        g.fillStyle=rr>0?green:rr<0?red:muted; g.font='700 19px "Hanken Grotesk",system-ui,sans-serif'; g.fillText((rr>0?'+':'')+(rr||0), rayX, ncy);
+        y+=rowH;
       });
+      g.textBaseline='alphabetic';
       y+=24;
     });
     g.textAlign='center'; g.fillStyle=muted; g.font='400 18px "Hanken Grotesk",system-ui,sans-serif';
