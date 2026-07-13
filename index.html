@@ -277,10 +277,10 @@
   .sccard td.eag{background:#1f7a4d;color:#fff;font-weight:700;border-radius:4px}
   .sccard td.bog{background:#fbeecf;color:#9a6b00}
   .sccard td.dbl{background:#f6dcd3;color:#b23a1d;font-weight:600}
-  .sccard td.tt,.sccard th.tt{padding-left:8px;border-left:1px solid var(--line)}
+  .sccard td.tt,.sccard th.tt{padding-left:2px;padding-right:2px;border-left:1px solid var(--line)}
   .sccard td.tt.pos{color:var(--good);font-weight:700}
   .sccard td.tt.neg{color:var(--clay);font-weight:700}
-  .sccard td.sub,.sccard th.sub{background:#eef5ef;color:var(--fairway);font-weight:700;padding-left:6px;border-left:1px dashed var(--line)}
+  .sccard td.sub,.sccard th.sub{background:#eef5ef;color:var(--fairway);font-weight:700;padding-left:2px;padding-right:2px;border-left:1px dashed var(--line)}
   .sccard td.hl,.sccard th.hl{background:#eef6f1;box-shadow:inset 0 0 0 1px #bcd9c8}
   /* Simbología de golf: ○ birdie · ◎ eagle · □ bogey · ▣ doble bogey+ (par = sin marca) */
   .gsym{display:inline-grid;place-items:center;min-width:18px;height:18px;padding:0 1px;font-variant-numeric:tabular-nums;line-height:1}
@@ -620,7 +620,7 @@
 
 <script>
 const App = (() => {
-  const APP_VERSION = '2026-07-10-63';   // ⬆️ SUBIR en cada deploy: la app se auto-recarga cuando detecta una versión distinta
+  const APP_VERSION = '2026-07-10-64';   // ⬆️ SUBIR en cada deploy: la app se auto-recarga cuando detecta una versión distinta
   const APP_URL = 'https://app.plagolf.com/';   // dominio canónico: los links de invitación y códigos SIEMPRE usan éste
   const KEY = 'rayas-campestre-v2';
   const uid = () => Math.random().toString(36).slice(2,9);
