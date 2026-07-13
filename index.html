@@ -619,7 +619,7 @@
 
 <script>
 const App = (() => {
-  const APP_VERSION = '2026-07-10-67';   // ⬆️ SUBIR en cada deploy: la app se auto-recarga cuando detecta una versión distinta
+  const APP_VERSION = '2026-07-10-68';   // ⬆️ SUBIR en cada deploy: la app se auto-recarga cuando detecta una versión distinta
   const APP_URL = 'https://app.plagolf.com/';   // dominio canónico: los links de invitación y códigos SIEMPRE usan éste
   const KEY = 'rayas-campestre-v2';
   const uid = () => Math.random().toString(36).slice(2,9);
@@ -2410,7 +2410,7 @@ const App = (() => {
     g.textAlign='center';
     g.fillStyle='#e3c878'; g.font='600 24px "Hanken Grotesk",system-ui,sans-serif';
     g.fillText('GOLF VIERNES · CAMPESTRE LEÓN', W/2, 64);
-    g.fillStyle='#ffffff'; g.font='700 52px Anton, system-ui, sans-serif';
+    g.fillStyle='#ffffff'; g.font='italic 600 54px "Newsreader",Georgia,serif';
     g.fillText(d.label||'Resultados', W/2, 124);
     g.fillStyle='rgba(255,255,255,.85)'; g.font='400 24px "Hanken Grotesk",system-ui,sans-serif';
     g.fillText(`${courseOf(d).name} · ${rows.length} jug. · raya $${state.rayaValue} · ${holesLabel(d)}`, W/2, 166);
@@ -2473,7 +2473,7 @@ const App = (() => {
     g.fillStyle='#ffffff'; g.fillRect(0,0,W,H);
     g.fillStyle='#0a6a3a'; g.fillRect(0,0,W,180);   // banda verde de encabezado
     g.textAlign='center'; g.fillStyle='#e3c878'; g.font='600 24px "Hanken Grotesk",system-ui,sans-serif'; g.fillText('GOLF VIERNES · CAMPESTRE LEÓN', W/2, 62);
-    g.fillStyle='#ffffff'; g.font='700 50px Anton, system-ui, sans-serif'; g.fillText(title, W/2, 120);
+    g.fillStyle='#ffffff'; g.font='italic 600 52px "Newsreader",Georgia,serif'; g.fillText(title, W/2, 120);
     if(subtitle){ g.fillStyle='rgba(255,255,255,.85)'; g.font='400 23px "Hanken Grotesk",system-ui,sans-serif'; g.fillText(subtitle, W/2, 158); }
     const colOf=c=> c==='good'?green : c==='bad'?red : c==='gold'||c==='ace'||c==='fire'?goldc : ink;
     let y=top;
@@ -2544,35 +2544,35 @@ const App = (() => {
     g.fillStyle='#ffffff'; g.fillRect(0,0,W,H);
     g.fillStyle='#0a6a3a'; g.fillRect(0,0,W,124);   // banda verde
     g.textAlign='center'; g.fillStyle='#e3c878'; g.font='600 22px "Hanken Grotesk",system-ui,sans-serif'; g.fillText('GOLF VIERNES · CAMPESTRE LEÓN', W/2, 48);
-    g.fillStyle='#ffffff'; g.font='700 40px Anton, system-ui, sans-serif'; g.fillText('Tarjeta · '+(d.label||''), W/2, 90);
+    g.fillStyle='#ffffff'; g.font='italic 600 44px "Newsreader",Georgia,serif'; g.fillText('Tarjeta · '+(d.label||''), W/2, 90);
     g.fillStyle='rgba(255,255,255,.85)'; g.font='400 20px "Hanken Grotesk",system-ui,sans-serif'; g.fillText(courseOf(d).name+' · '+holesLabel(d), W/2, 116);
     const colX=k=>padX+nameW+k*cW+cW/2, totX=padX+nameW+nC*cW+totW/2, rayX=padX+nameW+nC*cW+totW+rayW/2;
     let y=148;
     groups.forEach(gr=>{
       g.textAlign='left'; g.fillStyle=gr.gi===0?green:'#7a5bb0'; g.font='700 22px "Hanken Grotesk",system-ui,sans-serif'; g.fillText('Salida '+(gr.gi+1), padX, y); y+=30;
-      g.fillStyle=muted; g.font='700 17px "Hanken Grotesk",system-ui,sans-serif'; g.textAlign='left'; g.fillText('Hoyo', padX, y+22);
+      g.fillStyle=muted; g.font='700 17px "Patrick Hand",system-ui,sans-serif'; g.textAlign='left'; g.fillText('Hoyo', padX, y+22);
       g.textAlign='center'; cols.forEach((c,k)=>{ g.fillStyle=c.sub?goldc:muted; g.fillText(c.sub||holes[c.h].n, colX(k), y+22); }); g.fillStyle=muted; g.fillText('Tot', totX, y+22); g.fillText('Ray', rayX, y+22); y+=headH;
       g.textAlign='left'; g.fillStyle=muted; g.fillText('Par', padX, y+20);
       g.textAlign='center'; cols.forEach((c,k)=>{ g.fillStyle=c.sub?goldc:muted; g.fillText(c.sub?c.seg.reduce((a,i)=>a+holes[i].par,0):holes[c.h].par, colX(k), y+20); }); g.fillStyle=muted; g.fillText(parTot, totX, y+20); y+=headH-4;
       gr.ids.forEach(id=>{ const sc=ensureScore(d,id), tot=ord.reduce((a,i)=>a+(sc.gross[i]||0),0); const r=res?res.rows.find(x=>x.id===id):null, rr=r?r.total:0;
         const ncy=y+20; g.textBaseline='middle';
-        g.textAlign='left'; g.fillStyle=ink; g.font='700 19px "Hanken Grotesk",system-ui,sans-serif'; g.fillText(pname(id), padX, ncy);
+        g.textAlign='left'; g.fillStyle=ink; g.font='700 19px "Patrick Hand",system-ui,sans-serif'; g.fillText(pname(id), padX, ncy);
         g.textAlign='center';
         cols.forEach((c,k)=>{ const cx=colX(k);
-          if(c.sub){ const s=c.seg.reduce((a,i)=>a+(sc.gross[i]||0),0); g.fillStyle=goldc; g.font='700 18px "Hanken Grotesk",system-ui,sans-serif'; g.fillText(s||'·', cx, ncy); }
+          if(c.sub){ const s=c.seg.reduce((a,i)=>a+(sc.gross[i]||0),0); g.fillStyle=goldc; g.font='700 18px "Patrick Hand",system-ui,sans-serif'; g.fillText(s||'·', cx, ncy); }
           else { const gv=sc.gross[c.h], par=holes[c.h].par;
-            if(!gv){ g.fillStyle=miss; g.font='600 18px "Hanken Grotesk",system-ui,sans-serif'; g.fillText('·', cx, ncy); }
+            if(!gv){ g.fillStyle=miss; g.font='600 18px "Patrick Hand",system-ui,sans-serif'; g.fillText('·', cx, ncy); }
             else { const df=gv-par, col=df<=-1?green:df===0?ink:df===1?goldc:red;
               g.strokeStyle=col; g.lineWidth=1.6;
               if(df<=-1){ g.beginPath(); g.arc(cx,ncy,12,0,Math.PI*2); g.stroke(); if(df<=-2){ g.beginPath(); g.arc(cx,ncy,15,0,Math.PI*2); g.stroke(); } }
               else if(df>=1){ g.strokeRect(cx-12,ncy-12,24,24); if(df>=2){ g.strokeRect(cx-15,ncy-15,30,30); } }
-              g.fillStyle=col; g.font='700 20px "Hanken Grotesk",system-ui,sans-serif'; g.fillText(String(gv), cx, ncy);
+              g.fillStyle=col; g.font='700 20px "Patrick Hand",system-ui,sans-serif'; g.fillText(String(gv), cx, ncy);
               const stu=new Set([...autoUnits(gv,c.h,sc.putts[c.h],holes),...validManual(sc,c.h,holes)]); let em=''; stu.forEach(u=>{ const uu=state.units.find(z=>z.id===u); if(uu&&uu.emoji)em+=uu.emoji; });
-              if(em){ g.font='14px "Hanken Grotesk",system-ui,sans-serif'; g.fillText(em, cx, ncy+22); }
-              if(par===3){ const o=sc.oyes[c.h]||0; if(o){ g.fillStyle=o===1?green:muted; g.font='800 12px "Hanken Grotesk",system-ui,sans-serif'; g.fillText(String(o), cx+16, ncy-12); } }
+              if(em){ g.font='14px "Patrick Hand",system-ui,sans-serif'; g.fillText(em, cx, ncy+22); }
+              if(par===3){ const o=sc.oyes[c.h]||0; if(o){ g.fillStyle=o===1?green:muted; g.font='800 12px "Patrick Hand",system-ui,sans-serif'; g.fillText(String(o), cx+16, ncy-12); } }
             } } });
-        g.fillStyle=ink; g.font='700 19px "Hanken Grotesk",system-ui,sans-serif'; g.fillText(tot||'—', totX, ncy);
-        g.fillStyle=rr>0?green:rr<0?red:muted; g.font='700 19px "Hanken Grotesk",system-ui,sans-serif'; g.fillText((rr>0?'+':'')+(rr||0), rayX, ncy);
+        g.fillStyle=ink; g.font='700 19px "Patrick Hand",system-ui,sans-serif'; g.fillText(tot||'—', totX, ncy);
+        g.fillStyle=rr>0?green:rr<0?red:muted; g.font='700 19px "Patrick Hand",system-ui,sans-serif'; g.fillText((rr>0?'+':'')+(rr||0), rayX, ncy);
         y+=rowH;
       });
       g.textBaseline='alphabetic';
@@ -4760,7 +4760,7 @@ const App = (() => {
     window.addEventListener('touchend',end,{passive:true});
     window.addEventListener('touchcancel',()=>{ pulling=false; hide(); },{passive:true});
   }
-  async function init(){ try{ if(document.fonts&&document.fonts.load){ document.fonts.load("600 40px Newsreader"); document.fonts.load("700 16px 'Hanken Grotesk'"); } }catch(e){} loadDevUser(); await load(); autoPickDay(); render();
+  async function init(){ try{ if(document.fonts&&document.fonts.load){ document.fonts.load("600 40px Newsreader"); document.fonts.load("italic 600 40px Newsreader"); document.fonts.load("400 20px 'Patrick Hand'"); document.fonts.load("700 16px 'Hanken Grotesk'"); } }catch(e){} loadDevUser(); await load(); autoPickDay(); render();
     try{ const sv=localStorage.getItem('cl_view'); if(sv && ['liq','day','score','vent','high','cfg'].indexOf(sv)>=0 && sv!==curView) go(sv); }catch(e){}   // restaura la última vista (no desorientar al recargar)
     initPullRefresh(); startAuth(); if(!_devUser) loginModal();
     checkForUpdate();   // ¿hay versión nueva? recarga sola
