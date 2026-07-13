@@ -619,7 +619,7 @@
 
 <script>
 const App = (() => {
-  const APP_VERSION = '2026-07-10-71';   // ⬆️ SUBIR en cada deploy: la app se auto-recarga cuando detecta una versión distinta
+  const APP_VERSION = '2026-07-10-72';   // ⬆️ SUBIR en cada deploy: la app se auto-recarga cuando detecta una versión distinta
   const APP_URL = 'https://app.plagolf.com/';   // dominio canónico: los links de invitación y códigos SIEMPRE usan éste
   const KEY = 'rayas-campestre-v2';
   const uid = () => Math.random().toString(36).slice(2,9);
@@ -2537,18 +2537,23 @@ const App = (() => {
     if(!groups.length){ toast('Sin salidas'); return; }
     const S=2, padX=40, nameW=210, cW=46, totW=72, rayW=72;
     const tableW=nameW+nC*cW+totW+rayW, W=padX*2+tableW, rowH=54, headH=44;
-    let bodyH=130; groups.forEach(gr=>{ bodyH += 34 + headH*2 + gr.ids.length*rowH + 24; });
+    let bodyH=205; groups.forEach(gr=>{ bodyH += 34 + headH*2 + gr.ids.length*rowH + 24; });
     const H=bodyH+70;
     const cv=document.createElement('canvas'); cv.width=W*S; cv.height=H*S; const g=cv.getContext('2d'); g.scale(S,S);
     const ink='#1b211d', muted='#6e776f', goldc='#b98a2e', green='#0a6a3a', red='#c1272d', miss='#b8bfb9';
-    function rrect(x,yy,w,h,rad){ g.beginPath(); if(g.roundRect){ g.roundRect(x,yy,w,h,rad); } else { g.moveTo(x+rad,yy); g.arcTo(x+w,yy,x+w,yy+h,rad); g.arcTo(x+w,yy+h,x,yy+h,rad); g.arcTo(x,yy+h,x,yy,rad); g.arcTo(x,yy,x+w,yy,rad); g.closePath(); } g.stroke(); }
-    g.fillStyle='#f6efda'; g.fillRect(0,0,W,H);   // fondo crema, como la tarjeta papercard
-    g.fillStyle='#0a6a3a'; g.fillRect(0,0,W,124);   // banda verde
-    g.textAlign='center'; g.fillStyle='#e3c878'; g.font='600 22px "Hanken Grotesk",system-ui,sans-serif'; g.fillText('GOLF VIERNES · CAMPESTRE LEÓN', W/2, 48);
-    g.fillStyle='#ffffff'; g.font='italic 600 44px "Newsreader",Georgia,serif'; g.fillText('Tarjeta · '+(d.label||''), W/2, 90);
-    g.fillStyle='rgba(255,255,255,.85)'; g.font='400 20px "Hanken Grotesk",system-ui,sans-serif'; g.fillText(courseOf(d).name+' · '+holesLabel(d), W/2, 116);
+    function roundPath(x,yy,w,h,rad){ g.beginPath(); if(g.roundRect){ g.roundRect(x,yy,w,h,rad); } else { g.moveTo(x+rad,yy); g.arcTo(x+w,yy,x+w,yy+h,rad); g.arcTo(x+w,yy+h,x,yy+h,rad); g.arcTo(x,yy+h,x,yy,rad); g.arcTo(x,yy,x+w,yy,rad); g.closePath(); } }
+    function rrect(x,yy,w,h,rad){ roundPath(x,yy,w,h,rad); g.stroke(); }
+    g.fillStyle='#eef2ee'; g.fillRect(0,0,W,H);   // hoja (fondo tenue)
+    const CM=22, CR=28;   // tarjeta de papel: margen y radio
+    g.save(); g.shadowColor='rgba(20,45,30,.22)'; g.shadowBlur=28; g.shadowOffsetY=10; g.fillStyle='#f6efda'; roundPath(CM,CM,W-2*CM,H-2*CM,CR); g.fill(); g.restore();
+    g.strokeStyle='#d4c39a'; g.lineWidth=2; roundPath(CM,CM,W-2*CM,H-2*CM,CR); g.stroke();
+    g.textAlign='center';
+    g.fillStyle=goldc; g.font='700 24px "Hanken Grotesk",system-ui,sans-serif'; g.fillText('⛳ '+leagueName(ACTIVE_LEAGUE), W/2, CM+54);
+    g.fillStyle=green; g.font='italic 600 48px "Newsreader",Georgia,serif'; g.fillText('Tarjeta · '+(d.label||''), W/2, CM+108);
+    g.fillStyle=muted; g.font='400 22px "Hanken Grotesk",system-ui,sans-serif'; g.fillText(courseOf(d).name+' · '+holesLabel(d), W/2, CM+142);
+    g.strokeStyle='#e0d4ad'; g.lineWidth=1.5; g.beginPath(); g.moveTo(CM+50, CM+164); g.lineTo(W-CM-50, CM+164); g.stroke();
     const colX=k=>padX+nameW+k*cW+cW/2, totX=padX+nameW+nC*cW+totW/2, rayX=padX+nameW+nC*cW+totW+rayW/2;
-    let y=148;
+    let y=205;
     groups.forEach(gr=>{
       g.textAlign='left'; g.fillStyle=gr.gi===0?green:'#7a5bb0'; g.font='700 22px "Hanken Grotesk",system-ui,sans-serif'; g.fillText('Salida '+(gr.gi+1), padX, y); y+=30;
       g.fillStyle=muted; g.font='700 17px "Patrick Hand",system-ui,sans-serif'; g.textAlign='left'; g.fillText('Hoyo', padX, y+22);
