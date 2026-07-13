@@ -619,7 +619,7 @@
 
 <script>
 const App = (() => {
-  const APP_VERSION = '2026-07-10-70';   // ⬆️ SUBIR en cada deploy: la app se auto-recarga cuando detecta una versión distinta
+  const APP_VERSION = '2026-07-10-71';   // ⬆️ SUBIR en cada deploy: la app se auto-recarga cuando detecta una versión distinta
   const APP_URL = 'https://app.plagolf.com/';   // dominio canónico: los links de invitación y códigos SIEMPRE usan éste
   const KEY = 'rayas-campestre-v2';
   const uid = () => Math.random().toString(36).slice(2,9);
@@ -2542,7 +2542,7 @@ const App = (() => {
     const cv=document.createElement('canvas'); cv.width=W*S; cv.height=H*S; const g=cv.getContext('2d'); g.scale(S,S);
     const ink='#1b211d', muted='#6e776f', goldc='#b98a2e', green='#0a6a3a', red='#c1272d', miss='#b8bfb9';
     function rrect(x,yy,w,h,rad){ g.beginPath(); if(g.roundRect){ g.roundRect(x,yy,w,h,rad); } else { g.moveTo(x+rad,yy); g.arcTo(x+w,yy,x+w,yy+h,rad); g.arcTo(x+w,yy+h,x,yy+h,rad); g.arcTo(x,yy+h,x,yy,rad); g.arcTo(x,yy,x+w,yy,rad); g.closePath(); } g.stroke(); }
-    g.fillStyle='#ffffff'; g.fillRect(0,0,W,H);
+    g.fillStyle='#f6efda'; g.fillRect(0,0,W,H);   // fondo crema, como la tarjeta papercard
     g.fillStyle='#0a6a3a'; g.fillRect(0,0,W,124);   // banda verde
     g.textAlign='center'; g.fillStyle='#e3c878'; g.font='600 22px "Hanken Grotesk",system-ui,sans-serif'; g.fillText('GOLF VIERNES · CAMPESTRE LEÓN', W/2, 48);
     g.fillStyle='#ffffff'; g.font='italic 600 44px "Newsreader",Georgia,serif'; g.fillText('Tarjeta · '+(d.label||''), W/2, 90);
