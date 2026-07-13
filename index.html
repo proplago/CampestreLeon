@@ -400,6 +400,8 @@
   .ue{display:block;line-height:1;min-height:11px}
   .cmp .ue{font-size:11px;min-height:12px}
   .sccard .ue{font-size:9px;min-height:10px;margin-top:1px}
+  .oyn{font-style:normal;font-weight:800;font-size:9px;color:var(--muted);letter-spacing:.02em}
+  .oyn.oyw{color:var(--fairway)}
   .cmpme{font-weight:700;font-size:14px;color:var(--ink);padding:6px 4px}
   select.vsel{font-weight:800;font-variant-numeric:tabular-nums}
   select.vsel.neg{color:var(--clay)} select.vsel.pos{color:var(--good)}
@@ -616,7 +618,7 @@
 
 <script>
 const App = (() => {
-  const APP_VERSION = '2026-07-10-58';   // ⬆️ SUBIR en cada deploy: la app se auto-recarga cuando detecta una versión distinta
+  const APP_VERSION = '2026-07-10-59';   // ⬆️ SUBIR en cada deploy: la app se auto-recarga cuando detecta una versión distinta
   const APP_URL = 'https://app.plagolf.com/';   // dominio canónico: los links de invitación y códigos SIEMPRE usan éste
   const KEY = 'rayas-campestre-v2';
   const uid = () => Math.random().toString(36).slice(2,9);
@@ -2860,7 +2862,7 @@ const App = (() => {
     const sc=ensureScore(d,pid);
     const set=new Set([...(sc.gross[i]?autoUnits(sc.gross[i],i,sc.putts[i],holesOf(d)):[]),...validManual(sc,i,holesOf(d))]);
     let e=''; set.forEach(uid=>{ const u=state.units.find(z=>z.id===uid); if(u&&u.emoji)e+=u.emoji; });
-    if(holesOf(d)[i].par===3 && (sc.oyes[i]||0)===1) e+='📍';
+    if(holesOf(d)[i].par===3){ const o=sc.oyes[i]||0; if(o) e+=`<i class="oyn${o===1?' oyw':''}">${o===1?'📍':''}${o}</i>`; }   // lugar del oye de CADA jugador (📍 = 1º)
     return e;
   }
   function renderCard(d, onlyGroup, hlHole){
