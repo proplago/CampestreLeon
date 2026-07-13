@@ -400,8 +400,9 @@
   .ue{display:block;line-height:1;min-height:11px}
   .cmp .ue{font-size:11px;min-height:12px}
   .sccard .ue{font-size:9px;min-height:10px;margin-top:1px}
-  .oyn{font-style:normal;font-weight:800;font-size:9px;color:var(--muted);letter-spacing:.02em}
-  .oyn.oyw{color:var(--fairway)}
+  .sccard td:not(.pn):not(.tt):not(.sub){position:relative}
+  .oyc{position:absolute;top:2px;right:2px;font-size:8px;font-weight:800;line-height:1;color:var(--muted-2)}
+  .oyc.oyw{color:var(--fairway)}
   .cmpme{font-weight:700;font-size:14px;color:var(--ink);padding:6px 4px}
   select.vsel{font-weight:800;font-variant-numeric:tabular-nums}
   select.vsel.neg{color:var(--clay)} select.vsel.pos{color:var(--good)}
@@ -618,7 +619,7 @@
 
 <script>
 const App = (() => {
-  const APP_VERSION = '2026-07-10-59';   // ⬆️ SUBIR en cada deploy: la app se auto-recarga cuando detecta una versión distinta
+  const APP_VERSION = '2026-07-10-60';   // ⬆️ SUBIR en cada deploy: la app se auto-recarga cuando detecta una versión distinta
   const APP_URL = 'https://app.plagolf.com/';   // dominio canónico: los links de invitación y códigos SIEMPRE usan éste
   const KEY = 'rayas-campestre-v2';
   const uid = () => Math.random().toString(36).slice(2,9);
@@ -2858,11 +2859,11 @@ const App = (() => {
     const sym = df<=-2?'eagle':df===-1?'birdie':df===0?'par':df===1?'bogey':'dbogey';
     return `<span class="gsym ${sym}">${g}</span>`; }
   // Emojis de unidades (auto + manuales válidas) + 📍 del oye ganador de un hoyo. Compartido por tarjeta y comparativa.
-  function unitEmojis(d,pid,i){
+  function unitEmojis(d,pid,i,noOye){
     const sc=ensureScore(d,pid);
     const set=new Set([...(sc.gross[i]?autoUnits(sc.gross[i],i,sc.putts[i],holesOf(d)):[]),...validManual(sc,i,holesOf(d))]);
     let e=''; set.forEach(uid=>{ const u=state.units.find(z=>z.id===uid); if(u&&u.emoji)e+=u.emoji; });
-    if(holesOf(d)[i].par===3){ const o=sc.oyes[i]||0; if(o) e+=`<i class="oyn${o===1?' oyw':''}">${o===1?'📍':''}${o}</i>`; }   // lugar del oye de CADA jugador (📍 = 1º)
+    if(!noOye && holesOf(d)[i].par===3 && (sc.oyes[i]||0)===1) e+='📍';   // 📍 al ganador (Comparar); en la tarjeta el lugar de CADA quien va como badge de esquina
     return e;
   }
   function renderCard(d, onlyGroup, hlHole){
@@ -2889,8 +2890,8 @@ const App = (() => {
         const outG=front.reduce((a,i)=>a+(sc.gross[i]||0),0), inG=back.reduce((a,i)=>a+(sc.gross[i]||0),0);
         const r=res?res.rows.find(x=>x.id===id):null, rr=r?r.total:0;
         html+=`<tr><th class="pn">${p?pname(p.id):'—'}</th>`;
-        ord.forEach((i,k)=>{ const h=holes[i], g=sc.gross[i]; const em=g?unitEmojis(d,id,i):'';
-          html+=`<td class="${i===hlHole?'hl':''}"><span class="gcell"><span class="gnum">${gsymHtml(g,h.par)}</span><span class="ue">${em}</span></span></td>`;
+        ord.forEach((i,k)=>{ const h=holes[i], g=sc.gross[i]; const em=g?unitEmojis(d,id,i,true):''; const oy=(h.par===3&&g)?(sc.oyes[i]||0):0;
+          html+=`<td class="${i===hlHole?'hl':''}">${oy?`<span class="oyc${oy===1?' oyw':''}">${oy}</span>`:''}<span class="gcell"><span class="gnum">${gsymHtml(g,h.par)}</span><span class="ue">${em}</span></span></td>`;
           if(!nine&&k===8) html+=`<td class="tt sub"><b>${outG||'·'}</b></td>`; });
         if(!nine) html+=`<td class="tt sub"><b>${inG||'·'}</b></td>`;
         const rc=rr>0?'pos':rr<0?'neg':'';
