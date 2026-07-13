@@ -268,8 +268,8 @@
   .seg2 button.on{background:var(--fairway);color:#fff;font-weight:700}
   .cardscroll{overflow-x:auto;-webkit-overflow-scrolling:touch}
   .sccard{border-collapse:collapse;font-size:12px;white-space:nowrap}
-  .sccard th,.sccard td{padding:5px 0;min-width:24px;text-align:center;font-variant-numeric:tabular-nums}
-  .sccard .pn{position:sticky;left:0;background:#fff;text-align:left;padding-right:8px;min-width:58px;font-weight:700;z-index:1;box-shadow:1px 0 0 var(--line)}
+  .sccard th,.sccard td{padding:7px 0;min-width:29px;text-align:center;font-variant-numeric:tabular-nums}
+  .sccard .pn{position:sticky;left:0;background:#fff;text-align:left;padding-right:12px;min-width:58px;font-weight:700;z-index:1;box-shadow:1px 0 0 var(--line)}
   .sccard tr:first-child th{color:var(--muted);font-weight:600;border-bottom:1px solid var(--line)}
   .sccard .parr td,.sccard .parr th{color:var(--muted);font-size:11px;border-bottom:1px solid var(--line)}
   .sccard tr:not(:first-child):not(.parr) td,.sccard tr:not(:first-child):not(.parr) th{border-bottom:1px solid #f0ece0}
@@ -619,7 +619,7 @@
 
 <script>
 const App = (() => {
-  const APP_VERSION = '2026-07-10-65';   // ⬆️ SUBIR en cada deploy: la app se auto-recarga cuando detecta una versión distinta
+  const APP_VERSION = '2026-07-10-66';   // ⬆️ SUBIR en cada deploy: la app se auto-recarga cuando detecta una versión distinta
   const APP_URL = 'https://app.plagolf.com/';   // dominio canónico: los links de invitación y códigos SIEMPRE usan éste
   const KEY = 'rayas-campestre-v2';
   const uid = () => Math.random().toString(36).slice(2,9);
