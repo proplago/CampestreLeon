@@ -136,8 +136,9 @@
   /* player chips */
   .plist{display:flex;flex-direction:column;gap:8px}
   .prow{display:flex;align-items:center;gap:10px;padding:10px 12px;border:1px solid var(--line);border-radius:12px;background:#fff}
-  .avatar{width:34px;height:34px;border-radius:9px;background:var(--fairway);color:#fff;display:grid;place-items:center;font-weight:700;font-size:14px;flex:none}
+  .avatar{width:34px;height:34px;border-radius:9px;background:var(--fairway);color:#fff;display:grid;place-items:center;font-weight:700;font-size:14px;flex:none;overflow:hidden}
   .avatar.g{background:var(--amber);color:#3a2c00}
+  .avimg{width:100%;height:100%;object-fit:cover;border-radius:inherit;display:block}
   .prow .nm{font-weight:600;font-size:14px;word-break:break-word;overflow-wrap:anywhere}
   .prow .tag{font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--amber);font-weight:700}
   .icbtn{width:34px;height:34px;border-radius:9px;background:var(--paper-2);display:grid;place-items:center;font-size:15px;color:#54635a;flex:none}
@@ -226,7 +227,7 @@
   .plist{margin-top:12px}
   .prow{display:flex;align-items:center;gap:11px;padding:11px;background:#fff;border:1px solid var(--line);border-radius:14px;margin-bottom:8px;box-shadow:var(--shadow);cursor:pointer}
   .prow:active{transform:scale(.99)}
-  .prof-av{width:46px;height:46px;border-radius:50%;background:linear-gradient(150deg,var(--fairway),#0e3a24);color:#fff;font-family:'Newsreader',serif;font-weight:600;font-size:22px;display:grid;place-items:center;flex:none}
+  .prof-av{width:46px;height:46px;border-radius:50%;background:linear-gradient(150deg,var(--fairway),#0e3a24);color:#fff;font-family:'Newsreader',serif;font-weight:600;font-size:22px;display:grid;place-items:center;flex:none;overflow:hidden}
   .prof-av.sm{width:40px;height:40px;font-size:18px}
   .prof-hd{display:flex;align-items:center;gap:12px;margin-bottom:14px}
   .prof-stats{display:grid;grid-template-columns:repeat(5,1fr);gap:6px;margin-bottom:12px;text-align:center}
@@ -635,7 +636,7 @@
 
 <script>
 const App = (() => {
-  const APP_VERSION = '2026-07-10-76';   // ⬆️ SUBIR en cada deploy: la app se auto-recarga cuando detecta una versión distinta
+  const APP_VERSION = '2026-07-10-77';   // ⬆️ SUBIR en cada deploy: la app se auto-recarga cuando detecta una versión distinta
   const APP_URL = 'https://app.plagolf.com/';   // dominio canónico: los links de invitación y códigos SIEMPRE usan éste
   const KEY = 'rayas-campestre-v2';
   const uid = () => Math.random().toString(36).slice(2,9);
@@ -1981,7 +1982,7 @@ const App = (() => {
       const col=pe>0?'var(--good)':pe<0?'var(--clay)':'var(--ink)';
       const tcount=has?badgesFor(c).filter(b=>b.good&&b.val>0).length:0;
       return `<div class="prow" onclick="App.openProfile('${p.id}')">
-        <div class="prof-av sm">${(pname(p.id)[0]||'?').toUpperCase()}</div>
+        <div class="prof-av sm">${avInner(p,(pname(p.id)[0]||'?').toUpperCase())}</div>
         <div style="flex:1;min-width:0"><b>${pname(p.id)}</b><div class="hint">${has?c.days+' viernes · 🏆 '+tcount+' trofeos':'sin jugar aún'}</div></div>
         <div style="text-align:right"><div style="font-family:'Hanken Grotesk',sans-serif;font-weight:800;font-size:16px;color:${col}">${_money(pe)}</div><div class="hint">perfil ›</div></div></div>`; };
     const regs=sorted.filter(p=>!p.guest), guests=sorted.filter(p=>p.guest);
@@ -1991,12 +1992,39 @@ const App = (() => {
     }
     return h;
   }
+  // ===== Avatares con foto (Gmail o personalizada) — cae a la inicial si no hay/carga mal =====
+  function avUrl(p){ return (p && (p.photo || p.gphoto)) || ''; }   // personalizada gana sobre la de Gmail
+  function avInner(p, initial){ const u=avUrl(p); const ini=_esc(initial||'?');
+    return u?`<img class="avimg" src="${_esc(u)}" referrerpolicy="no-referrer" alt="" data-i="${ini}" onerror="this.replaceWith(document.createTextNode(this.dataset.i||''))">`:ini; }
+  function compressAvatar(file){ return new Promise(function(resolve,reject){ const img=new Image(), url=URL.createObjectURL(file);
+    img.onload=function(){ URL.revokeObjectURL(url); const iw=img.naturalWidth||img.width, ih=img.naturalHeight||img.height, s=Math.min(iw,ih), S=160;
+      const cv=document.createElement('canvas'); cv.width=S; cv.height=S; const g=cv.getContext('2d');
+      g.drawImage(img, (iw-s)/2, (ih-s)/2, s, s, 0, 0, S, S);
+      try{ resolve(cv.toDataURL('image/jpeg',0.72)); }catch(e){ reject(e); } };
+    img.onerror=function(){ URL.revokeObjectURL(url); reject(new Error('img')); }; img.src=url; }); }
+  function syncGooglePhoto(u){   // al entrar con Google: guarda su foto de perfil en el jugador (si cambió y no tiene personalizada)
+    if(!u||!u.photoURL||!_devUser||!_devUser.playerId) return;
+    const p=player(_devUser.playerId); if(!p||p.gphoto===u.photoURL) return;
+    p.gphoto=u.photoURL;
+    try{ if(authAvailable()) firebase.database().ref('leagues/'+ACTIVE_LEAGUE+'/players/'+p.id+'/gphoto').set(u.photoURL); }catch(e){}
+    if(_loadedOnce) render();
+  }
+  function pickPlayerPhoto(id,input){ const f=input&&input.files&&input.files[0]; if(!f) return; const p=player(id); if(!p) return;
+    if(!/^image\//.test(f.type)){ toast('Solo imágenes'); input.value=''; return; }
+    toast('Procesando…');
+    compressAvatar(f).then(function(b64){ p.photo=b64;
+      const prev=document.getElementById('m_avprev'); if(prev) prev.innerHTML=`<img class="avimg" src="${b64}">`;
+      try{ if(authAvailable()) firebase.database().ref('leagues/'+ACTIVE_LEAGUE+'/players/'+id+'/photo').set(b64); }catch(e){}
+      save(); toast('Foto actualizada 📸'); }).catch(function(){ toast('No se pudo procesar la foto'); }); input.value=''; }
+  function clearPlayerPhoto(id){ const p=player(id); if(!p) return; delete p.photo;
+    try{ if(authAvailable()) firebase.database().ref('leagues/'+ACTIVE_LEAGUE+'/players/'+id+'/photo').remove(); }catch(e){}
+    save(); editPlayerModal(id); toast(p.gphoto?'Usando tu foto de Gmail':'Foto quitada'); }
   function openProfile(pid){
     const cs=careerStats(); const c=cs.C[pid]; const p=player(pid);
     if(!p) return;
     if(!c){ modal(`<h3 style="margin:0 0 6px">${pname(pid)}</h3><div class="hint" style="margin-bottom:12px">Aún no tiene viernes jugados. Sus trofeos aparecerán aquí.</div><button class="btn block" onclick="App.closeModal()">Cerrar</button>`); return; }
     const col=c.pesos>0?'var(--good)':c.pesos<0?'var(--clay)':'var(--ink)';
-    let h=`<div class="prof-hd"><div class="prof-av">${(pname(pid)[0]||'?').toUpperCase()}</div>
+    let h=`<div class="prof-hd"><div class="prof-av">${avInner(p,(pname(pid)[0]||'?').toUpperCase())}</div>
       <div style="flex:1"><h3 style="margin:0">${pname(pid)}</h3><div class="hint">${c.days} viernes · ${c.won}G–${c.lost}P</div></div>
       <div style="text-align:right"><div style="font-family:'Hanken Grotesk',sans-serif;font-weight:800;font-size:24px;color:${col}">${_money(c.pesos)}</div><div class="hint">balance del año</div></div></div>`;
     h+=`<div class="prof-stats">${[['🐦',c.birdies],['🦅',c.eagles],['⛳',c.aces],['🎯',c.oyesWon],['💀',(c.castById&&c.castById.calaca)||c.calacas]].map(([e,v])=>`<div><div class="ps-e">${e}</div><div class="ps-v">${v}</div></div>`).join('')}</div>`;
@@ -3503,7 +3531,7 @@ const App = (() => {
       <div class="hint">Cada quien aparece al entrar con Google por el link del grupo. ⭐ = favorito (sale arriba al convocar).</div><div class="plist">`;
     [...state.players].sort((a,b)=>(b.fav?1:0)-(a.fav?1:0)||(a.name||'').localeCompare(b.name||'')).forEach(p=>{
       const sub = p.guest ? 'Invitado' : (p.email ? _esc(p.email) : 'sin cuenta');
-      html+=`<div class="prow"><div class="avatar ${p.guest?'g':''}">${((p.apodo||p.name||'?').slice(0,1)||'?').toUpperCase()}</div>
+      html+=`<div class="prow"><div class="avatar ${p.guest?'g':''}">${avInner(p,((p.apodo||p.name||'?').slice(0,1)||'?').toUpperCase())}</div>
         <div class="grow"><div class="nm">${_esc(p.name||p.apodo||'(sin nombre)')}${(p.apodo||'').trim()?` <span class="apod">"${_esc(p.apodo.trim())}"</span>`:''}${(p.uid&&roleOfUid(p.uid)==='admin')?' <span class="tag">admin</span>':''}</div>
         <div class="desc" style="font-size:11px;color:var(--muted)">${sub}</div></div>
         <button class="icbtn" onclick="App.toggleFav('${p.id}')">${p.fav?'⭐':'☆'}</button>
@@ -3521,7 +3549,7 @@ const App = (() => {
       <div class="hint">Quiénes están en tu grupo. La gestiona el admin.</div><div class="plist">`;
     [...state.players].sort((a,b)=>(a.guest?1:0)-(b.guest?1:0)||(a.name||'').localeCompare(b.name||'')).forEach(p=>{
       const tag = (p.uid&&roleOfUid(p.uid)==='admin') ? ' <span class="tag">admin</span>' : (p.guest ? ' <span class="apod">invitado</span>' : '');
-      html+=`<div class="prow"><div class="avatar ${p.guest?'g':''}">${(((p.apodo||p.name||'?').slice(0,1))||'?').toUpperCase()}</div>
+      html+=`<div class="prow"><div class="avatar ${p.guest?'g':''}">${avInner(p,(((p.apodo||p.name||'?').slice(0,1))||'?').toUpperCase())}</div>
         <div class="grow"><div class="nm">${_esc(p.name||'?')}${(p.apodo||'').trim()?` <span class="apod">"${_esc(p.apodo.trim())}"</span>`:''}${tag}</div></div>
         ${p.id===mine?'<span class="tag" style="background:var(--fairway);color:#fff;border-color:var(--fairway)">tú</span>':''}</div>`;
     });
@@ -3905,7 +3933,14 @@ const App = (() => {
   function editPlayerModal(id){
     const p=player(id);
     modal(`<h3>Editar jugador</h3>
-      <label class="fl">Nombre</label><input id="m_name" class="txt" value="${_esc(p.name)}">
+      <label class="fl">Foto</label>
+      <div class="row" style="gap:10px;align-items:center;margin-bottom:2px">
+        <div class="avatar" id="m_avprev" style="width:52px;height:52px;border-radius:14px;font-size:20px">${avInner(p,((p.apodo||p.name||'?').slice(0,1)||'?').toUpperCase())}</div>
+        <button class="btn sm outline" onclick="document.getElementById('m_avfile').click()">Subir foto</button>
+        ${p.photo?`<button class="btn sm ghost" onclick="App.clearPlayerPhoto('${id}')">${p.gphoto?'Usar la de Gmail':'Quitar'}</button>`:(p.gphoto?`<span class="hint">Usando tu foto de Gmail</span>`:'')}
+        <input id="m_avfile" type="file" accept="image/*" style="display:none" onchange="App.pickPlayerPhoto('${id}',this)">
+      </div>
+      <label class="fl" style="margin-top:8px">Nombre</label><input id="m_name" class="txt" value="${_esc(p.name)}">
       <label class="fl" style="margin-top:10px">Apodo (opcional)</label><input id="m_apodo" class="txt" value="${_esc(p.apodo||'')}" placeholder="como le dicen en el 19">
       <label class="fl" style="margin-top:10px"><input type="checkbox" id="m_fav" ${p.fav?'checked':''}> Favorito (sale arriba al convocar)</label>
       <label class="fl" style="margin-top:6px"><input type="checkbox" id="m_guest" ${p.guest?'checked':''}> Es invitado</label>
@@ -4220,7 +4255,7 @@ const App = (() => {
         if(!u){ _authPending=false; if(_devUser&&_devUser.real){ _devUser=null; } render(); if(!_devUser) loginModal(); return; }
         attachFbSync();   // YA hay sesión → (re)engancha el sync del grupo (el de load() pudo cancelarse por leer sin auth)
         if(_devUser && !_devUser.real){ _devUser=null; }   // hay sesión de Google: la identidad REAL manda; tira cualquier "modo prueba" viejo (p.ej. un súper local rancio de localStorage)
-        resolveAuthIdentity(u).then(function(){ if(isRealAuth()){ closeModal(); cleanUrl(); } hydrateLeaguesFromFirebase(); render(); if(_authPending){ _canSelfRegister?joinRegisterModal():loginModal(); } });
+        resolveAuthIdentity(u).then(function(){ if(isRealAuth()){ closeModal(); cleanUrl(); syncGooglePhoto(u); } hydrateLeaguesFromFirebase(); render(); if(_authPending){ _canSelfRegister?joinRegisterModal():loginModal(); } });
       });
     }catch(e){}
   }
@@ -5068,7 +5103,7 @@ const App = (() => {
     pickScore,score,putt,setOyes,quick,toggleUnit,toggleCast,navHole,gotoPending,gotoPlayerPending,setScoreGroup,setStart,setSalidaStart,setHoles,setCourse,
     setVentFocus,pickVent,openBet,openH2H,setLiqTab,setScoreTab,setCmp,setVentPick,
     setDblPlayer,toggleDbl,closeDay,washoutDay,historyModal,exportImage,exportHigh,exportProfile,exportSalidas,exportSeasonTable,exportCompare,exportScorecard,toggleSound,
-    setRaya,submitRayaPair,approveRayaReq,rejectRayaReq,removeRayaPair,createPlayer,editPlayerModal,savePlayer,delPlayer,toggleFav,
+    setRaya,submitRayaPair,approveRayaReq,rejectRayaReq,removeRayaPair,createPlayer,editPlayerModal,savePlayer,delPlayer,toggleFav,pickPlayerPhoto,clearPlayerPhoto,
     courseModal,setHole,setCfgCourse,addCourse,importSeedCourse,importCatCourse,createBlankCourse,publishCourse,renameCourse,deleteCourse,unitModal,createUnit,delUnit,castModal,createCast,delCast,toggleCastTipo,
     toggleBet,customBetModal,saveCustomBet,delCustomBet,toggleCustomBet,
     exportData,renderCfg,renderVent,renderDay,closeModal,confirmYes,renderHigh,setHighTab,openProfile,rulesModal,editRulesModal,saveRules,
