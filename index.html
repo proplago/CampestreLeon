@@ -489,6 +489,18 @@
   .disclosure{background:#f6efda;border-color:#d4c39a}
   .disclosure summary{font-family:'Patrick Hand','Newsreader',cursive;font-size:15px;color:#6b5a2a}
   .disclosure table td:first-child,.disclosure table th{font-family:'Patrick Hand','Newsreader',cursive}
+  /* Onboarding / FOMO: tarjeta "completa tu perfil" */
+  .obcard{background:#f6efda;border:1px solid #d4c39a;border-radius:14px;padding:12px 14px;margin-bottom:12px;box-shadow:0 3px 12px rgba(0,0,0,.06)}
+  .ob-hd{display:flex;gap:12px;align-items:center;margin-bottom:9px}
+  .ob-t{font-family:'Newsreader',serif;font-style:italic;font-weight:600;font-size:19px;color:var(--fairway);line-height:1.1}
+  .ob-s{font-family:'Patrick Hand','Newsreader',cursive;font-size:14px;color:#8a7442;margin-top:2px}
+  .ob-steps{display:flex;flex-direction:column;gap:6px}
+  .ob-step{display:flex;align-items:center;gap:10px;width:100%;text-align:left;background:#fff;border:1px solid #e3d6b0;border-radius:10px;padding:9px 11px;font-family:'Patrick Hand','Newsreader',cursive;font-size:15px;color:var(--ink);cursor:pointer}
+  .ob-step:active{background:#efe6c9}
+  .ob-step[disabled]{opacity:.55;cursor:default}
+  .ob-ico{font-size:17px;flex:none}
+  .ob-tx{flex:1;min-width:0}
+  .ob-go{color:var(--fairway);font-weight:800;font-size:19px;flex:none}
   .lb-row .pos{padding:11px 0 11px 12px;font-weight:700;color:var(--ink)}
   .lb-row .nm{font-family:'Newsreader',serif;font-weight:600;font-size:17px;color:var(--fairway);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding-right:6px}
   .lb-row .pesos{text-align:right;font-weight:800;font-size:16px}
@@ -636,7 +648,7 @@
 
 <script>
 const App = (() => {
-  const APP_VERSION = '2026-07-10-77';   // ⬆️ SUBIR en cada deploy: la app se auto-recarga cuando detecta una versión distinta
+  const APP_VERSION = '2026-07-10-78';   // ⬆️ SUBIR en cada deploy: la app se auto-recarga cuando detecta una versión distinta
   const APP_URL = 'https://app.plagolf.com/';   // dominio canónico: los links de invitación y códigos SIEMPRE usan éste
   const KEY = 'rayas-campestre-v2';
   const uid = () => Math.random().toString(36).slice(2,9);
@@ -1471,6 +1483,36 @@ const App = (() => {
   // FINAL = todos capturaron sus hoyos, O el día está cerrado (lo que pase primero)
   function isFinalDay(d){ return !!(d.closed || d.washout || dayAllFinished(d)); }
 
+  // ---- Onboarding / FOMO: tarjeta de "completa tu perfil" con % de avance ----
+  // Solo para el usuario logueado (no invitado). Se AUTO-OCULTA cuando el perfil está completo,
+  // así no estorba a los veteranos. Congruente con el look papel + letra a mano de la app.
+  function onboardCard(){
+    if(!isRealAuth()) return '';
+    const pid=(typeof myPid==='function')?myPid():((_devUser&&_devUser.playerId)||null);
+    if(!pid) return '';
+    const p=player(pid); if(!p||p.guest) return '';
+    const cs=careerStats(); const played=!!(cs&&cs.C&&cs.C[pid]&&cs.C[pid].days>0);
+    const hasPhoto=!!(p.photo||p.gphoto);
+    const hasApodo=!!(p.apodo&&p.apodo.trim());
+    const hasVent=Object.keys(state.ventajas||{}).some(function(k){ const s=k.split('>'); return s[0]===pid||s[1]===pid; });
+    const steps=[
+      {ok:hasPhoto, ico:'📷', t:'Ponte una foto',        cta:"App.editPlayerModal('"+pid+"')"},
+      {ok:hasApodo, ico:'✍️', t:'Elige tu apodo del 19', cta:"App.editPlayerModal('"+pid+"')"},
+      {ok:hasVent,  ico:'⚖️', t:'Captura tus ventajas',  cta:"App.go('vent')"},
+      {ok:played,   ico:'⛳', t:'Juega tu primer viernes', cta:null}
+    ];
+    const done=steps.filter(function(s){return s.ok;}).length, tot=steps.length, pct=Math.round(done/tot*100);
+    if(done>=tot) return '';   // perfil completo → nada que mostrar
+    const R=22, C=2*Math.PI*R, off=C*(1-done/tot);
+    const ring=`<svg width="58" height="58" viewBox="0 0 58 58" style="flex:none">
+      <circle cx="29" cy="29" r="${R}" fill="none" stroke="#e3d6b0" stroke-width="6"/>
+      <circle cx="29" cy="29" r="${R}" fill="none" stroke="var(--fairway)" stroke-width="6" stroke-linecap="round" stroke-dasharray="${C.toFixed(1)}" stroke-dashoffset="${off.toFixed(1)}" transform="rotate(-90 29 29)"/>
+      <text x="29" y="34" text-anchor="middle" font-family="'Hanken Grotesk',sans-serif" font-weight="800" font-size="15" fill="var(--ink)">${pct}%</text></svg>`;
+    const pend=steps.filter(function(s){return !s.ok;});
+    const rows=pend.map(function(s){ return `<button class="ob-step" ${s.cta?('onclick="'+s.cta+'"'):'disabled'}><span class="ob-ico">${s.ico}</span><span class="ob-tx">${s.t}</span>${s.cta?'<span class="ob-go">›</span>':'<span class="hint">te esperamos</span>'}</button>`; }).join('');
+    const sub = done===tot-1 ? '¡Solo te falta uno!' : 'Te falta poco para estar listo';
+    return `<div class="obcard"><div class="ob-hd">${ring}<div style="min-width:0"><div class="ob-t">Completa tu perfil</div><div class="ob-s">${done} de ${tot} · ${sub}</div></div></div><div class="ob-steps">${rows}</div></div>`;
+  }
   // ---- Liquidación ----
   function renderLiq(){
     const box=document.getElementById('liqContent');
@@ -1480,11 +1522,12 @@ const App = (() => {
       <button class="${liqTab==='temp'?'on':''}" onclick="App.setLiqTab('temp')">💰 Temporada</button></div>`;
     if(liqTab==='cmp') liqTab='hoy';   // 'Comparar' se movió a Captura
     if(liqTab==='temp'){ lead.style.display='none'; box.innerHTML=seg+renderSeason(); return; }
+    const ob=onboardCard();   // FOMO/onboarding: % de avance del perfil (foto, apodo, ventajas, 1er viernes) — se oculta al completarse
     const d=curDay();
-    if(!d){ box.innerHTML=seg+emptyState('🏌️','Aún no hay un día activo','Crea un viernes de juego para empezar a capturar.','App.newDayModal()','Crear día'); lead.style.display='none'; return; }
+    if(!d){ box.innerHTML=seg+ob+emptyState('🏌️','Aún no hay un día activo','Crea un viernes de juego para empezar a capturar.','App.newDayModal()','Crear día'); lead.style.display='none'; return; }
     lead.style.display='block';
     const res=compute();
-    if(!res){ box.innerHTML=seg+emptyState('⛳','Asigna jugadores a las salidas','Ve a “Salidas” y arma los grupos del día.','App.go(\'day\')','Ir a Salidas'); return; }
+    if(!res){ box.innerHTML=seg+ob+emptyState('⛳','Asigna jugadores a las salidas','Ve a “Salidas” y arma los grupos del día.','App.go(\'day\')','Ir a Salidas'); return; }
 
     const val=validateDay(d);
     // El aviso de validación solo aplica antes de cerrar; en un día cerrado se omite (ya hay banner de "Día cerrado").
@@ -1502,7 +1545,7 @@ const App = (() => {
     const wash=!!d.washout;   // 🌂 La Acapulqueña: apuestas canceladas por clima
     const pesoTxt=n=> wash ? `<span style="text-decoration:line-through;opacity:.5">${fmtP(n)}</span>${n<0?' 🛟':''}` : fmtP(n);
     const washBanner = wash ? `<div class="valbar" style="background:#e6f1fb;border:1px solid #b5d4f4;color:#185fa5"><b>🌂 La Acapulqueña</b> · campo cerrado por clima — apuestas <b>canceladas</b>, nadie paga. Queda la carrilla y el 🛟 salvavidas.</div>` : '';
-    let html=seg+washBanner+valBanner;
+    let html=seg+ob+washBanner+valBanner;
     const fin=isFinalDay(d), hasScores=dayAnyScores(d);
     const statusTag = fin ? `<span class="pgfinal">FINAL</span>` : `<span class="pglive">EN VIVO</span>`;
 
