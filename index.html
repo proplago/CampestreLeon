@@ -74,6 +74,10 @@
   .phcell img{width:100%;height:100%;object-fit:cover;cursor:pointer;display:block}
   .phtag{position:absolute;left:0;right:0;bottom:0;background:rgba(0,0,0,.55);color:#fff;font-size:10px;padding:2px 5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .phdel{position:absolute;top:3px;right:3px;width:20px;height:20px;border:0;border-radius:50%;background:rgba(0,0,0,.55);color:#fff;font-size:12px;line-height:20px;text-align:center;cursor:pointer;padding:0}
+  .phstrip{display:flex;gap:8px;overflow-x:auto;padding-bottom:2px;-webkit-overflow-scrolling:touch}
+  .phthumb{position:relative;flex:none;width:74px;height:74px;border-radius:10px;overflow:hidden;cursor:pointer;background:#000}
+  .phthumb img{width:100%;height:100%;object-fit:cover;display:block}
+  .phthumb .phh{position:absolute;bottom:2px;right:2px;background:rgba(0,0,0,.62);color:#fff;font-size:9px;padding:1px 4px;border-radius:5px;font-family:'Patrick Hand','Newsreader',cursive}
   .daypill{display:inline-flex;align-items:center;gap:6px;flex:none;max-width:52%;background:#fff;border:1.5px solid var(--fairway);color:var(--fairway);border-radius:999px;padding:7px 12px;font-weight:700;font-size:13px}
   .daypill:active{background:var(--paper-2)}
   .daypill .dp-txt{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -501,6 +505,11 @@
   .ob-ico{font-size:17px;flex:none}
   .ob-tx{flex:1;min-width:0}
   .ob-go{color:var(--fairway);font-weight:800;font-size:19px;flex:none}
+  .fomocard{background:linear-gradient(135deg,#123e28,#0c2c1c);border-radius:14px;padding:14px 15px;margin-bottom:12px;box-shadow:0 4px 14px rgba(0,0,0,.14)}
+  .fomo-cd{font-family:'Newsreader',serif;font-style:italic;font-weight:600;font-size:20px;color:#fff;line-height:1.15}
+  .fchips{display:flex;flex-wrap:wrap;gap:6px;margin-top:9px}
+  .fchip{background:rgba(246,239,218,.14);border:1px solid rgba(246,239,218,.26);color:#f6efda;border-radius:999px;padding:4px 10px;font-family:'Patrick Hand','Newsreader',cursive;font-size:13px}
+  .fomo-cta{margin-top:9px;font-family:'Patrick Hand','Newsreader',cursive;font-size:14px;color:#bfd6c6}
   .lb-row .pos{padding:11px 0 11px 12px;font-weight:700;color:var(--ink)}
   .lb-row .nm{font-family:'Newsreader',serif;font-weight:600;font-size:17px;color:var(--fairway);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding-right:6px}
   .lb-row .pesos{text-align:right;font-weight:800;font-size:16px}
@@ -648,7 +657,7 @@
 
 <script>
 const App = (() => {
-  const APP_VERSION = '2026-07-10-78';   // ⬆️ SUBIR en cada deploy: la app se auto-recarga cuando detecta una versión distinta
+  const APP_VERSION = '2026-07-10-79';   // ⬆️ SUBIR en cada deploy: la app se auto-recarga cuando detecta una versión distinta
   const APP_URL = 'https://app.plagolf.com/';   // dominio canónico: los links de invitación y códigos SIEMPRE usan éste
   const KEY = 'rayas-campestre-v2';
   const uid = () => Math.random().toString(36).slice(2,9);
@@ -1513,6 +1522,31 @@ const App = (() => {
     const sub = done===tot-1 ? '¡Solo te falta uno!' : 'Te falta poco para estar listo';
     return `<div class="obcard"><div class="ob-hd">${ring}<div style="min-width:0"><div class="ob-t">Completa tu perfil</div><div class="ob-s">${done} de ${tot} · ${sub}</div></div></div><div class="ob-steps">${rows}</div></div>`;
   }
+  // FOMO nivel 2: tarjeta "próximo viernes" con cuenta regresiva + tu racha + tu lugar en la temporada.
+  // Se muestra ENTRE rondas (día final/cerrado o sin día): no distrae durante la captura en vivo.
+  function daysToFriday(){ try{ const dow=new Date().getDay(); return (5-dow+7)%7; }catch(e){ return -1; } }   // 0 = hoy es viernes
+  function attendanceStreak(pid){ let n=0; const ds=state.days||[];   // días vienen del más reciente al más viejo
+    for(let i=0;i<ds.length;i++){ const sc=(ds[i].scores||{})[pid]; const played=sc&&sc.gross&&sc.gross.some(function(x){return x>0;}); if(played) n++; else break; } return n; }
+  function fomoCard(d){
+    if(!isRealAuth()) return '';
+    if(d && !isFinalDay(d) && dayAnyScores(d)) return '';   // ronda en vivo → no estorbar
+    const pid=myPid();
+    const dtf=daysToFriday();
+    const cd = dtf===0?'¡Hoy es viernes! ⛳' : dtf===1?'Mañana es viernes 👀' : dtf>0?('Faltan '+dtf+' días para el viernes') : 'El próximo viernes te esperamos';
+    let streak=0, place=null, total=0;
+    if(pid){ streak=attendanceStreak(pid);
+      const ss=careerStats();
+      const arr=Object.keys((ss&&ss.C)||{}).map(function(id){ return {id:id, pesos:(ss.C[id]&&ss.C[id].pesos)||0, days:(ss.C[id]&&ss.C[id].days)||0}; }).filter(function(x){ return x.days>0; });
+      arr.sort(function(a,b){ return b.pesos-a.pesos; }); total=arr.length;
+      const idx=arr.findIndex(function(x){ return x.id===pid; }); if(idx>=0) place=idx+1;
+    }
+    const chips=[];
+    if(streak>0) chips.push(`<span class="fchip">🔥 ${streak} viernes seguido${streak>1?'s':''}</span>`);
+    else chips.push(`<span class="fchip">⛳ tu racha empieza este viernes</span>`);
+    if(place) chips.push(`<span class="fchip">🏅 vas #${place} de ${total} en el año</span>`);
+    const cta = place&&place>1 ? 'Sube en la tabla — no te quedes fuera del 19 🍻' : place===1 ? 'Eres el líder — ven a defenderlo 👑' : 'Nos vemos en el tee ⛳';
+    return `<div class="fomocard"><div class="fomo-cd">${cd}</div><div class="fchips">${chips.join('')}</div><div class="fomo-cta">${cta}</div></div>`;
+  }
   // ---- Liquidación ----
   function renderLiq(){
     const box=document.getElementById('liqContent');
@@ -1523,11 +1557,12 @@ const App = (() => {
     if(liqTab==='cmp') liqTab='hoy';   // 'Comparar' se movió a Captura
     if(liqTab==='temp'){ lead.style.display='none'; box.innerHTML=seg+renderSeason(); return; }
     const ob=onboardCard();   // FOMO/onboarding: % de avance del perfil (foto, apodo, ventajas, 1er viernes) — se oculta al completarse
+    const fomo=fomoCard(curDay());   // FOMO nivel 2: próximo viernes + racha + lugar (solo entre rondas)
     const d=curDay();
-    if(!d){ box.innerHTML=seg+ob+emptyState('🏌️','Aún no hay un día activo','Crea un viernes de juego para empezar a capturar.','App.newDayModal()','Crear día'); lead.style.display='none'; return; }
+    if(!d){ box.innerHTML=seg+ob+fomo+emptyState('🏌️','Aún no hay un día activo','Crea un viernes de juego para empezar a capturar.','App.newDayModal()','Crear día'); lead.style.display='none'; return; }
     lead.style.display='block';
     const res=compute();
-    if(!res){ box.innerHTML=seg+ob+emptyState('⛳','Asigna jugadores a las salidas','Ve a “Salidas” y arma los grupos del día.','App.go(\'day\')','Ir a Salidas'); return; }
+    if(!res){ box.innerHTML=seg+ob+fomo+emptyState('⛳','Asigna jugadores a las salidas','Ve a “Salidas” y arma los grupos del día.','App.go(\'day\')','Ir a Salidas'); return; }
 
     const val=validateDay(d);
     // El aviso de validación solo aplica antes de cerrar; en un día cerrado se omite (ya hay banner de "Día cerrado").
@@ -1545,7 +1580,7 @@ const App = (() => {
     const wash=!!d.washout;   // 🌂 La Acapulqueña: apuestas canceladas por clima
     const pesoTxt=n=> wash ? `<span style="text-decoration:line-through;opacity:.5">${fmtP(n)}</span>${n<0?' 🛟':''}` : fmtP(n);
     const washBanner = wash ? `<div class="valbar" style="background:#e6f1fb;border:1px solid #b5d4f4;color:#185fa5"><b>🌂 La Acapulqueña</b> · campo cerrado por clima — apuestas <b>canceladas</b>, nadie paga. Queda la carrilla y el 🛟 salvavidas.</div>` : '';
-    let html=seg+ob+washBanner+valBanner;
+    let html=seg+ob+fomo+washBanner+valBanner;
     const fin=isFinalDay(d), hasScores=dayAnyScores(d);
     const statusTag = fin ? `<span class="pgfinal">FINAL</span>` : `<span class="pglive">EN VIVO</span>`;
 
@@ -1593,7 +1628,7 @@ const App = (() => {
         : (isAdmin()
             ? `<button class="btn block" onclick="App.closeDay()">Cerrar el día y ajustar ventajas</button><button class="btn ghost block" style="margin-top:8px;color:#185fa5;border-color:#b5d4f4" onclick="App.washoutDay()">🌂 La Acapulqueña · cancelar por clima</button>`
             : `<div class="hint" style="margin-top:6px">El admin cierra el día al terminar (ajusta las ventajas).</div>`);
-    html+=`<div class="exprow"><button class="expbtn" onclick="App.exportImage()">📸 Imagen</button><button class="expbtn" onclick="App.exportComprobante()">📄 Comprobante PDF</button><button class="expbtn" onclick="App.photosModal()">📷 Fotos</button></div>`;
+    html+=`<div class="exprow"><button class="expbtn" onclick="App.exportImage()">📸 Imagen</button><button class="expbtn" onclick="App.exportComprobante()">📄 Comprobante PDF</button></div>`;
 
     // desglose por concepto
     html+=desgloseHtml(res,d);
@@ -1611,7 +1646,9 @@ const App = (() => {
       });
       html+=`</div>`;
     }
+    html+=dayPhotoStrip(d);
     box.innerHTML=html;
+    loadDayStrip(d.id);
   }
   const sgn=n=> (n>0?'+':'')+n;
   // Desglose por concepto (Hoyos / Unidades / Oyes / Medal / Castigo$ / Total). Reutilizado en El 19 y en Comparar.
@@ -5076,6 +5113,31 @@ const App = (() => {
       try{ resolve(cv.toDataURL('image/jpeg',0.65)); }catch(e){ reject(e); } };
     img.onerror=function(){ URL.revokeObjectURL(url); reject(new Error('img')); }; img.src=url; }); }
   function photosRef(dayId){ return firebase.database().ref('photos/'+ACTIVE_LEAGUE+'/'+dayId); }
+  // Tira de fotos del día (abajo de la tarjeta en Liquidación · Hoy). Carga perezosa; toca para ver en Polaroid.
+  function dayPhotoStrip(d){ if(_backend!=='fb'||!d) return '';
+    return `<div class="card" style="padding:10px 12px">
+      <div class="row" style="justify-content:space-between;align-items:center;margin-bottom:8px">
+        <b style="font-size:14px">📷 Fotos del día</b>
+        <span style="display:flex;gap:6px"><button class="expbtn" onclick="App.photosModal()">+ Agregar</button><button class="expbtn" onclick="App.photoHistoryModal()">🗂️ Histórico</button></span>
+      </div>
+      <div id="dayStrip" class="phstrip"><div class="hint">Cargando…</div></div></div>`; }
+  function loadDayStrip(dayId){ if(_backend!=='fb') return; const el=document.getElementById('dayStrip'); if(!el) return;
+    photosRef(dayId).once('value').then(function(s){ const v=s.val()||{}; _photoCache[dayId]=v;
+      const ids=Object.keys(v).sort(function(a,b){ return (v[b].ts||0)-(v[a].ts||0); });
+      if(!ids.length){ el.innerHTML='<div class="hint">Aún no hay fotos. Sácate una en Captura 📸</div>'; return; }
+      el.innerHTML=ids.map(function(id){ const p=v[id]||{}; return `<div class="phthumb" onclick="App.viewPhoto('${dayId}','${id}')"><img loading="lazy" src="${p.img}">${p.hole?`<span class="phh">H${p.hole}</span>`:''}</div>`; }).join('');
+    }).catch(function(){ el.innerHTML='<div class="hint">No se pudieron cargar (revisa conexión).</div>'; }); }
+  // Histórico: lista de viernes; toca uno para ver su galería (carga solo ese día).
+  function photoHistoryModal(){ if(_backend!=='fb'){ toast('Las fotos necesitan conexión'); return; }
+    const days=(state.days||[]);
+    modal(`<h3>🗂️ Histórico de fotos</h3>
+      <div class="hint" style="margin-bottom:8px">Toca un viernes para ver sus fotos.</div>
+      <div class="plist" style="max-height:58vh;overflow:auto">${days.length?days.map(function(d){ return `<div class="prow" style="cursor:pointer" onclick="App.photoDayView('${d.id}')"><div class="avatar" style="background:#e8f2ec;color:#1b211d">📷</div><div class="grow"><div class="nm">${_esc(d.label||d.date||d.id)}</div><div class="hint">${_esc((courseOf(d)||{}).name||'')}</div></div><span class="ob-go">›</span></div>`; }).join(''):'<div class="hint">Aún no hay días.</div>'}</div>
+      <button class="btn ghost block" style="margin-top:10px" onclick="App.closeModal()">Cerrar</button>`); }
+  function photoDayView(dayId){ const d=(state.days||[]).find(function(x){ return x.id===dayId; }); if(!d) return;
+    modal(`<h3>📷 ${_esc(d.label||'')}</h3><div id="phGrid" class="phgrid"><div class="hint">Cargando…</div></div>
+      <button class="btn outline block" style="margin-top:10px" onclick="App.photoHistoryModal()">← Histórico</button>`);
+    renderPhotos(dayId); }
   function photosModal(){ const d=curDay(); if(!d){ toast('No hay día activo'); return; }
     if(_backend!=='fb'){ toast('Las fotos necesitan conexión'); return; }
     modal(`<h3>📷 Fotos · ${_esc(d.label||'')}</h3>
@@ -5104,7 +5166,7 @@ const App = (() => {
     toast('Subiendo foto…');
     compressPhoto(f).then(function(b64){ if(b64.length>800000){ throw new Error('big'); }
       const rec={img:b64, by:(_devUser&&_devUser.uid)||null, ts:Date.now()}; if(tag) rec.pid=tag;
-      return photosRef(d.id).push(rec); }).then(function(){ input.value=''; toast('Foto agregada 📸'); renderPhotos(d.id); })
+      return photosRef(d.id).push(rec); }).then(function(){ input.value=''; toast('Foto agregada 📸'); renderPhotos(d.id); loadDayStrip(d.id); })
       .catch(function(e){ input.value=''; toast(e&&e.message==='big'?'La foto pesa mucho aún comprimida':'No se pudo subir la foto'); }); }
   function delPhoto(dayId,id){ const v=(_photoCache[dayId]||{})[id]||{}; const me=(_devUser&&_devUser.uid)||null;
     if(!(isAdmin()||(me&&v.by===me))){ toast('Solo quien la subió o el admin'); return; }
@@ -5129,7 +5191,7 @@ const App = (() => {
     const hole=_capPhotoHole; toast('Subiendo foto…');
     compressPhoto(f).then(function(b64){ if(b64.length>800000){ throw new Error('big'); }
       const rec={img:b64, by:(_devUser&&_devUser.uid)||null, ts:Date.now(), hole:hole, course:(courseOf(d)||{}).name||'', date:(d.label||d.date||'')};
-      return photosRef(d.id).push(rec); }).then(function(){ input.value=''; toast('Foto del hoyo '+hole+' 📸'); })
+      return photosRef(d.id).push(rec); }).then(function(){ input.value=''; toast('Foto del hoyo '+hole+' 📸'); loadDayStrip(d.id); })
       .catch(function(e){ input.value=''; toast(e&&e.message==='big'?'La foto pesa mucho':'No se pudo subir'); }); }
   function sharePolaroid(dayId,id){ const v=(_photoCache[dayId]||{})[id]; if(!v) return; const cap=_photoCap(v);
     const img=new Image(); img.onload=function(){ const w=img.width, pad=Math.round(w*0.045), capH=Math.round(w*0.17);
@@ -5150,7 +5212,7 @@ const App = (() => {
     courseModal,setHole,setCfgCourse,addCourse,importSeedCourse,importCatCourse,createBlankCourse,publishCourse,renameCourse,deleteCourse,unitModal,createUnit,delUnit,castModal,createCast,delCast,toggleCastTipo,
     toggleBet,customBetModal,saveCustomBet,delCustomBet,toggleCustomBet,
     exportData,renderCfg,renderVent,renderDay,closeModal,confirmYes,renderHigh,setHighTab,openProfile,rulesModal,editRulesModal,saveRules,
-    exportComprobante,cmpPrint,cmpClose,photosModal,onPhotoPick,delPhoto,viewPhoto,capturePhoto,onCapPhotoPick,sharePolaroid,forceUpdate,clearCacheReload,
+    exportComprobante,cmpPrint,cmpClose,photosModal,onPhotoPick,delPhoto,viewPhoto,capturePhoto,onCapPhotoPick,sharePolaroid,photoHistoryModal,photoDayView,forceUpdate,clearCacheReload,
     // Gancho de PRUEBAS (tests.html): acceso directo al motor con estado sintético. NO usar desde la UI.
     __test:{ computeDay,_computeDayRaw,medalSeg,h2h,allocate,received,playOrder,orderIdx,isSecond,autoUnits,validManual,unitsOnHole,inferOyes,autoCast,dayStats,seasonStats,careerStats,clearStatCache,intHcp,intHcpOf,playerDiffs,COURSE_SEED,courseSlug,mostRecentDayId,autoPickDay,resetOpenedFresh:function(){_openedFresh=true;},startOf,pairSameStart,dayMixedStarts,salidaStartOf,firstNineDone,isRetired,dayAllFinished,validateDay,dayThru,dayHighlights,dayCarrilla,SAVED_TROPHIES,MISSED_TROPHIES,seasonHighlights,
       setState:function(st){ state=Object.assign(state,st); clearStatCache(); },
