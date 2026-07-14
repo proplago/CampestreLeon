@@ -478,6 +478,10 @@
   .lb-row{border-bottom-color:#e3d6b0}
   .lb-row:active{background:#efe6c9}
   .lb .pos,.lb .nm,.lb .pesos,.lb .rayas,.pod-name,.pod-pesos,.pod-base{font-family:'Patrick Hand','Newsreader',cursive}
+  .cbub{background:#f6efda;border-left-color:#c9982f;font-family:'Patrick Hand','Newsreader',cursive;font-size:15px}
+  .tbadge{background:#f6efda;border-color:#d4c39a}
+  .tbadge .tb-n{font-family:'Patrick Hand','Newsreader',cursive;font-size:11px}
+  .tbadge .tb-v{font-family:'Patrick Hand','Newsreader',cursive;font-size:17px}
   .lb-row .pos{padding:11px 0 11px 12px;font-weight:700;color:var(--ink)}
   .lb-row .nm{font-family:'Newsreader',serif;font-weight:600;font-size:17px;color:var(--fairway);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding-right:6px}
   .lb-row .pesos{text-align:right;font-weight:800;font-size:16px}
@@ -625,7 +629,7 @@
 
 <script>
 const App = (() => {
-  const APP_VERSION = '2026-07-10-74';   // ⬆️ SUBIR en cada deploy: la app se auto-recarga cuando detecta una versión distinta
+  const APP_VERSION = '2026-07-10-75';   // ⬆️ SUBIR en cada deploy: la app se auto-recarga cuando detecta una versión distinta
   const APP_URL = 'https://app.plagolf.com/';   // dominio canónico: los links de invitación y códigos SIEMPRE usan éste
   const KEY = 'rayas-campestre-v2';
   const uid = () => Math.random().toString(36).slice(2,9);
