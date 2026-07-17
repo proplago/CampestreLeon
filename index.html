@@ -657,7 +657,7 @@
 
 <script>
 const App = (() => {
-  const APP_VERSION = '2026-07-10-79';   // ⬆️ SUBIR en cada deploy: la app se auto-recarga cuando detecta una versión distinta
+  const APP_VERSION = '2026-07-10-80';   // ⬆️ SUBIR en cada deploy: la app se auto-recarga cuando detecta una versión distinta
   const APP_URL = 'https://app.plagolf.com/';   // dominio canónico: los links de invitación y códigos SIEMPRE usan éste
   const KEY = 'rayas-campestre-v2';
   const uid = () => Math.random().toString(36).slice(2,9);
@@ -3415,8 +3415,9 @@ const App = (() => {
     const _d=curDay();
     const inDay=new Set(_d?dayPlayers(_d).filter(Boolean):[]);
     const dayGuestIds=[...inDay].filter(id=>{ const p=player(id); return p&&p.guest; });
+    const allGuestIds=state.players.filter(p=>p.guest).map(p=>p.id);   // invitados: cualquiera los gestiona (no tienen login propio)
     if(isRegular() && myPid() && player(myPid())){
-      const allowed=new Set([myPid(),...dayGuestIds]);   // sus propias ventajas + las de los invitados del día
+      const allowed=new Set([myPid(),...allGuestIds]);   // sus ventajas + TODAS las de invitados (para poder cuadrar entre ellos)
       if(!allowed.has(ventFocus)) ventFocus=myPid();
     }
     // regulares primero (alfabético), invitados al final
@@ -3451,10 +3452,10 @@ const App = (() => {
       }
     }
     html+=`<div class="card"><div class="row" style="justify-content:space-between">
-        <label class="fl" style="margin:0">${isRegular()?(dayGuestIds.length?'Tus ventajas / invitados del día':'Tus ventajas'):'Ver ventajas de'}</label>
+        <label class="fl" style="margin:0">${isRegular()?(allGuestIds.length?'Tus ventajas / invitados':'Tus ventajas'):'Ver ventajas de'}</label>
         <button class="btn outline sm" onclick="App.historyModal()">Historial / sliding</button></div>`;
     if(isRegular()){
-      const focusList=[myPid(),...dayGuestIds].filter((v,i,a)=>v&&player(v)&&a.indexOf(v)===i);
+      const focusList=[myPid(),...allGuestIds].filter((v,i,a)=>v&&player(v)&&a.indexOf(v)===i);
       if(focusList.length>1){
         html+=`<select class="txt" style="margin-top:6px" onchange="App.setVentFocus(this.value)">`;
         focusList.forEach(id=>html+=`<option value="${id}" ${id===ventFocus?'selected':''}>${pname(id)}${player(id).guest?' (inv)':''}</option>`);
@@ -3485,16 +3486,19 @@ const App = (() => {
         <select class="txt vsel ${v>0?'neg':v<0?'pos':''}" style="max-width:92px" onchange="App.pickVent('${p.id}',this.value)">${opts}</select>
         </div>`; };
     const meIsGuest=me&&me.guest;
-    let opps=sorted.filter(p=>p.id!==ventFocus);
-    if(meIsGuest) opps=opps.filter(p=>inDay.has(p.id));   // invitado: solo vs los que van ese día
-    const regOpps=opps.filter(p=>!p.guest);
-    const guestOpps=opps.filter(p=>p.guest && inDay.has(p.id));   // invitados rivales: solo los del día
+    const opps=sorted.filter(p=>p.id!==ventFocus);
+    // Regulares rivales: si el foco es invitado, solo los del día (con quienes puede jugar); si es regular, todos.
+    const regOpps = meIsGuest ? opps.filter(p=>!p.guest && inDay.has(p.id)) : opps.filter(p=>!p.guest);
+    // Invitados rivales: con foco INVITADO se muestran TODOS los invitados (para cuadrar sus cuentas entre ellos aunque aún
+    // no estén en salidas); con foco regular, solo los invitados del día. Sus ventajas las puede ajustar cualquiera.
+    const guestOpps = opps.filter(p=>p.guest && (meIsGuest || inDay.has(p.id)));
     html+=`<div class="card"><h3>${me.name} vs…</h3>
       <div class="hint">Elige el valor directo (sin ir de uno en uno). <b style="color:var(--clay)">+ (rojo)</b> = ${pname(me.id)} <b>le da</b> ventaja al otro · <b style="color:var(--good)">− (verde)</b> = el otro <b>le da</b> a ${pname(me.id)}.${isRegular()?' Tu primer ajuste queda fijo; para cambiarlo después se pide al admin.':''}</div>`;
     regOpps.forEach(p=>html+=vrowH(p));
+    if(meIsGuest && !regOpps.length) html+=`<div class="hint">Aún no hay regulares en el día. Sus cuentas contra regulares se cuadran cuando entre a unas salidas.</div>`;
     html+=`</div>`;
     if(guestOpps.length){
-      html+=`<details class="card disclosure"><summary>Invitados (${guestOpps.length}) →</summary><div style="margin-top:8px">${guestOpps.map(vrowH).join('')}</div></details>`;
+      html+=`<details class="card disclosure" ${meIsGuest?'open':''}><summary>Invitados (${guestOpps.length}) →</summary><div style="margin-top:8px">${guestOpps.map(vrowH).join('')}</div></details>`;
     }
     box.innerHTML=html;
   }
