@@ -509,10 +509,15 @@
   .egcard{background:linear-gradient(135deg,#123e28,#0c2c1c);border-radius:14px;margin-bottom:12px;box-shadow:0 4px 14px rgba(0,0,0,.14);overflow:hidden}
   .eg-sum{list-style:none;cursor:pointer;padding:11px 14px;display:flex;align-items:center;justify-content:space-between;gap:10px;color:#f6efda;font-family:'Patrick Hand','Newsreader',cursive;font-size:15px}
   .eg-sum::-webkit-details-marker{display:none}
-  .eg-sumtx{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .eg-av{width:40px;height:40px;border-radius:50%;overflow:hidden;flex:none;background:rgba(246,239,218,.18);display:grid;place-items:center;color:#f6efda;font-family:'Newsreader',serif;font-weight:600;font-size:17px}
+  .eg-id{flex:1;min-width:0}
+  .eg-nm{font-family:'Newsreader',serif;font-style:italic;font-weight:600;font-size:16px;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.15}
+  .eg-mini{font-family:'Patrick Hand','Newsreader',cursive;font-size:12.5px;color:#bfd6c6;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:1px}
   .eg-chev{color:#bfd6c6;flex:none;transition:transform .2s}
   .egcard[open] .eg-chev{transform:rotate(180deg)}
   .eg-body{padding:0 14px 12px}
+  .eg-cta-row{display:flex;gap:8px;margin-top:10px}
+  .eg-cta-row .eg-cta{margin-top:0}
   .eg-row{display:flex;align-items:center;gap:9px;padding:7px 0;border-top:1px solid rgba(246,239,218,.12)}
   .eg-ic{font-size:16px;flex:none;width:20px;text-align:center}
   .eg-k{color:#bfd6c6;font-family:'Patrick Hand','Newsreader',cursive;font-size:13px;flex:none;min-width:92px}
@@ -665,7 +670,7 @@
 
 <script>
 const App = (() => {
-  const APP_VERSION = '2026-07-10-81';   // ⬆️ SUBIR en cada deploy: la app se auto-recarga cuando detecta una versión distinta
+  const APP_VERSION = '2026-07-10-82';   // ⬆️ SUBIR en cada deploy: la app se auto-recarga cuando detecta una versión distinta
   const APP_URL = 'https://app.plagolf.com/';   // dominio canónico: los links de invitación y códigos SIEMPRE usan éste
   const KEY = 'rayas-campestre-v2';
   const uid = () => Math.random().toString(36).slice(2,9);
@@ -1557,10 +1562,19 @@ const App = (() => {
       ['🏆','Logros', '👑×'+(c.leaderDays||0)+' · 🐦'+(c.birdies||0)+' · 🦅'+(c.eagles||0)+(c.aces?' · ⛳'+c.aces:'')+' · 🎯'+(c.oyesWon||0)]
     ];
     const body=rows.map(function(r){ return `<div class="eg-row"><span class="eg-ic">${r[0]}</span><span class="eg-k">${r[1]}</span><span class="eg-v">${r[2]}</span></div>`; }).join('');
+    const initial=((p.apodo||p.name||'?').slice(0,1)||'?').toUpperCase();
     let open=false; try{ open=localStorage.getItem('cl_engage_open')==='1'; }catch(e){}
     return `<details class="egcard" ${open?'open':''} ontoggle="try{localStorage.setItem('cl_engage_open',this.open?'1':'0')}catch(e){}">
-      <summary class="eg-sum"><span class="eg-sumtx">${sum}</span><span class="eg-chev">▾</span></summary>
-      <div class="eg-body">${body}<button class="eg-cta" onclick="App.go('high')">Ver El 19 y trofeos →</button></div></details>`;
+      <summary class="eg-sum">
+        <div class="eg-av">${avInner(p,initial)}</div>
+        <div class="eg-id"><div class="eg-nm">${pname(pid)}</div><div class="eg-mini">${sum}</div></div>
+        <span class="eg-chev">▾</span>
+      </summary>
+      <div class="eg-body">${body}
+        <div class="eg-cta-row">
+          <button class="eg-cta" onclick="App.openProfile('${pid}')">👤 Mi perfil</button>
+          <button class="eg-cta" onclick="App.go('high')">El 19 y trofeos →</button>
+        </div></div></details>`;
   }
   // ---- Liquidación ----
   function renderLiq(){
