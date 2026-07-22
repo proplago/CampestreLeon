@@ -67,7 +67,15 @@
     border-bottom:1px solid var(--line);
   }
   .appbar{display:flex;align-items:center;justify-content:space-between;gap:10px;padding-bottom:11px}
-  .ab-brand{font-family:'Newsreader',serif;font-style:italic;font-weight:600;font-size:19px;color:var(--fairway);white-space:nowrap;display:flex;align-items:center;gap:8px;min-width:0}
+  .ab-user{flex:none;width:34px;height:34px;border-radius:50%;overflow:hidden;border:1.5px solid var(--fairway);padding:0;background:#eaf3ec;display:grid;place-items:center;cursor:pointer;color:var(--fairway);font-weight:700;font-size:15px;line-height:1}
+  .ab-brand{font-family:'Newsreader',serif;font-style:italic;font-weight:600;font-size:19px;color:var(--fairway);white-space:nowrap;display:flex;align-items:center;justify-content:center;gap:8px;min-width:0;flex:1}
+  /* Tu espacio (hoja del avatar) */
+  .us-hd{display:flex;align-items:center;gap:12px;margin-bottom:4px}
+  .us-av{width:52px;height:52px;border-radius:50%;overflow:hidden;flex:none;background:#eaf3ec;display:grid;place-items:center;color:var(--fairway);font-family:'Newsreader',serif;font-weight:600;font-size:22px}
+  .us-nm{font-family:'Newsreader',serif;font-style:italic;font-weight:600;font-size:20px;color:var(--fairway);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .us-sub{font-size:12.5px;color:var(--muted);margin-top:1px}
+  .us-season{background:linear-gradient(135deg,#123e28,#0c2c1c);border-radius:12px;padding:2px 14px 8px;margin:12px 0}
+  .us-actions{margin-top:12px}
   .beta-tag{font-family:'Hanken Grotesk',system-ui,sans-serif;font-style:normal;font-weight:800;font-size:9px;letter-spacing:.09em;text-transform:uppercase;color:#9a6b00;background:#fbf1d6;border:1px solid #e6c34a;border-radius:5px;padding:2px 5px;line-height:1;flex:none;align-self:center}
   .phgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;max-height:52vh;overflow:auto}
   .phcell{position:relative;border-radius:8px;overflow:hidden;background:#e9ece8;aspect-ratio:1}
@@ -584,6 +592,7 @@
 
 <header>
   <div class="appbar">
+    <button class="ab-user" id="abUser" onclick="App.userSpace()" aria-label="Tu espacio">👤</button>
     <div class="ab-brand">
       <span style="display:inline-flex"><svg width="24" height="24" viewBox="0 0 24 24"><path d="M3 16 C5 13 9 12 12 12 C16 12 19 13.5 21 16 C19.5 17.6 16 18.6 12 18.6 C8 18.6 4.5 17.6 3 16 Z" fill="#e6c34a" stroke="#0a6a3a" stroke-width="1.3" stroke-linejoin="round"/><ellipse cx="13.6" cy="15.1" rx="1.3" ry="0.72" fill="#0a6a3a"/><path d="M13.6 15 L13.6 4.2" stroke="#0a6a3a" stroke-width="1.3" stroke-linecap="round"/><path d="M13.6 4.4 L19.2 6.1 L13.6 7.9 Z" fill="#c1272d"/></svg></span><span id="brandName">Golf Viernes</span><span class="beta-tag" title="Versión en pruebas">beta</span></div>
     <button class="daypill" id="dayPill" onclick="App.daysModal()" aria-label="Día y administración">
@@ -670,7 +679,7 @@
 
 <script>
 const App = (() => {
-  const APP_VERSION = '2026-07-10-82';   // ⬆️ SUBIR en cada deploy: la app se auto-recarga cuando detecta una versión distinta
+  const APP_VERSION = '2026-07-10-83';   // ⬆️ SUBIR en cada deploy: la app se auto-recarga cuando detecta una versión distinta
   const APP_URL = 'https://app.plagolf.com/';   // dominio canónico: los links de invitación y códigos SIEMPRE usan éste
   const KEY = 'rayas-campestre-v2';
   const uid = () => Math.random().toString(36).slice(2,9);
@@ -1540,12 +1549,10 @@ const App = (() => {
   function daysToFriday(){ try{ const dow=new Date().getDay(); return (5-dow+7)%7; }catch(e){ return -1; } }   // 0 = hoy es viernes
   function attendanceStreak(pid){ let n=0; const ds=state.days||[];   // días vienen del más reciente al más viejo
     for(let i=0;i<ds.length;i++){ const sc=(ds[i].scores||{})[pid]; const played=sc&&sc.gross&&sc.gross.some(function(x){return x>0;}); if(played) n++; else break; } return n; }
-  function engageCard(){
-    if(!isRealAuth()) return '';
-    const pid=myPid(); if(!pid) return '';
-    const p=player(pid); if(!p||p.guest) return '';
+  // Filas de "tu temporada" (reutilizadas en la hoja Tu espacio). '' si aún no juega.
+  function mySeasonHtml(pid){
     const cs=careerStats(); const c=cs&&cs.C&&cs.C[pid];
-    if(!c||!c.days) return '';   // aún no juega → que se enfoque en el onboarding
+    if(!c||!c.days) return '';
     const arr=Object.keys(cs.C).map(function(id){ return {id:id, pesos:(cs.C[id]&&cs.C[id].pesos)||0, days:(cs.C[id]&&cs.C[id].days)||0}; }).filter(function(x){ return x.days>0; });
     arr.sort(function(a,b){ return b.pesos-a.pesos; });
     const total=arr.length, idx=arr.findIndex(function(x){ return x.id===pid; }), place=idx>=0?idx+1:total;
@@ -1553,7 +1560,6 @@ const App = (() => {
     const streak=attendanceStreak(pid), dtf=daysToFriday();
     const money=function(n){ return (n<0?'−$':'$')+Math.abs(Math.round(n)).toLocaleString('es-MX'); };
     const cd = dtf===0?'¡Hoy es viernes! ⛳' : dtf===1?'Mañana es viernes 👀' : dtf>0?('Faltan '+dtf+' días para el viernes') : 'El próximo viernes';
-    const sum = '🔥 '+(streak>0?streak+' seguido'+(streak>1?'s':''):'sin racha')+'  ·  🏅 #'+place+'/'+total+'  ·  ⛳ '+(dtf<=0?'¡hoy!':dtf+'d');
     const rows=[
       ['⛳','Próximo viernes', cd],
       ['🔥','Tu racha', streak>0?(streak+' viernes seguido'+(streak>1?'s':'')):'arranca este viernes'],
@@ -1561,20 +1567,28 @@ const App = (() => {
       ['💰','Tu temporada', money(c.pesos||0)+' · '+(c.won||0)+'G–'+(c.lost||0)+'P'],
       ['🏆','Logros', '👑×'+(c.leaderDays||0)+' · 🐦'+(c.birdies||0)+' · 🦅'+(c.eagles||0)+(c.aces?' · ⛳'+c.aces:'')+' · 🎯'+(c.oyesWon||0)]
     ];
-    const body=rows.map(function(r){ return `<div class="eg-row"><span class="eg-ic">${r[0]}</span><span class="eg-k">${r[1]}</span><span class="eg-v">${r[2]}</span></div>`; }).join('');
-    const initial=((p.apodo||p.name||'?').slice(0,1)||'?').toUpperCase();
-    let open=false; try{ open=localStorage.getItem('cl_engage_open')==='1'; }catch(e){}
-    return `<details class="egcard" ${open?'open':''} ontoggle="try{localStorage.setItem('cl_engage_open',this.open?'1':'0')}catch(e){}">
-      <summary class="eg-sum">
-        <div class="eg-av">${avInner(p,initial)}</div>
-        <div class="eg-id"><div class="eg-nm">${pname(pid)}</div><div class="eg-mini">${sum}</div></div>
-        <span class="eg-chev">▾</span>
-      </summary>
-      <div class="eg-body">${body}
-        <div class="eg-cta-row">
-          <button class="eg-cta" onclick="App.openProfile('${pid}')">👤 Mi perfil</button>
-          <button class="eg-cta" onclick="App.go('high')">El 19 y trofeos →</button>
-        </div></div></details>`;
+    return rows.map(function(r){ return `<div class="eg-row"><span class="eg-ic">${r[0]}</span><span class="eg-k">${r[1]}</span><span class="eg-v">${r[2]}</span></div>`; }).join('');
+  }
+  // "Tu espacio": hoja que abre el avatar arriba-izquierda. Hogar persistente de lo personal.
+  function userSpace(){
+    if((!isRealAuth() && !_devUser) ) { loginModal(); return; }
+    const pid=myPid(); const p=pid?player(pid):null;
+    if(!p){ loginModal(); return; }   // sesión sin jugador (p.ej. súper operador) → login/gestión
+    const ini=((p.apodo||p.name||'?').slice(0,1)||'?').toUpperCase();
+    const role=_devUser?(_devUser.role==='super'?'Súper admin':_devUser.role==='admin'?'Admin del grupo':'Jugador'):'Jugador';
+    const season=mySeasonHtml(pid);
+    let h=`<div class="us-hd"><div class="us-av">${avInner(p,ini)}</div>
+      <div style="min-width:0"><div class="us-nm">${_esc(pname(pid))}</div><div class="us-sub">${p.apodo?('“'+_esc(p.apodo)+'” · '):''}${role}</div></div></div>`;
+    h+= season ? `<div class="us-season">${season}</div>`
+               : `<div class="hint" style="margin:12px 0">Aún no juegas un viernes. Aquí verás tu racha, tu lugar y tus logros.</div>`;
+    h+=`<div class="us-actions">
+      <button class="btn outline block" onclick="App.openProfile('${pid}')">👤 Ver mi perfil completo</button>
+      <button class="btn outline block" style="margin-top:8px" onclick="document.getElementById('usPhoto').click()">📷 Cambiar foto</button>
+      <input id="usPhoto" type="file" accept="image/*" style="display:none" onchange="App.pickPlayerPhoto('${pid}',this)">
+      <button class="btn outline block" style="margin-top:8px" onclick="App.go('high')">🏆 El 19 y trofeos</button>
+      ${authAvailable()?`<button class="btn ghost block" style="margin-top:8px" onclick="App.signOutAuth()">Cerrar sesión</button>`:''}
+    </div>`;
+    modal('<div id="userSpaceSheet">'+h+'</div>');
   }
   // ---- Liquidación ----
   function renderLiq(){
@@ -1586,12 +1600,11 @@ const App = (() => {
     if(liqTab==='cmp') liqTab='hoy';   // 'Comparar' se movió a Captura
     if(liqTab==='temp'){ lead.style.display='none'; box.innerHTML=seg+renderSeason(); return; }
     const ob=onboardCard();   // FOMO/onboarding: % de avance del perfil (foto, apodo, ventajas, 1er viernes) — se oculta al completarse
-    const eng=engageCard();   // tarjeta de temporada colapsable (veteranos): próximo viernes + racha + lugar + logros
     const d=curDay();
-    if(!d){ box.innerHTML=seg+ob+eng+emptyState('🏌️','Aún no hay un día activo','Crea un viernes de juego para empezar a capturar.','App.newDayModal()','Crear día'); lead.style.display='none'; return; }
+    if(!d){ box.innerHTML=seg+ob+emptyState('🏌️','Aún no hay un día activo','Crea un viernes de juego para empezar a capturar.','App.newDayModal()','Crear día'); lead.style.display='none'; return; }
     lead.style.display='block';
     const res=compute();
-    if(!res){ box.innerHTML=seg+ob+eng+emptyState('⛳','Asigna jugadores a las salidas','Ve a “Salidas” y arma los grupos del día.','App.go(\'day\')','Ir a Salidas'); return; }
+    if(!res){ box.innerHTML=seg+ob+emptyState('⛳','Asigna jugadores a las salidas','Ve a “Salidas” y arma los grupos del día.','App.go(\'day\')','Ir a Salidas'); return; }
 
     const val=validateDay(d);
     // El aviso de validación solo aplica antes de cerrar; en un día cerrado se omite (ya hay banner de "Día cerrado").
@@ -1609,7 +1622,7 @@ const App = (() => {
     const wash=!!d.washout;   // 🌂 La Acapulqueña: apuestas canceladas por clima
     const pesoTxt=n=> wash ? `<span style="text-decoration:line-through;opacity:.5">${fmtP(n)}</span>${n<0?' 🛟':''}` : fmtP(n);
     const washBanner = wash ? `<div class="valbar" style="background:#e6f1fb;border:1px solid #b5d4f4;color:#185fa5"><b>🌂 La Acapulqueña</b> · campo cerrado por clima — apuestas <b>canceladas</b>, nadie paga. Queda la carrilla y el 🛟 salvavidas.</div>` : '';
-    let html=seg+ob+eng+washBanner+valBanner;
+    let html=seg+ob+washBanner+valBanner;
     const fin=isFinalDay(d), hasScores=dayAnyScores(d);
     const statusTag = fin ? `<span class="pgfinal">FINAL</span>` : `<span class="pglive">EN VIVO</span>`;
 
@@ -2124,7 +2137,7 @@ const App = (() => {
     compressAvatar(f).then(function(b64){ p.photo=b64;
       const prev=document.getElementById('m_avprev'); if(prev) prev.innerHTML=`<img class="avimg" src="${b64}">`;
       try{ if(authAvailable()) firebase.database().ref('leagues/'+ACTIVE_LEAGUE+'/players/'+id+'/photo').set(b64); }catch(e){}
-      save(); toast('Foto actualizada 📸'); }).catch(function(){ toast('No se pudo procesar la foto'); }); input.value=''; }
+      save(); render(); if(document.getElementById('userSpaceSheet')) userSpace(); toast('Foto actualizada 📸'); }).catch(function(){ toast('No se pudo procesar la foto'); }); input.value=''; }
   function clearPlayerPhoto(id){ const p=player(id); if(!p) return; delete p.photo;
     try{ if(authAvailable()) firebase.database().ref('leagues/'+ACTIVE_LEAGUE+'/players/'+id+'/photo').remove(); }catch(e){}
     save(); editPlayerModal(id); toast(p.gphoto?'Usando tu foto de Gmail':'Foto quitada'); }
@@ -4512,12 +4525,19 @@ const App = (() => {
     confirmModal('¿Generar un código nuevo? El anterior dejará de funcionar.','Nuevo código',function(){
       state._leagueMeta=state._leagueMeta||{}; state._leagueMeta.joinCode=genJoinCode(); save(); renderCfg(); toast('Código nuevo'); }); }
 
-  function updateIdBar(){ const b=document.getElementById('idbar'); if(!b) return;
-    let left;
-    if(_authPending && _authUser) left='⏳ '+(_authUser.email||'tu cuenta')+' · pendiente de asignar';
-    else left='👤 '+(_devUser?curUserLabel():'Modo prueba — elige usuario');
-    const right = (isRealAuth()||_authPending)?'salir':'cambiar';
-    b.innerHTML='<span>'+left+'</span><span style="color:var(--fairway);font-weight:700">'+right+'</span>'; }
+  function updateIdBar(){
+    // Avatar persistente arriba-izquierda: foto de Gmail del usuario logueado (o 👤 si no hay sesión/jugador).
+    const ab=document.getElementById('abUser');
+    if(ab){ const pid=myPid(); const p=pid?player(pid):null;
+      if(p){ ab.innerHTML=avInner(p,((p.apodo||p.name||'?').slice(0,1)||'?').toUpperCase()); }
+      else { ab.innerHTML='👤'; }
+    }
+    // Barra delgada: SOLO en estados accionables (pendiente de asignar, o sin usuario elegido en modo prueba).
+    const b=document.getElementById('idbar'); if(!b) return;
+    if(_authPending && _authUser){ b.style.display='flex'; b.innerHTML='<span>⏳ '+_esc(_authUser.email||'tu cuenta')+' · pendiente de asignar</span><span style="color:var(--fairway);font-weight:700">salir</span>'; return; }
+    if(!isRealAuth() && !_devUser){ b.style.display='flex'; b.innerHTML='<span>👤 Elige tu usuario para empezar</span><span style="color:var(--fairway);font-weight:700">entrar</span>'; return; }
+    b.style.display='none';
+  }
   function loginModal(){
     const ps=[...state.players].sort((a,b)=>(a.guest?1:0)-(b.guest?1:0)||(a.name||'').localeCompare(b.name||''));
     const signedIn = isRealAuth() || _authPending;
@@ -5244,7 +5264,7 @@ const App = (() => {
     setRaya,submitRayaPair,approveRayaReq,rejectRayaReq,removeRayaPair,createPlayer,editPlayerModal,savePlayer,delPlayer,toggleFav,pickPlayerPhoto,clearPlayerPhoto,
     courseModal,setHole,setCfgCourse,addCourse,importSeedCourse,importCatCourse,createBlankCourse,publishCourse,renameCourse,deleteCourse,unitModal,createUnit,delUnit,castModal,createCast,delCast,toggleCastTipo,
     toggleBet,customBetModal,saveCustomBet,delCustomBet,toggleCustomBet,
-    exportData,renderCfg,renderVent,renderDay,closeModal,confirmYes,renderHigh,setHighTab,openProfile,rulesModal,editRulesModal,saveRules,
+    exportData,renderCfg,renderVent,renderDay,closeModal,confirmYes,renderHigh,setHighTab,openProfile,userSpace,rulesModal,editRulesModal,saveRules,
     exportComprobante,cmpPrint,cmpClose,photosModal,onPhotoPick,delPhoto,viewPhoto,capturePhoto,onCapPhotoPick,sharePolaroid,photoHistoryModal,photoDayView,forceUpdate,clearCacheReload,
     // Gancho de PRUEBAS (tests.html): acceso directo al motor con estado sintético. NO usar desde la UI.
     __test:{ computeDay,_computeDayRaw,medalSeg,h2h,allocate,received,playOrder,orderIdx,isSecond,autoUnits,validManual,unitsOnHole,inferOyes,autoCast,dayStats,seasonStats,careerStats,clearStatCache,intHcp,intHcpOf,playerDiffs,COURSE_SEED,courseSlug,mostRecentDayId,autoPickDay,resetOpenedFresh:function(){_openedFresh=true;},startOf,pairSameStart,dayMixedStarts,salidaStartOf,firstNineDone,isRetired,dayAllFinished,validateDay,dayThru,dayHighlights,dayCarrilla,SAVED_TROPHIES,MISSED_TROPHIES,seasonHighlights,
