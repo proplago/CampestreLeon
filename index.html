@@ -505,11 +505,19 @@
   .ob-ico{font-size:17px;flex:none}
   .ob-tx{flex:1;min-width:0}
   .ob-go{color:var(--fairway);font-weight:800;font-size:19px;flex:none}
-  .fomocard{background:linear-gradient(135deg,#123e28,#0c2c1c);border-radius:14px;padding:14px 15px;margin-bottom:12px;box-shadow:0 4px 14px rgba(0,0,0,.14)}
-  .fomo-cd{font-family:'Newsreader',serif;font-style:italic;font-weight:600;font-size:20px;color:#fff;line-height:1.15}
-  .fchips{display:flex;flex-wrap:wrap;gap:6px;margin-top:9px}
-  .fchip{background:rgba(246,239,218,.14);border:1px solid rgba(246,239,218,.26);color:#f6efda;border-radius:999px;padding:4px 10px;font-family:'Patrick Hand','Newsreader',cursive;font-size:13px}
-  .fomo-cta{margin-top:9px;font-family:'Patrick Hand','Newsreader',cursive;font-size:14px;color:#bfd6c6}
+  /* Tarjeta de temporada (veteranos) — colapsable, verde fairway */
+  .egcard{background:linear-gradient(135deg,#123e28,#0c2c1c);border-radius:14px;margin-bottom:12px;box-shadow:0 4px 14px rgba(0,0,0,.14);overflow:hidden}
+  .eg-sum{list-style:none;cursor:pointer;padding:11px 14px;display:flex;align-items:center;justify-content:space-between;gap:10px;color:#f6efda;font-family:'Patrick Hand','Newsreader',cursive;font-size:15px}
+  .eg-sum::-webkit-details-marker{display:none}
+  .eg-sumtx{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .eg-chev{color:#bfd6c6;flex:none;transition:transform .2s}
+  .egcard[open] .eg-chev{transform:rotate(180deg)}
+  .eg-body{padding:0 14px 12px}
+  .eg-row{display:flex;align-items:center;gap:9px;padding:7px 0;border-top:1px solid rgba(246,239,218,.12)}
+  .eg-ic{font-size:16px;flex:none;width:20px;text-align:center}
+  .eg-k{color:#bfd6c6;font-family:'Patrick Hand','Newsreader',cursive;font-size:13px;flex:none;min-width:92px}
+  .eg-v{color:#fff;font-family:'Patrick Hand','Newsreader',cursive;font-size:14px;flex:1;text-align:right}
+  .eg-cta{width:100%;margin-top:10px;background:rgba(246,239,218,.14);border:1px solid rgba(246,239,218,.26);color:#f6efda;border-radius:10px;padding:9px;font-family:'Patrick Hand','Newsreader',cursive;font-size:14px;cursor:pointer}
   .lb-row .pos{padding:11px 0 11px 12px;font-weight:700;color:var(--ink)}
   .lb-row .nm{font-family:'Newsreader',serif;font-weight:600;font-size:17px;color:var(--fairway);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding-right:6px}
   .lb-row .pesos{text-align:right;font-weight:800;font-size:16px}
@@ -657,7 +665,7 @@
 
 <script>
 const App = (() => {
-  const APP_VERSION = '2026-07-10-80';   // ⬆️ SUBIR en cada deploy: la app se auto-recarga cuando detecta una versión distinta
+  const APP_VERSION = '2026-07-10-81';   // ⬆️ SUBIR en cada deploy: la app se auto-recarga cuando detecta una versión distinta
   const APP_URL = 'https://app.plagolf.com/';   // dominio canónico: los links de invitación y códigos SIEMPRE usan éste
   const KEY = 'rayas-campestre-v2';
   const uid = () => Math.random().toString(36).slice(2,9);
@@ -1522,30 +1530,37 @@ const App = (() => {
     const sub = done===tot-1 ? '¡Solo te falta uno!' : 'Te falta poco para estar listo';
     return `<div class="obcard"><div class="ob-hd">${ring}<div style="min-width:0"><div class="ob-t">Completa tu perfil</div><div class="ob-s">${done} de ${tot} · ${sub}</div></div></div><div class="ob-steps">${rows}</div></div>`;
   }
-  // FOMO nivel 2: tarjeta "próximo viernes" con cuenta regresiva + tu racha + tu lugar en la temporada.
-  // Se muestra ENTRE rondas (día final/cerrado o sin día): no distrae durante la captura en vivo.
+  // Engagement de temporada (para los que YA completaron su perfil): tarjeta COLAPSABLE (cerrada por defecto,
+  // recuerda estado) con cuenta regresiva, racha, lugar/distancia al líder, balance y logros. Sin límite de "entre rondas".
   function daysToFriday(){ try{ const dow=new Date().getDay(); return (5-dow+7)%7; }catch(e){ return -1; } }   // 0 = hoy es viernes
   function attendanceStreak(pid){ let n=0; const ds=state.days||[];   // días vienen del más reciente al más viejo
     for(let i=0;i<ds.length;i++){ const sc=(ds[i].scores||{})[pid]; const played=sc&&sc.gross&&sc.gross.some(function(x){return x>0;}); if(played) n++; else break; } return n; }
-  function fomoCard(d){
+  function engageCard(){
     if(!isRealAuth()) return '';
-    if(d && !isFinalDay(d) && dayAnyScores(d)) return '';   // ronda en vivo → no estorbar
-    const pid=myPid();
-    const dtf=daysToFriday();
-    const cd = dtf===0?'¡Hoy es viernes! ⛳' : dtf===1?'Mañana es viernes 👀' : dtf>0?('Faltan '+dtf+' días para el viernes') : 'El próximo viernes te esperamos';
-    let streak=0, place=null, total=0;
-    if(pid){ streak=attendanceStreak(pid);
-      const ss=careerStats();
-      const arr=Object.keys((ss&&ss.C)||{}).map(function(id){ return {id:id, pesos:(ss.C[id]&&ss.C[id].pesos)||0, days:(ss.C[id]&&ss.C[id].days)||0}; }).filter(function(x){ return x.days>0; });
-      arr.sort(function(a,b){ return b.pesos-a.pesos; }); total=arr.length;
-      const idx=arr.findIndex(function(x){ return x.id===pid; }); if(idx>=0) place=idx+1;
-    }
-    const chips=[];
-    if(streak>0) chips.push(`<span class="fchip">🔥 ${streak} viernes seguido${streak>1?'s':''}</span>`);
-    else chips.push(`<span class="fchip">⛳ tu racha empieza este viernes</span>`);
-    if(place) chips.push(`<span class="fchip">🏅 vas #${place} de ${total} en el año</span>`);
-    const cta = place&&place>1 ? 'Sube en la tabla — no te quedes fuera del 19 🍻' : place===1 ? 'Eres el líder — ven a defenderlo 👑' : 'Nos vemos en el tee ⛳';
-    return `<div class="fomocard"><div class="fomo-cd">${cd}</div><div class="fchips">${chips.join('')}</div><div class="fomo-cta">${cta}</div></div>`;
+    const pid=myPid(); if(!pid) return '';
+    const p=player(pid); if(!p||p.guest) return '';
+    const cs=careerStats(); const c=cs&&cs.C&&cs.C[pid];
+    if(!c||!c.days) return '';   // aún no juega → que se enfoque en el onboarding
+    const arr=Object.keys(cs.C).map(function(id){ return {id:id, pesos:(cs.C[id]&&cs.C[id].pesos)||0, days:(cs.C[id]&&cs.C[id].days)||0}; }).filter(function(x){ return x.days>0; });
+    arr.sort(function(a,b){ return b.pesos-a.pesos; });
+    const total=arr.length, idx=arr.findIndex(function(x){ return x.id===pid; }), place=idx>=0?idx+1:total;
+    const gap = place>1 ? ((arr[0].pesos||0)-(c.pesos||0)) : 0;
+    const streak=attendanceStreak(pid), dtf=daysToFriday();
+    const money=function(n){ return (n<0?'−$':'$')+Math.abs(Math.round(n)).toLocaleString('es-MX'); };
+    const cd = dtf===0?'¡Hoy es viernes! ⛳' : dtf===1?'Mañana es viernes 👀' : dtf>0?('Faltan '+dtf+' días para el viernes') : 'El próximo viernes';
+    const sum = '🔥 '+(streak>0?streak+' seguido'+(streak>1?'s':''):'sin racha')+'  ·  🏅 #'+place+'/'+total+'  ·  ⛳ '+(dtf<=0?'¡hoy!':dtf+'d');
+    const rows=[
+      ['⛳','Próximo viernes', cd],
+      ['🔥','Tu racha', streak>0?(streak+' viernes seguido'+(streak>1?'s':'')):'arranca este viernes'],
+      ['🏅','Tu lugar', '#'+place+' de '+total+(place===1?' · ¡líder! 👑':' · a '+money(gap)+' del 1°')],
+      ['💰','Tu temporada', money(c.pesos||0)+' · '+(c.won||0)+'G–'+(c.lost||0)+'P'],
+      ['🏆','Logros', '👑×'+(c.leaderDays||0)+' · 🐦'+(c.birdies||0)+' · 🦅'+(c.eagles||0)+(c.aces?' · ⛳'+c.aces:'')+' · 🎯'+(c.oyesWon||0)]
+    ];
+    const body=rows.map(function(r){ return `<div class="eg-row"><span class="eg-ic">${r[0]}</span><span class="eg-k">${r[1]}</span><span class="eg-v">${r[2]}</span></div>`; }).join('');
+    let open=false; try{ open=localStorage.getItem('cl_engage_open')==='1'; }catch(e){}
+    return `<details class="egcard" ${open?'open':''} ontoggle="try{localStorage.setItem('cl_engage_open',this.open?'1':'0')}catch(e){}">
+      <summary class="eg-sum"><span class="eg-sumtx">${sum}</span><span class="eg-chev">▾</span></summary>
+      <div class="eg-body">${body}<button class="eg-cta" onclick="App.go('high')">Ver El 19 y trofeos →</button></div></details>`;
   }
   // ---- Liquidación ----
   function renderLiq(){
@@ -1557,12 +1572,12 @@ const App = (() => {
     if(liqTab==='cmp') liqTab='hoy';   // 'Comparar' se movió a Captura
     if(liqTab==='temp'){ lead.style.display='none'; box.innerHTML=seg+renderSeason(); return; }
     const ob=onboardCard();   // FOMO/onboarding: % de avance del perfil (foto, apodo, ventajas, 1er viernes) — se oculta al completarse
-    const fomo=fomoCard(curDay());   // FOMO nivel 2: próximo viernes + racha + lugar (solo entre rondas)
+    const eng=engageCard();   // tarjeta de temporada colapsable (veteranos): próximo viernes + racha + lugar + logros
     const d=curDay();
-    if(!d){ box.innerHTML=seg+ob+fomo+emptyState('🏌️','Aún no hay un día activo','Crea un viernes de juego para empezar a capturar.','App.newDayModal()','Crear día'); lead.style.display='none'; return; }
+    if(!d){ box.innerHTML=seg+ob+eng+emptyState('🏌️','Aún no hay un día activo','Crea un viernes de juego para empezar a capturar.','App.newDayModal()','Crear día'); lead.style.display='none'; return; }
     lead.style.display='block';
     const res=compute();
-    if(!res){ box.innerHTML=seg+ob+fomo+emptyState('⛳','Asigna jugadores a las salidas','Ve a “Salidas” y arma los grupos del día.','App.go(\'day\')','Ir a Salidas'); return; }
+    if(!res){ box.innerHTML=seg+ob+eng+emptyState('⛳','Asigna jugadores a las salidas','Ve a “Salidas” y arma los grupos del día.','App.go(\'day\')','Ir a Salidas'); return; }
 
     const val=validateDay(d);
     // El aviso de validación solo aplica antes de cerrar; en un día cerrado se omite (ya hay banner de "Día cerrado").
@@ -1580,7 +1595,7 @@ const App = (() => {
     const wash=!!d.washout;   // 🌂 La Acapulqueña: apuestas canceladas por clima
     const pesoTxt=n=> wash ? `<span style="text-decoration:line-through;opacity:.5">${fmtP(n)}</span>${n<0?' 🛟':''}` : fmtP(n);
     const washBanner = wash ? `<div class="valbar" style="background:#e6f1fb;border:1px solid #b5d4f4;color:#185fa5"><b>🌂 La Acapulqueña</b> · campo cerrado por clima — apuestas <b>canceladas</b>, nadie paga. Queda la carrilla y el 🛟 salvavidas.</div>` : '';
-    let html=seg+ob+fomo+washBanner+valBanner;
+    let html=seg+ob+eng+washBanner+valBanner;
     const fin=isFinalDay(d), hasScores=dayAnyScores(d);
     const statusTag = fin ? `<span class="pgfinal">FINAL</span>` : `<span class="pglive">EN VIVO</span>`;
 
