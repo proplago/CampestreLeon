@@ -68,7 +68,9 @@
   }
   .appbar{display:flex;align-items:center;justify-content:space-between;gap:10px;padding-bottom:11px}
   .ab-user{flex:none;width:40px;height:40px;border-radius:50%;overflow:hidden;border:1.5px solid var(--fairway);padding:0;background:#eaf3ec;display:grid;place-items:center;cursor:pointer;color:var(--fairway);font-weight:700;font-size:16px;line-height:1}
-  .ab-brand{font-family:'Newsreader',serif;font-style:italic;font-weight:600;font-size:19px;color:var(--fairway);white-space:nowrap;display:flex;align-items:center;justify-content:center;gap:8px;min-width:0;flex:1}
+  .ab-brand{font-family:'Newsreader',serif;font-style:italic;font-weight:600;font-size:19px;color:var(--fairway);white-space:nowrap;display:flex;align-items:center;justify-content:center;gap:8px;min-width:0;flex:1;overflow:hidden}
+  .ab-brand #brandName{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
+  @media(max-width:440px){ .ab-brand{font-size:17px;gap:6px} .ab-brand .beta-tag{display:none} }
   /* Tu espacio (hoja del avatar) */
   .us-hd{display:flex;align-items:center;gap:12px;margin-bottom:4px}
   .us-av{width:52px;height:52px;border-radius:50%;overflow:hidden;flex:none;background:#eaf3ec;display:grid;place-items:center;color:var(--fairway);font-family:'Newsreader',serif;font-weight:600;font-size:22px}
@@ -679,7 +681,7 @@
 
 <script>
 const App = (() => {
-  const APP_VERSION = '2026-07-10-84';   // ⬆️ SUBIR en cada deploy: la app se auto-recarga cuando detecta una versión distinta
+  const APP_VERSION = '2026-07-10-85';   // ⬆️ SUBIR en cada deploy: la app se auto-recarga cuando detecta una versión distinta
   const APP_URL = 'https://app.plagolf.com/';   // dominio canónico: los links de invitación y códigos SIEMPRE usan éste
   const KEY = 'rayas-campestre-v2';
   const uid = () => Math.random().toString(36).slice(2,9);
