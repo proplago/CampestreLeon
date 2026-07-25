@@ -684,7 +684,7 @@
 
 <script>
 const App = (() => {
-  const APP_VERSION = '2026-07-10-86';   // ⬆️ SUBIR en cada deploy: la app se auto-recarga cuando detecta una versión distinta
+  const APP_VERSION = '2026-07-10-87';   // ⬆️ SUBIR en cada deploy: la app se auto-recarga cuando detecta una versión distinta
   const APP_URL = 'https://app.plagolf.com/';   // dominio canónico: los links de invitación y códigos SIEMPRE usan éste
   const KEY = 'rayas-campestre-v2';
   const uid = () => Math.random().toString(36).slice(2,9);
@@ -1651,14 +1651,11 @@ const App = (() => {
       <div class="lb-head"><div class="c1">POS</div><div class="c2">JUGADOR</div><div class="c3">PESOS</div><div class="c4">RAYAS</div></div>
       <div class="lb-sub">HOY · ${courseOf(d).name.toUpperCase()} · ${holesLabel(d).toUpperCase()} · RAYA $${state.rayaValue}${anyRayaPair()?' · PAREJAS CON OTRO VALOR':''}</div>`;
     const nHoles=playOrder(d).length;
-    const mine=myPid();
-    const order=res.rows.map((r,i)=>i);   // ranking real (i = posición); si soy jugador del día, me fijo hasta arriba
-    if(mine){ const mi=res.rows.findIndex(r=>r.id===mine); if(mi>0){ order.splice(mi,1); order.unshift(mi); } }
-    order.forEach((i)=>{ const r=res.rows[i]; const p=player(r.id); const th=dayThru(d,r.id); const ret=isRetired(d,r.id); const isMe=(r.id===mine);
+    res.rows.forEach((r,i)=>{ const p=player(r.id); const th=dayThru(d,r.id); const ret=isRetired(d,r.id);
       const thru = ret ? ` <span class="thru done">⏹ cerró en ${th}</span>` : (fin ? '' : (th>=nHoles ? ' <span class="thru done">✓ terminó</span>' : ` <span class="thru">thru ${th}</span>`));
-      html+=`<div class="lb-row${isMe?' me':''}" onclick="App.openBet('${r.id}')">
+      html+=`<div class="lb-row" onclick="App.openBet('${r.id}')">
         <div class="pos">${i+1}</div>
-        <div class="nm">${pname(r.id)}${isMe?' <span class="youtag">TÚ</span>':''}${i===0?' <span class="star">★</span>':''}${p&&p.guest?' <span style="font-size:10px;color:var(--muted-2)">·inv</span>':''}${thru}</div>
+        <div class="nm">${pname(r.id)}${i===0?' <span class="star">★</span>':''}${p&&p.guest?' <span style="font-size:10px;color:var(--muted-2)">·inv</span>':''}${thru}</div>
         <div class="pesos ${clsP(r.pesos)}">${pesoTxt(r.pesos)}</div>
         <div class="rayas">${r.total>0?'+':r.total<0?'−':''}${Math.abs(r.total)||0}</div>
       </div>`;
@@ -3133,7 +3130,8 @@ const App = (() => {
     const groups=(d.salidas||[]).map((g,i)=>i).filter(g=>(d.salidas[g]||[]).filter(Boolean).length>0);   // todos los grupos (no solo 2)
     if(groups.length===0){ box.innerHTML=seg+emptyState('⛳','Sin salidas','Sortea en “Salidas”.','App.go(\'day\')','Ir a Salidas'); return; }
     if(!groups.includes(curScoreGroup)) curScoreGroup=groups[0];
-    const gids=(d.salidas[curScoreGroup]||[]).filter(Boolean);
+    let gids=(d.salidas[curScoreGroup]||[]).filter(Boolean);
+    const _me=myPid(); if(_me && gids.indexOf(_me)>0){ gids=[_me].concat(gids.filter(id=>id!==_me)); }   // yo primero: capturo mi score antes que el de los demás
     const order = curCaptureOrder(d); const last=order.length-1;
     if(curHoleNav<0)curHoleNav=0; if(curHoleNav>last)curHoleNav=last;
     const hi=order[curHoleNav]; const h=holesOf(d)[hi];
