@@ -684,7 +684,7 @@
 
 <script>
 const App = (() => {
-  const APP_VERSION = '2026-07-10-88';   // ⬆️ SUBIR en cada deploy: la app se auto-recarga cuando detecta una versión distinta
+  const APP_VERSION = '2026-07-10-89';   // ⬆️ SUBIR en cada deploy: la app se auto-recarga cuando detecta una versión distinta
   const APP_URL = 'https://app.plagolf.com/';   // dominio canónico: los links de invitación y códigos SIEMPRE usan éste
   const KEY = 'rayas-campestre-v2';
   const uid = () => Math.random().toString(36).slice(2,9);
@@ -2457,7 +2457,7 @@ const App = (() => {
   function setDblPlayer(id){ dblPlayer=id; render(); }
   function toggleDbl(a,b){ const d=curDay();   // a = el que dobla (perdedor de la 1ª vuelta)
     if(!_devUser){ toast('Elige usuario primero'); loginModal(); return; }
-    if(captureLocked()){ toast('Día cerrado · solo el admin puede editar'); return; }
+    if(captureLocked()){ toast(captureLockMsg()); return; }
     if(!isAdmin() && !(isRegular() && myPid()===a)){ toast('Solo puedes doblar tú (o el admin)'); return; }
     if(!pairSameStart(d,a,b)){ toast('No se puede doblar: salen de distinto hoyo'); return; }
     if(isRetired(d,a)||isRetired(d,b)){ toast('No se puede doblar: alguien ya cerró su jugada'); return; }
@@ -3039,7 +3039,7 @@ const App = (() => {
   }
   // rota la combinación de parejas 2v2 de una salida (3 posibles). Vive en d.parejas[gi] (0..2).
   function cycleParejas(gi){ const d=curDay(); if(!d) return;
-    if(captureLocked()){ toast('Día cerrado · solo el admin puede editar'); return; }
+    if(captureLocked()){ toast(captureLockMsg()); return; }
     d.parejas=d.parejas||{}; d.parejas[gi]=(((d.parejas[gi]||0)+1)%3);
     save(); clearStatCache(); renderDay(); if(curView==='liq') renderLiq(); }
   function sorteo(){
@@ -3121,7 +3121,7 @@ const App = (() => {
     renderFeed();
     const d=curDay();
     const seg=`<div class="seg2"><button class="${scoreTab==='cap'?'on':''}" onclick="App.setScoreTab('cap')">Capturar</button><button class="${scoreTab==='cmp'?'on':''}" onclick="App.setScoreTab('cmp')">Comparar</button></div>`
-      + (captureLocked()?`<div class="valbar warn" style="margin-top:8px">🔒 Día cerrado · solo lectura (el admin puede corregir)</div>`:'');
+      + (captureLocked()?`<div class="valbar warn" style="margin-top:8px">${(curDay()&&curDay().closed)?'🔒':'👀'} ${captureLockMsg()}</div>`:'');
     if(!d){ box.innerHTML=seg+emptyState('📝','Sin día activo','Crea un día y asigna salidas.','App.go(\'day\')','Ir a Salidas'); return; }
     const ids=dayPlayers(d).filter(Boolean);
     if(ids.length===0){ box.innerHTML=seg+emptyState('⛳','No hay jugadores','Asigna jugadores en “Salidas”.','App.go(\'day\')','Ir a Salidas'); return; }
@@ -3257,8 +3257,12 @@ const App = (() => {
   function setCourse(id){ if(!isAdmin())return; const d=curDay(); if(!d||!state.courses.find(c=>c.id===id))return; d.courseId=id; curHoleNav=0; save(); renderDay(); }
   function toggleSound(){ state.sound=!state.sound; save(); if(state.sound) playSound('mini'); renderCfg(); }
   // Captura bloqueada si el día está cerrado, salvo admin/super (que pueden corregir)
-  function captureLocked(){ const d=curDay(); return !!(d && d.closed && !isAdmin()); }
-  function quick(pid,h,rel){ if(captureLocked()){ toast('Día cerrado · solo el admin puede editar'); return; } const d=curDay(); const sc=ensureScore(d,pid); const par=holesOf(d)[h].par;
+  // Solo pueden EDITAR scores: admin/super, o un jugador que SÍ juega ese día. Los demás observan.
+  function captureLocked(){ const d=curDay(); if(!d) return false; if(isAdmin()) return false;
+    if(d.closed) return true;                                   // día cerrado → solo admin
+    const me=myPid(); return !(me && dayPlayers(d).includes(me)); }   // no juegas hoy → solo lectura
+  function captureLockMsg(){ const d=curDay(); return (d&&d.closed) ? 'Día cerrado · solo el admin puede editar' : 'Solo observas — no juegas este día'; }
+  function quick(pid,h,rel){ if(captureLocked()){ toast(captureLockMsg()); return; } const d=curDay(); const sc=ensureScore(d,pid); const par=holesOf(d)[h].par;
     sc.gross[h]=Math.max(1,par+rel); if(sc.putts[h]==null)sc.putts[h]=2; save(); checkCelebrate(pid,h); renderScore(); }
   function pickScore(id){ curScorePlayer=id; renderScore(); }
   function celebrate(name){
@@ -3393,7 +3397,7 @@ const App = (() => {
     setTimeout(()=>{ o.classList.add('out'); setTimeout(()=>o.remove(),350); }, tier==='big'?2200:1400);
   }
   function putt(pid,h,delta){
-    if(captureLocked()){ toast('Día cerrado · solo el admin puede editar'); return; }
+    if(captureLocked()){ toast(captureLockMsg()); return; }
     const d=curDay(); const sc=ensureScore(d,pid);
     let v=sc.putts[h];
     if(v==null){ v = delta>0?1:0; }       // − desde vacío = 0 (hole out)
@@ -3414,7 +3418,7 @@ const App = (() => {
     return {id:last, place:miss[0]};
   }
   function setOyes(pid,h,val){
-    if(captureLocked()){ toast('Día cerrado · solo el admin puede editar'); renderScore(); return; }
+    if(captureLocked()){ toast(captureLockMsg()); renderScore(); return; }
     const d=curDay(); const sc=ensureScore(d,pid);
     let v=parseInt(val,10)||0;
     const grp=d.salidas.find(g=>(g||[]).includes(pid))||[];
@@ -3430,13 +3434,13 @@ const App = (() => {
     save(); checkCelebrate(pid,h); if(inf) checkCelebrate(inf.id,h); renderScore();
   }
   function score(pid,h,delta){
-    if(captureLocked()){ toast('Día cerrado · solo el admin puede editar'); return; }
+    if(captureLocked()){ toast(captureLockMsg()); return; }
     const d=curDay(); const sc=ensureScore(d,pid);
     sc.gross[h]=Math.max(0,(sc.gross[h]||0)+delta);
     save(); checkAce(pid,h); renderScore();
   }
   function toggleUnit(pid,h,uid){
-    if(captureLocked()){ toast('Día cerrado · solo el admin puede editar'); return; }
+    if(captureLocked()){ toast(captureLockMsg()); return; }
     const d=curDay(); const sc=ensureScore(d,pid);
     const u=state.units.find(x=>x.id===uid);
     sc.units[h]=sc.units[h]||[]; const k=sc.units[h].indexOf(uid);
@@ -3449,7 +3453,7 @@ const App = (() => {
     save(); checkCelebrate(pid,h); renderScore();
   }
   function toggleCast(pid,h,cid){
-    if(captureLocked()){ toast('Día cerrado · solo el admin puede editar'); return; }
+    if(captureLocked()){ toast(captureLockMsg()); return; }
     const d=curDay(); const sc=ensureScore(d,pid);
     sc.cast[h]=sc.cast[h]||[]; const k=sc.cast[h].indexOf(cid);
     k>=0?sc.cast[h].splice(k,1):sc.cast[h].push(cid);
