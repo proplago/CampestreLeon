@@ -539,6 +539,9 @@
   .lb-row .pesos.pos{color:var(--fairway)} .lb-row .pesos.neg{color:var(--clay)} .lb-row .pesos.zero{color:var(--muted-2)}
   .lb-row .rayas{padding-right:12px;text-align:right;font-weight:600;color:#5a655c}
   .lb-row .star{color:var(--amber);font-size:12px}
+  .lb-row.me{background:#eef7f0;box-shadow:inset 3px 0 0 var(--fairway)}
+  .lb-row.me .nm{color:#0a6a3a}
+  .youtag{font-size:9.5px;font-weight:800;letter-spacing:.05em;color:#fff;background:var(--fairway);border-radius:5px;padding:1px 6px;margin-left:2px;vertical-align:middle}
   .lb-row .thru{font-size:10px;font-weight:800;letter-spacing:.02em;color:#9a6b00;background:#fbf4e6;border-radius:999px;padding:1px 7px;margin-left:6px;vertical-align:middle}
   .lb-row .thru.done{color:var(--good);background:#eafaf0}
   .pod-tit .pglive{color:#9a6b00}
@@ -681,7 +684,7 @@
 
 <script>
 const App = (() => {
-  const APP_VERSION = '2026-07-10-85';   // ⬆️ SUBIR en cada deploy: la app se auto-recarga cuando detecta una versión distinta
+  const APP_VERSION = '2026-07-10-86';   // ⬆️ SUBIR en cada deploy: la app se auto-recarga cuando detecta una versión distinta
   const APP_URL = 'https://app.plagolf.com/';   // dominio canónico: los links de invitación y códigos SIEMPRE usan éste
   const KEY = 'rayas-campestre-v2';
   const uid = () => Math.random().toString(36).slice(2,9);
@@ -1648,11 +1651,14 @@ const App = (() => {
       <div class="lb-head"><div class="c1">POS</div><div class="c2">JUGADOR</div><div class="c3">PESOS</div><div class="c4">RAYAS</div></div>
       <div class="lb-sub">HOY · ${courseOf(d).name.toUpperCase()} · ${holesLabel(d).toUpperCase()} · RAYA $${state.rayaValue}${anyRayaPair()?' · PAREJAS CON OTRO VALOR':''}</div>`;
     const nHoles=playOrder(d).length;
-    res.rows.forEach((r,i)=>{ const p=player(r.id); const th=dayThru(d,r.id); const ret=isRetired(d,r.id);
+    const mine=myPid();
+    const order=res.rows.map((r,i)=>i);   // ranking real (i = posición); si soy jugador del día, me fijo hasta arriba
+    if(mine){ const mi=res.rows.findIndex(r=>r.id===mine); if(mi>0){ order.splice(mi,1); order.unshift(mi); } }
+    order.forEach((i)=>{ const r=res.rows[i]; const p=player(r.id); const th=dayThru(d,r.id); const ret=isRetired(d,r.id); const isMe=(r.id===mine);
       const thru = ret ? ` <span class="thru done">⏹ cerró en ${th}</span>` : (fin ? '' : (th>=nHoles ? ' <span class="thru done">✓ terminó</span>' : ` <span class="thru">thru ${th}</span>`));
-      html+=`<div class="lb-row" onclick="App.openBet('${r.id}')">
+      html+=`<div class="lb-row${isMe?' me':''}" onclick="App.openBet('${r.id}')">
         <div class="pos">${i+1}</div>
-        <div class="nm">${pname(r.id)}${i===0?' <span class="star">★</span>':''}${p&&p.guest?' <span style="font-size:10px;color:var(--muted-2)">·inv</span>':''}${thru}</div>
+        <div class="nm">${pname(r.id)}${isMe?' <span class="youtag">TÚ</span>':''}${i===0?' <span class="star">★</span>':''}${p&&p.guest?' <span style="font-size:10px;color:var(--muted-2)">·inv</span>':''}${thru}</div>
         <div class="pesos ${clsP(r.pesos)}">${pesoTxt(r.pesos)}</div>
         <div class="rayas">${r.total>0?'+':r.total<0?'−':''}${Math.abs(r.total)||0}</div>
       </div>`;
@@ -3355,6 +3361,7 @@ const App = (() => {
   }
   function checkCelebrate(pid,h){
     const d=curDay(); if(!d) return;
+    if(myPid() && pid!==myPid()) return;   // festejos SOLO de lo que hizo el usuario logueado (no de lo que captura de otros)
     state.celebrated=state.celebrated||{};
     let changed=false, best=null, neg=false, plainPos=false; const customSounds=[];
     celebrations(pid,h).forEach(c=>{
