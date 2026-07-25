@@ -316,6 +316,17 @@
   .valdet{font-size:11.5px;color:#7a5a00;margin-top:4px;line-height:1.4}
   .gtabs{display:flex;gap:8px;margin-bottom:12px}
   .gtabs button{flex:1;padding:9px;border-radius:999px;background:#fff;border:1.5px solid var(--line-3);font-weight:700;font-size:13px;color:var(--muted)}
+  /* Salto automático de hoyo: aviso confirmando + pulso del encabezado */
+  .holejump{position:fixed;left:0;right:0;bottom:calc(env(safe-area-inset-bottom) + 78px);display:flex;justify-content:center;z-index:60;transition:opacity .3s;padding:0 16px}
+  .holejump.out{opacity:0}
+  .hj-card{background:#0a6a3a;color:#f6efda;border-radius:14px;padding:9px 18px;box-shadow:0 10px 28px rgba(10,60,35,.38);text-align:center;display:flex;flex-direction:column;align-items:center;gap:1px;cursor:pointer;max-width:86%;animation:hjin .24s ease}
+  .hj-chk{font-size:19px;line-height:1}
+  .hj-t{font-family:'Newsreader',Georgia,serif;font-style:italic;font-weight:600;font-size:16px;line-height:1.1}
+  .hj-s{font-family:'Patrick Hand','Newsreader',cursive;font-size:12.5px;color:#bfe0cd}
+  @keyframes hjin{from{transform:translateY(14px) scale(.95);opacity:0}to{transform:none;opacity:1}}
+  @keyframes hjpulse{0%{transform:scale(1)}40%{transform:scale(1.09)}100%{transform:scale(1)}}
+  .holenav.pulse .hninfo{animation:hjpulse .6s ease}
+  @media (prefers-reduced-motion:reduce){ .hj-card,.holenav.pulse .hninfo{animation:none} }
   .gtabs button.on{background:var(--fairway);color:#fff;border-color:var(--fairway)}
   .gtabs button.on.g2{background:var(--purple);border-color:var(--purple)}
   .holenav{display:flex;align-items:center;gap:12px;background:transparent;color:var(--ink);padding:0;margin-bottom:16px}
@@ -688,7 +699,7 @@
 
 <script>
 const App = (() => {
-  const APP_VERSION = '2026-07-10-90';   // ⬆️ SUBIR en cada deploy: la app se auto-recarga cuando detecta una versión distinta
+  const APP_VERSION = '2026-07-10-91';   // ⬆️ SUBIR en cada deploy: la app se auto-recarga cuando detecta una versión distinta
   const APP_URL = 'https://app.plagolf.com/';   // dominio canónico: los links de invitación y códigos SIEMPRE usan éste
   const KEY = 'rayas-campestre-v2';
   const uid = () => Math.random().toString(36).slice(2,9);
@@ -3148,7 +3159,8 @@ const App = (() => {
       groups.forEach(g=>html+=`<button class="${g===curScoreGroup?'on':''} ${g>0?'g2':''}" onclick="App.setScoreGroup(${g})">Salida ${g+1}</button>`);
       html+=`</div>`;
     }
-    html+=`<div class="holenav">
+    const _pulse=_hlPulse; _hlPulse=false;   // el pulso del encabezado suena una sola vez tras el salto
+    html+=`<div class="holenav${_pulse?' pulse':''}">
       <button onclick="App.navHole(-1)" ${curHoleNav===0?'disabled':''}>‹</button>
       <div class="hninfo"><div class="hnh">Hoyo ${h.n}${h.par===3?' · oyes':''}</div>
         <div class="hnp">Par ${h.par} · HCP ${h.si} · ${curHoleNav+1} de ${order.length}</div></div>
@@ -3253,6 +3265,34 @@ const App = (() => {
     if(d && playOrder(d)[curHoleNav]!==prev) commitHole(d,prev);
     renderScore(); }
   function setScoreGroup(g){ curScoreGroup=g; renderScore(); }
+  // ---- Salto automático al completar el hoyo (con confirmación; se puede cancelar tocando) ----
+  let _holeJumpT=null, _autoAdvDone=null, _hlPulse=false;
+  function autoAdvOn(){ try{ return localStorage.getItem('cl_autoadv')!=='0'; }catch(e){ return true; } }   // ON por defecto (por dispositivo)
+  function toggleAutoAdv(){ try{ localStorage.setItem('cl_autoadv', autoAdvOn()?'0':'1'); }catch(e){} renderCfg(); }
+  function holeCompleteForGroup(d,hi){ const gids=(d.salidas[curScoreGroup]||[]).filter(Boolean); if(!gids.length) return false; return gids.every(id=>{ const sc=ensureScore(d,id); return sc.gross[hi]>0; }); }
+  function maybeAutoAdvance(d,hi){
+    if(!d || !autoAdvOn() || captureLocked()) return;
+    const order=curCaptureOrder(d); const idx=order.indexOf(hi);
+    if(idx<0 || idx>=order.length-1) return;         // no existe o es el último hoyo
+    if(order[curHoleNav]!==hi) return;               // solo si estás viendo ese hoyo
+    if(!holeCompleteForGroup(d,hi)) return;          // aún falta el score de alguien
+    const key=d.id+'|'+curScoreGroup+'|'+hi;
+    if(!_autoAdvDone) _autoAdvDone=new Set();
+    if(_autoAdvDone.has(key)) return;                // ya saltamos de aquí antes (no re-disparar al corregir un hoyo)
+    _autoAdvDone.add(key); scheduleHoleJump(d,hi,order[idx+1]);
+  }
+  function scheduleHoleJump(d,fromHi,toHi){
+    clearTimeout(_holeJumpT);
+    document.querySelectorAll('.holejump').forEach(e=>e.remove());
+    const fromN=holesOf(d)[fromHi].n, toN=holesOf(d)[toHi].n;
+    const o=document.createElement('div'); o.className='holejump';
+    o.innerHTML=`<div class="hj-card"><div class="hj-chk">✓</div><div class="hj-t">Hoyo ${fromN} completo</div><div class="hj-s">Pasamos al ${toN} · toca para quedarte</div></div>`;
+    o.onclick=function(){ clearTimeout(_holeJumpT); o.classList.add('out'); setTimeout(()=>o.remove(),250); toast('Te quedas en el hoyo '+fromN); };
+    document.body.appendChild(o);
+    const reduce = window.matchMedia && matchMedia('(prefers-reduced-motion:reduce)').matches;
+    _holeJumpT=setTimeout(function(){ o.classList.add('out'); setTimeout(()=>o.remove(),300);
+      const order=curCaptureOrder(d); const ni=order.indexOf(toHi); if(ni>=0){ curHoleNav=ni; _hlPulse=true; renderScore(); } }, reduce?650:1150);
+  }
   function setStart(v){ if(!isAdmin())return; const d=curDay(); d.start=v; d.salidaStarts=null; save(); clearStatCache(); renderDay(); }   // toggle global: todas salen del mismo hoyo (limpia overrides)
   function setSalidaStart(gi,v){ if(!isAdmin())return; const d=curDay(); if(!d||d.holes===9) return;
     d.salidaStarts=d.salidaStarts||[]; while(d.salidaStarts.length<(d.salidas||[]).length) d.salidaStarts.push(d.start||1);
@@ -3267,7 +3307,7 @@ const App = (() => {
     const me=myPid(); return !(me && dayPlayers(d).includes(me)); }   // no juegas hoy → solo lectura
   function captureLockMsg(){ const d=curDay(); return (d&&d.closed) ? 'Día cerrado · solo el admin puede editar' : 'Solo observas — no juegas este día'; }
   function quick(pid,h,rel){ if(captureLocked()){ toast(captureLockMsg()); return; } const d=curDay(); const sc=ensureScore(d,pid); const par=holesOf(d)[h].par;
-    sc.gross[h]=Math.max(1,par+rel); if(sc.putts[h]==null)sc.putts[h]=2; save(); checkCelebrate(pid,h); renderScore(); }
+    sc.gross[h]=Math.max(1,par+rel); if(sc.putts[h]==null)sc.putts[h]=2; save(); checkCelebrate(pid,h); renderScore(); maybeAutoAdvance(d,h); }
   function pickScore(id){ curScorePlayer=id; renderScore(); }
   function celebrate(name){
     const o=document.createElement('div'); o.className='celebrate';
@@ -3441,7 +3481,7 @@ const App = (() => {
     if(captureLocked()){ toast(captureLockMsg()); return; }
     const d=curDay(); const sc=ensureScore(d,pid);
     sc.gross[h]=Math.max(0,(sc.gross[h]||0)+delta);
-    save(); checkAce(pid,h); renderScore();
+    save(); checkAce(pid,h); renderScore(); maybeAutoAdvance(d,h);
   }
   function toggleUnit(pid,h,uid){
     if(captureLocked()){ toast(captureLockMsg()); return; }
@@ -3773,6 +3813,11 @@ const App = (() => {
     html+=`<div class="card"><div class="row" style="justify-content:space-between">
       <div><h3 style="margin:0">Soniditos</h3><div class="hint" style="margin:2px 0 0">Celebración de birdies, eagles, hole in one…</div></div>
       <button class="sw ${state.sound?'on':''}" onclick="App.toggleSound()"><span></span></button></div></div>`;
+
+    // salto automático de hoyo (preferencia por dispositivo)
+    html+=`<div class="card"><div class="row" style="justify-content:space-between">
+      <div><h3 style="margin:0">Salto automático de hoyo</h3><div class="hint" style="margin:2px 0 0">Al capturar el score de todos, brinca al siguiente (puedes tocar “quedarte”).</div></div>
+      <button class="sw ${autoAdvOn()?'on':''}" onclick="App.toggleAutoAdv()"><span></span></button></div></div>`;
 
     // unidades
     html+=`<div class="card"><div class="row" style="justify-content:space-between"><h3>Unidades</h3>
@@ -5277,7 +5322,7 @@ const App = (() => {
     toggleAssign:null,togglePlaying,cancelPlayer,moveGroup,confirmMove,sorteo,cycleParejas,setSalidaTime,addGuestModal,
     pickScore,score,putt,setOyes,quick,toggleUnit,toggleCast,navHole,gotoPending,gotoPlayerPending,setScoreGroup,setStart,setSalidaStart,setHoles,setCourse,
     setVentFocus,pickVent,openBet,openH2H,setLiqTab,setScoreTab,setCmp,setVentPick,
-    setDblPlayer,toggleDbl,closeDay,washoutDay,historyModal,exportImage,exportHigh,exportProfile,exportSalidas,exportSeasonTable,exportCompare,exportScorecard,toggleSound,
+    setDblPlayer,toggleDbl,closeDay,washoutDay,historyModal,exportImage,exportHigh,exportProfile,exportSalidas,exportSeasonTable,exportCompare,exportScorecard,toggleSound,toggleAutoAdv,
     setRaya,submitRayaPair,approveRayaReq,rejectRayaReq,removeRayaPair,createPlayer,editPlayerModal,savePlayer,delPlayer,toggleFav,pickPlayerPhoto,clearPlayerPhoto,
     courseModal,setHole,setCfgCourse,addCourse,importSeedCourse,importCatCourse,createBlankCourse,publishCourse,renameCourse,deleteCourse,unitModal,createUnit,delUnit,castModal,createCast,delCast,toggleCastTipo,
     toggleBet,customBetModal,saveCustomBet,delCustomBet,toggleCustomBet,
