@@ -684,7 +684,7 @@
 
 <script>
 const App = (() => {
-  const APP_VERSION = '2026-07-10-87';   // ⬆️ SUBIR en cada deploy: la app se auto-recarga cuando detecta una versión distinta
+  const APP_VERSION = '2026-07-10-88';   // ⬆️ SUBIR en cada deploy: la app se auto-recarga cuando detecta una versión distinta
   const APP_URL = 'https://app.plagolf.com/';   // dominio canónico: los links de invitación y códigos SIEMPRE usan éste
   const KEY = 'rayas-campestre-v2';
   const uid = () => Math.random().toString(36).slice(2,9);
@@ -2721,7 +2721,8 @@ const App = (() => {
     if(!nine) cols.push({sub:'IN',seg:back});
     const nC=cols.length;
     const parTot=ord.reduce((a,i)=>a+holes[i].par,0);
-    const groups=d.salidas.map((g,i)=>({gi:i, ids:(g||[]).filter(Boolean)})).filter(g=>g.ids.length);
+    const _me=myPid();
+    const groups=d.salidas.map((g,i)=>{ let ids=(g||[]).filter(Boolean); if(_me && ids.indexOf(_me)>0){ ids=[_me].concat(ids.filter(x=>x!==_me)); } return {gi:i, ids:ids}; }).filter(g=>g.ids.length);   // yo hasta arriba en la tarjeta exportada
     if(!groups.length){ toast('Sin salidas'); return; }
     const S=2, padX=40, nameW=210, cW=46, totW=72, rayW=72;
     const tableW=nameW+nC*cW+totW+rayW, W=padX*2+tableW, rowH=54, headH=44;
@@ -3082,7 +3083,8 @@ const App = (() => {
     let html='';
     d.salidas.forEach((grp,gi)=>{
       if(onlyGroup!=null && gi!==onlyGroup) return;
-      const ids=(grp||[]).filter(Boolean); if(!ids.length) return;
+      let ids=(grp||[]).filter(Boolean); if(!ids.length) return;
+      const _me=myPid(); if(_me && ids.indexOf(_me)>0){ ids=[_me].concat(ids.filter(x=>x!==_me)); }   // yo hasta arriba en la tarjeta
       html+=`<div class="card papercard" style="padding:10px 8px">
         <div style="font-weight:700;font-size:13px;color:${gi===0?'var(--fairway)':'#5b3a8a'};margin:0 4px 8px">Salida ${gi+1}</div>
         <div class="cardscroll"><table class="sccard">
