@@ -109,6 +109,10 @@
     background:#fff;border-top:1px solid var(--line);
     display:grid;grid-template-columns:repeat(6,1fr);
     padding:7px 2px calc(env(safe-area-inset-bottom) + 9px);
+    /* iOS: fija la barra a su propia capa de GPU para que no se "despegue" a media pantalla durante el scroll con inercia */
+    transform:translateZ(0);-webkit-transform:translateZ(0);
+    backface-visibility:hidden;-webkit-backface-visibility:hidden;
+    will-change:transform;
   }
   nav button{
     color:var(--muted-2);font-size:9px;font-weight:600;letter-spacing:0;white-space:nowrap;
@@ -684,7 +688,7 @@
 
 <script>
 const App = (() => {
-  const APP_VERSION = '2026-07-10-89';   // ⬆️ SUBIR en cada deploy: la app se auto-recarga cuando detecta una versión distinta
+  const APP_VERSION = '2026-07-10-90';   // ⬆️ SUBIR en cada deploy: la app se auto-recarga cuando detecta una versión distinta
   const APP_URL = 'https://app.plagolf.com/';   // dominio canónico: los links de invitación y códigos SIEMPRE usan éste
   const KEY = 'rayas-campestre-v2';
   const uid = () => Math.random().toString(36).slice(2,9);
