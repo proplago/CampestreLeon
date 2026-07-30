@@ -467,6 +467,8 @@
   .pop.tneg .pop-c{animation:popdroop 1.5s ease forwards}
   @keyframes popdroop{0%{transform:scale(.6) translateY(-14px) rotate(-6deg);opacity:0}22%{transform:scale(1.05) translateY(0) rotate(0);opacity:1}72%{opacity:1}100%{transform:scale(.95) translateY(40px) rotate(6deg);opacity:0}}
   .pop.tneg .pop-lbl{background:#3a4750;color:#dfe6ea}
+  /* nombre de quien la hizo · solo en negativas y solo si no soy yo */
+  .pop-who{font-family:'Newsreader',serif;font-style:italic;font-weight:600;font-size:19px;color:#fff;margin-top:5px;text-shadow:0 2px 8px rgba(0,0,0,.55)}
   .pop.tneg .pop-emo{filter:grayscale(.2) drop-shadow(0 6px 10px rgba(0,0,0,.25))}
   .spk{position:absolute;left:50%;top:32px;width:0;height:0}
   .pop.tbig .spk{top:45px}
@@ -754,7 +756,7 @@
 
 <script>
 const App = (() => {
-  const APP_VERSION = '2026-07-10-93';   // ⬆️ SUBIR en cada deploy: la app se auto-recarga cuando detecta una versión distinta
+  const APP_VERSION = '2026-07-10-94';   // ⬆️ SUBIR en cada deploy: la app se auto-recarga cuando detecta una versión distinta
   const APP_URL = 'https://app.plagolf.com/';   // dominio canónico: los links de invitación y códigos SIEMPRE usan éste
   const KEY = 'rayas-campestre-v2';
   const uid = () => Math.random().toString(36).slice(2,9);
@@ -1006,6 +1008,7 @@ const App = (() => {
   }
   // Merge 3-vías: aplica lo que cambió el peer y CONSERVA ediciones locales en vuelo
   function applyRemoteTree(root){
+    const before=_loadedOnce?castSnapshot(curDay()):null;   // para detectar castigos que ACABAN de llegar
     const remote=flattenTree(root), local=buildShards(state), merged={};
     let peerChanged=false;
     const keys=new Set([...Object.keys(remote),...Object.keys(local),...Object.keys(_shardCache)]);
@@ -1015,7 +1018,10 @@ const App = (() => {
     });
     if(!peerChanged) return;
     const ns=rebuildFromShards(merged);
-    if(ns){ state=Object.assign(state,ns); _shardCache=_cloneShards(merged); clearStatCache(); autoPickDay(); if(_loadedOnce) render(); }
+    if(ns){ state=Object.assign(state,ns); _shardCache=_cloneShards(merged); clearStatCache(); autoPickDay();
+      restoreHole();                       // el día pudo llegar recién ahora (arranque en frío)
+      if(_loadedOnce){ negFromRemote(before); render(); }   // castigos que capturó OTRO teléfono
+    }
   }
   // (Re)engancha el sync de Firebase DESPUÉS de tener sesión. Las reglas exigen auth != null, y un listener enganchado
   // SIN sesión se cancela (permission_denied) y nunca vuelve a entregar datos → por eso no cargaban los jugadores.
@@ -1250,6 +1256,38 @@ const App = (() => {
     if(state.days.some(d=>d.id===state.currentDayId)) return;                 // ya hay un día válido → respétalo
     try{ const saved=localStorage.getItem(curDayKey()); if(saved && state.days.some(d=>d.id===saved)){ state.currentDayId=saved; return; } }catch(e){}   // restaura el último que vio
     state.currentDayId=mostRecentDayId(); rememberCurDay(); }
+
+  // ---- Hoyo y salida en curso: por dispositivo, igual que el día visto ----
+  // Antes vivían solo en memoria (curHoleNav arranca en 0), así que CUALQUIER recarga te
+  // devolvía al hoyo 1 y había que volver a navegar hasta donde ibas.
+  function holeKey(dayId){ return 'cl_hole::'+ACTIVE_LEAGUE+'::'+dayId; }
+  function rememberHole(){
+    try{ const d=curDay(); if(d) localStorage.setItem(holeKey(d.id), curScoreGroup+'|'+curHoleNav); }catch(e){}
+  }
+  // Primer hoyo del recorrido cuya captura aún no está completa para la salida activa.
+  function firstPendingHole(d){
+    if(!d) return 0;
+    const order=curCaptureOrder(d);
+    for(let i=0;i<order.length;i++) if(!holeCompleteForGroup(d,order[i])) return i;
+    return Math.max(0, order.length-1);   // todo capturado → quédate en el último
+  }
+  // Al abrir: restaura dónde ibas; si no hay nada guardado, cae en el primer hoyo pendiente.
+  // Idempotente por día: en el arranque el día puede no existir todavía (llega luego por
+  // Firebase), y al cambiar de día hay que restaurar la posición de ESE día — pero nunca
+  // pisar la navegación del usuario una vez restaurado.
+  let _holeRestoredFor=null;
+  function restoreHole(){
+    const d=curDay(); if(!d) return;
+    if(_holeRestoredFor===d.id) return;
+    _holeRestoredFor=d.id;
+    let grp=null, hole=null;
+    try{ const raw=localStorage.getItem(holeKey(d.id));
+      if(raw){ const p=raw.split('|'); grp=parseInt(p[0],10); hole=parseInt(p[1],10); } }catch(e){}
+    const nGrp=(d.salidas||[]).length;
+    curScoreGroup = (grp!=null && grp>=0 && grp<nGrp) ? grp : 0;
+    const last=curCaptureOrder(d).length-1;
+    curHoleNav = (hole!=null && hole>=0 && hole<=last) ? hole : firstPendingHole(d);
+  }
   function dayPlayers(d){ if(d.playing) return [...d.playing]; return (d.salidas||[]).reduce((a,g)=>a.concat(g||[]),[]); }
   // Cap de salida por día de la semana: sáb/dom máx 5 (fivesome), entre semana máx 6 (sixsome).
   function dayOfWeek(d){ if(!d||!d.date) return null; const m=/^(\d{4})-(\d{2})-(\d{2})/.exec(d.date); if(!m) return null; return new Date(+m[1],+m[2]-1,+m[3]).getDay(); }
@@ -3235,6 +3273,7 @@ const App = (() => {
     const _me=myPid(); if(_me && gids.indexOf(_me)>0){ gids=[_me].concat(gids.filter(id=>id!==_me)); }   // yo primero: capturo mi score antes que el de los demás
     const order = curCaptureOrder(d); const last=order.length-1;
     if(curHoleNav<0)curHoleNav=0; if(curHoleNav>last)curHoleNav=last;
+    rememberHole();   // punto único: toda navegación de hoyo/salida pasa por aquí
     const hi=order[curHoleNav]; const h=holesOf(d)[hi];
 
     let html=seg;
@@ -3353,7 +3392,15 @@ const App = (() => {
   let _holeJumpT=null, _autoAdvDone=null, _hlPulse=false;
   function autoAdvOn(){ try{ return localStorage.getItem('cl_autoadv')!=='0'; }catch(e){ return true; } }   // ON por defecto (por dispositivo)
   function toggleAutoAdv(){ try{ localStorage.setItem('cl_autoadv', autoAdvOn()?'0':'1'); }catch(e){} renderCfg(); }
-  function holeCompleteForGroup(d,hi){ const gids=(d.salidas[curScoreGroup]||[]).filter(Boolean); if(!gids.length) return false; return gids.every(id=>{ const sc=ensureScore(d,id); return sc.gross[hi]>0; }); }
+  function holeCompleteForGroup(d,hi){
+    const gids=(d.salidas[curScoreGroup]||[]).filter(Boolean); if(!gids.length) return false;
+    if(!gids.every(id=>{ const sc=ensureScore(d,id); return sc.gross[hi]>0; })) return false;
+    // En par 3 el hoyo NO está completo hasta que el grupo tenga su lugar de oyes: antes
+    // brincaba con solo los golpes y había que regresarse a meterlos. Si ese día no juegan
+    // oyes, se avanza con la flecha.
+    if(holesOf(d)[hi].par===3 && !gids.every(id=>{ const sc=ensureScore(d,id); return ((sc.oyes||{})[hi]||0)>0; })) return false;
+    return true;
+  }
   function maybeAutoAdvance(d,hi){
     if(!d || !autoAdvOn() || captureLocked()) return;
     const order=curCaptureOrder(d); const idx=order.indexOf(hi);
@@ -3491,17 +3538,64 @@ const App = (() => {
     new Set([...ac,...mc]).forEach(cid=>{ const c=state.castigos.find(x=>x.id===cid); if(c) out.push({type:'cast:'+cid, emoji:'😭', label:(c.emoji?c.emoji+' ':'')+c.name.split(' ')[0], tier:'neg'}); });
     return out;
   }
+  // ---- Castigos: quién los tiene AHORA en el día activo (para diferenciar los recién llegados) ----
+  // Incluye los automáticos (calaca 10+) porque no viven en sc.cast, se derivan del score.
+  function castSnapshot(d){
+    const s=new Set(); if(!d||!d.scores) return s;
+    Object.keys(d.scores).forEach(pid=>{
+      const sc=d.scores[pid]||{}, cast=sc.cast||{}, gross=sc.gross||[];
+      Object.keys(cast).forEach(h=>{ (cast[h]||[]).forEach(cid=>s.add(pid+'|'+h+'|'+cid)); });
+      gross.forEach((g,h)=>{ if(g>0) autoCast(g).forEach(cid=>s.add(pid+'|'+h+'|'+cid)); });
+    });
+    return s;
+  }
+  // Dedup de NEGATIVAS por DISPOSITIVO. No puede ir en state.celebrated porque ese objeto
+  // viaja en los shards de Firebase: si un teléfono marcara la calaca como "ya mostrada",
+  // los demás nunca la verían — justo lo contrario de lo que queremos.
+  let _negSeen=null;
+  function negKey(dayId){ return 'cl_neg::'+ACTIVE_LEAGUE+'::'+dayId; }
+  function negSeen(dayId){
+    if(_negSeen && _negSeen.day===dayId) return _negSeen.set;
+    let arr=[]; try{ arr=JSON.parse(localStorage.getItem(negKey(dayId))||'[]'); }catch(e){}
+    _negSeen={day:dayId, set:new Set(arr)}; return _negSeen.set;
+  }
+  function negMark(dayId,k){
+    const s=negSeen(dayId); if(s.has(k)) return false; s.add(k);
+    try{ localStorage.setItem(negKey(dayId), JSON.stringify([...s].slice(-400))); }catch(e){}
+    return true;
+  }
+  // Un castigo que capturó OTRO teléfono: sale con el nombre de quien lo hizo.
+  function negFromRemote(before){
+    if(!before) return;
+    const d=curDay(); if(!d) return;
+    const after=castSnapshot(d);
+    const nuevos=[...after].filter(k=>!before.has(k));
+    if(!nuevos.length) return;
+    const k0=nuevos[0], p=k0.split('|');                    // uno a la vez: el pop es centrado
+    const c=state.castigos.find(x=>x.id===p[2]); if(!c) return;
+    if(!negMark(d.id, k0)) return;
+    popCelebrate('😭', (c.emoji?c.emoji+' ':'')+c.name.split(' ')[0], 'neg', p[0]);
+    playSound('neg');
+  }
   function checkCelebrate(pid,h){
     const d=curDay(); if(!d) return;
-    if(myPid() && pid!==myPid()) return;   // festejos SOLO de lo que hizo el usuario logueado (no de lo que captura de otros)
+    // Positivas: SOLO las mías. Antes la guarda era `if(myPid() && pid!==myPid())`, así que
+    // en un teléfono sin jugador ligado se caía y salían los festejos de todos.
+    const me=myPid(), mias = !!me && pid===me;
     state.celebrated=state.celebrated||{};
     let changed=false, best=null, neg=false, plainPos=false; const customSounds=[];
     celebrations(pid,h).forEach(c=>{
+      // Negativas: le salen a TODOS, las capture quien las capture, con el nombre de quien
+      // la hizo (a mí, sin mi nombre: ya sé que fui yo). Dedup por dispositivo.
+      if(c.tier==='neg'){
+        if(!negMark(d.id, pid+'|'+h+'|'+c.type.replace(/^cast:/,''))) return;
+        neg=true; popCelebrate(c.emoji,c.label,'neg', mias?null:pid); return;
+      }
+      if(!mias) return;                                        // lo bueno, solo lo mío
       if(c.type==='ace' && isActiveCaptureHole(d,h)) return;   // diferir el ace hasta que avance de hoyo
       const k=d.id+'|'+pid+'|'+h+'|'+c.type;
       if(state.celebrated[k]) return;
       state.celebrated[k]=true; changed=true;
-      if(c.tier==='neg'){ neg=true; popCelebrate(c.emoji,c.label,'neg'); return; }
       const tier = c.type==='ace'?'ace':(c.tier||'mini');
       if((tierRank[tier]||1) > (tierRank[best]||0)) best=tier;
       if(c.sound) customSounds.push(c.sound); else plainPos=true;
@@ -3513,14 +3607,17 @@ const App = (() => {
     if(neg) playSound('neg');
     if(changed) save();
   }
-  function popCelebrate(emoji,label,tier){
+  // `who` = pid de quien lo hizo. Solo se usa en las negativas y solo si NO soy yo:
+  // si la calaca es mía, no necesito que la pantalla me diga mi propio nombre.
+  function popCelebrate(emoji,label,tier,who){
     document.querySelectorAll('.pop').forEach(e=>e.remove());   // uno a la vez, centrado
     const tc = tier==='big'?'tbig':tier==='neg'?'tneg':'tmini';
     const o=document.createElement('div'); o.className='pop '+tc;
+    const nm = who ? pname(who) : '';
     const n = tier==='big'?34:10, cols=['#e8c87a','#74e7a0','#ff8f76','#5b3a8a','#3a7d54'];
     let sp=''; for(let i=0;i<n;i++){ const a=Math.random()*360, dist=40+Math.random()*80, dur=.7+Math.random()*.6;
       sp+=`<i style="--a:${a}deg;--d:${dist}px;background:${cols[i%cols.length]};animation-duration:${dur}s"></i>`; }
-    o.innerHTML=`<div class="pop-c"><div class="pop-emo">${emoji}</div><div class="pop-lbl">${label}</div><div class="spk">${sp}</div></div>`;
+    o.innerHTML=`<div class="pop-c"><div class="pop-emo">${emoji}</div><div class="pop-lbl">${label}</div>${nm?`<div class="pop-who">${_esc(nm)}</div>`:''}<div class="spk">${sp}</div></div>`;
     document.body.appendChild(o);
     setTimeout(()=>{ o.classList.add('out'); setTimeout(()=>o.remove(),350); }, tier==='big'?2200:1400);
   }
@@ -5141,7 +5238,7 @@ const App = (() => {
     window.addEventListener('orientationchange',()=>{ set(false); acc=0; lastY=Math.max(0,window.scrollY||0); },{passive:true});
   }
   function showChrome(){ const el=document.getElementById('chrome'); if(el) el.classList.remove('chrome-off'); }
-  async function init(){ try{ if(document.fonts&&document.fonts.load){ document.fonts.load("600 40px Newsreader"); document.fonts.load("italic 600 40px Newsreader"); document.fonts.load("400 20px 'Patrick Hand'"); document.fonts.load("700 16px 'Hanken Grotesk'"); } }catch(e){} loadDevUser(); await load(); autoPickDay(); render();
+  async function init(){ try{ if(document.fonts&&document.fonts.load){ document.fonts.load("600 40px Newsreader"); document.fonts.load("italic 600 40px Newsreader"); document.fonts.load("400 20px 'Patrick Hand'"); document.fonts.load("700 16px 'Hanken Grotesk'"); } }catch(e){} loadDevUser(); await load(); autoPickDay(); restoreHole(); render();
     try{ const sv=localStorage.getItem('cl_view'); if(sv && ['liq','day','score','vent','high','cfg'].indexOf(sv)>=0 && sv!==curView) go(sv); }catch(e){}   // restaura la última vista (no desorientar al recargar)
     initPullRefresh(); initAutoHideChrome(); startAuth(); if(!_devUser) loginModal();
     checkForUpdate();   // ¿hay versión nueva? recarga sola
@@ -5463,7 +5560,10 @@ const App = (() => {
     // Gancho de PRUEBAS (tests.html): acceso directo al motor con estado sintético. NO usar desde la UI.
     __test:{ computeDay,_computeDayRaw,medalSeg,h2h,allocate,received,playOrder,orderIdx,isSecond,autoUnits,validManual,unitsOnHole,inferOyes,autoCast,dayStats,seasonStats,careerStats,clearStatCache,intHcp,intHcpOf,playerDiffs,COURSE_SEED,courseSlug,mostRecentDayId,autoPickDay,resetOpenedFresh:function(){_openedFresh=true;},startOf,pairSameStart,dayMixedStarts,salidaStartOf,firstNineDone,isRetired,dayAllFinished,validateDay,dayThru,dayHighlights,dayCarrilla,SAVED_TROPHIES,MISSED_TROPHIES,seasonHighlights,
       setState:function(st){ state=Object.assign(state,st); clearStatCache(); },
-      getState:function(){ return state; } } };
+      getState:function(){ return state; },
+      castSnapshot:castSnapshot, negFromRemote:negFromRemote, holeCompleteForGroup:holeCompleteForGroup,
+      firstPendingHole:firstPendingHole, restoreHole:restoreHole,
+      navState:function(){ return {grupo:curScoreGroup, hoyo:curHoleNav}; } } };
 })();
 if(!window.__TEST__) App.init();   // tests.html pone __TEST__=true para usar App.__test sin arrancar la UI
 </script>
