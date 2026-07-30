@@ -34,18 +34,20 @@
     --line-2:#eef0ed;        /* separador entre filas */
     --line-3:#d6dad4;        /* borde apagado */
     --amber:#d8b24e;         /* dorado acento / 1er lugar */
-    --gold-deep:#b98a2e;     /* dorado oscuro (labels) */
-    --gold-soft:#e3c878;     /* dorado sobre verde */
+    --gold-deep:#896622;     /* dorado oscuro (labels) · 2.71→4.58 sobre el papel kraft */
+    --gold-soft:#e9d393;     /* dorado sobre verde · 4.08→4.53 sobre --fairway */
     --clay:#c1272d;          /* pérdidas / banderín */
-    --muted:#6e776f;         /* gris texto secundario */
-    --muted-2:#9aa39a;       /* gris inactivo */
+    --muted:#666f67;         /* gris texto secundario · 4.03→4.53 sobre el papel kraft */
+    --muted-2:#707770;       /* gris inactivo · 2.60→4.60; era ilegible en la nav (9px) */
     --purple:#7a5bb0;        /* Grupo 2 */
     --good:#0a6a3a;          /* + dinero a favor */
     --shadow:0 1px 0 rgba(0,0,0,.02),0 10px 30px rgba(15,40,28,.07);
-    /* Safe-area detrás de una variable: Chromium no puede emular env(), así que sin esta
-       indirección el caso "PWA con notch" —donde vive este bug— no se puede probar. */
+    /* Safe-area detrás de una variable: Chromium NO puede emular env(), así que sin esta
+       indirección el caso "PWA con notch" —justo donde viven los bugs de barras— es
+       imposible de probar en pruebas headless. Con esto se simula con setProperty(). */
+    --sat:env(safe-area-inset-top);
     --sab:env(safe-area-inset-bottom);
-    /* Altura REAL de la nav: 1 borde + 7 + (4+22+3+~11+4) + 9 = 61px, +1 de holgura.
+    /* Altura REAL de la nav inferior: 1 borde + 7 + (4+22+3+~11+4) + 9 = 61px, +1 de holgura.
        Fuente única de verdad para el colchón del contenido y para el toast. */
     --navh:calc(62px + var(--sab));
   }
@@ -63,7 +65,8 @@
     color:var(--ink);
     background:var(--paper);
     /* Sin padding-bottom aquí: se SUMABA al de <main> (84 + 96 + safe-area = 180px) contra
-       una nav de 62px, dejando ~119px de blanco muerto que hacía ver la barra "despegada". */
+       una nav de 62px, dejando ~119px de blanco muerto que hacía ver la barra "despegada".
+       El colchón lo pone <main> solo, con var(--navh). */
     -webkit-text-size-adjust:100%;
   }
   h1,h2,h3{margin:0}
@@ -76,10 +79,21 @@
   header{
     background:#fff;
     color:var(--ink);
-    padding:calc(env(safe-area-inset-top) + 10px) 16px 0;
-    position:sticky;top:0;z-index:30;
+    padding:calc(var(--sat) + 10px) 16px 0;
+    /* El sticky ya NO vive aquí: lo hace #chrome. Cuando header y .feedbar eran dos sticky
+       hermanos con el mismo z-index, el empate lo desempataba el orden del DOM y el ticker
+       (que va después) se pintaba encima del avatar. */
     border-bottom:1px solid var(--line);
   }
+  /* Todo el bloque superior en UNA sola capa pegajosa: appbar + idbar + avisos + ticker.
+     Un solo z-index => imposible que se tapen entre sí.
+     Auto-ocultar: translateY(-100%) es relativo a su PROPIA altura, así que funciona igual
+     con notch, con barra de avisos, con ticker o sin nada — sin medir nada por JS. */
+  #chrome{position:sticky;top:0;z-index:30;background:#fff;transition:transform .22s ease}
+  #chrome.chrome-off{transform:translateY(-100%)}
+  /* si no se ve, que no gaste compositor animando el ticker */
+  #chrome.chrome-off .feed-track{animation-play-state:paused}
+  @media(prefers-reduced-motion:reduce){ #chrome{transition:none} }
   .appbar{display:flex;align-items:center;justify-content:space-between;gap:10px;padding-bottom:11px}
   .ab-user{flex:none;width:40px;height:40px;border-radius:50%;overflow:hidden;border:1.5px solid var(--fairway);padding:0;background:#eaf3ec;display:grid;place-items:center;cursor:pointer;color:var(--fairway);font-weight:700;font-size:16px;line-height:1}
   .ab-brand{font-family:'Newsreader',serif;font-style:italic;font-weight:600;font-size:19px;color:var(--fairway);white-space:nowrap;display:flex;align-items:center;justify-content:center;gap:8px;min-width:0;flex:1;overflow:hidden}
@@ -123,12 +137,12 @@
     background:#fff;border-top:1px solid var(--line);
     display:grid;grid-template-columns:repeat(6,1fr);
     padding:7px 2px calc(var(--sab) + 9px);
-    /* Se revirtió la promoción a capa GPU (translateZ/backface-visibility/will-change) del
-       intento anterior: WebKit decide qué capa sigue al viewport por position:fixed y por la
-       ausencia de ancestros transformados, NO por si está compositada — no servía de nada.
-       Y will-change permanente reserva memoria de capa toda la vida de la página y crea un
-       bloque contenedor que rompería cualquier position:fixed anidado aquí.
-       La causa real era el rebote elástico: ver overscroll-behavior arriba. */
+    /* Se revirtió la promoción a capa GPU (translateZ/backface-visibility/will-change) que
+       intentaba arreglar el despegue: WebKit decide qué capa sigue al viewport por
+       position:fixed y por la ausencia de ancestros transformados, NO por si está
+       compositada — así que no servía de nada. Y will-change permanente reserva memoria
+       de capa toda la vida de la página y crea un bloque contenedor que rompería cualquier
+       position:fixed que se anide aquí. La causa real era el rebote: ver overscroll-behavior. */
   }
   nav button{
     color:var(--muted-2);font-size:9px;font-weight:600;letter-spacing:0;white-space:nowrap;
@@ -203,22 +217,16 @@
   .addsel{appearance:none;-webkit-appearance:none;width:100%;margin-top:10px;font-size:14px;font-weight:600;color:var(--fairway);background:#fff;border:1.5px solid var(--fairway);border-radius:12px;padding:11px 32px 11px 14px;
     background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='13' height='13' viewBox='0 0 24 24' fill='none' stroke='%230a6a3a' stroke-width='2.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 13px center}
 
-  /* scorecard */
-  .scsel{display:flex;gap:8px;overflow-x:auto;padding-bottom:6px;margin-bottom:10px}
-  .scsel button{flex:none;padding:9px 13px;border-radius:11px;background:var(--paper-2);font-weight:600;font-size:13px;color:#54635a;white-space:nowrap}
-  .scsel button.active{background:var(--fairway);color:#fff}
-  .holegrid{display:grid;grid-template-columns:repeat(2,1fr);gap:8px}
-  .hole{border:1px solid var(--line);border-radius:12px;padding:9px;background:#fff}
-  .hole .hh{display:flex;justify-content:space-between;align-items:center;font-size:11px;color:var(--muted);font-weight:600;margin-bottom:6px}
-  .hole .hh b{color:var(--ink);font-size:13px}
-  .hole .sc{display:flex;align-items:center;gap:6px}
+  /* scorecard
+     Se borró el CSS de un diseño anterior (grid de 18 hoyos con selector de jugador):
+     .scsel, .holegrid, .hole, .hole .hh, .hole .sc, .putts y .putts .plab. Ninguna función
+     de render los emitía — hoy se captura el grupo entero por hoyo con .hbh-*.
+     Ojo: .plab SÍ se usa, pero lo estiliza la regla viva .hbh-pt .plab (más abajo). */
   .mini{width:40px;height:40px;border-radius:0;background:#fff;font-weight:600;font-size:22px;color:var(--fairway);display:grid;place-items:center}
   .mini:active{background:var(--paper-2)}
   .scval{min-width:42px;text-align:center;font-family:'Hanken Grotesk',sans-serif;font-weight:800;font-size:24px;line-height:1;color:var(--ink)}
   .scval.good{color:var(--good)}
   .scval.over{color:var(--clay)}
-  .putts{display:flex;align-items:center;gap:6px;margin-top:7px;justify-content:center}
-  .putts .plab{font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:#5b3a8a;font-weight:700;margin-right:2px}
   .pmini{width:28px;height:28px;border-radius:7px;background:var(--paper-2);color:var(--fairway);font-weight:700;font-size:16px}
   .pmini:active{background:#e6e8e4}
   .pval{min-width:24px;text-align:center;font-weight:700;font-size:15px;color:var(--muted);font-variant-numeric:tabular-nums}
@@ -255,6 +263,30 @@
   .hcard.fire .hval{color:#c2410c}
   .hcard.ace{border-top-color:var(--amber);box-shadow:0 0 0 2px rgba(216,178,78,.35);animation:acepulse 1.4s ease-in-out infinite}
   @keyframes acepulse{0%,100%{box-shadow:0 0 0 rgba(224,181,60,0)}50%{box-shadow:0 0 16px rgba(224,181,60,.75)}}
+
+  /* Tira compacta de trofeos del día, dentro de El 19 justo debajo del podio.
+     Antes vivían en su propia sección y la gente nunca entraba a verlos al terminar la
+     jugada. Aquí se ven sin buscarlos. Versión chica de .hcard: se desliza en horizontal. */
+  .tstrip-tit{font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--gold-deep);font-weight:800;margin:14px 0 7px}
+  .tstrip{display:flex;gap:8px;overflow-x:auto;padding:1px 0 6px;-webkit-overflow-scrolling:touch;scrollbar-width:none}
+  .tstrip::-webkit-scrollbar{display:none}
+  /* mismo papel que .tbadge (la vitrina del perfil): un trofeo se ve igual en toda la app */
+  .tchip{flex:none;min-width:96px;max-width:132px;background:#f6efda;border:1px solid #d4c39a;
+    border-top:3px solid var(--muted-2);border-radius:12px;padding:8px 10px 9px;box-shadow:var(--shadow)}
+  .tchip .tc-e{font-size:20px;line-height:1}
+  .tchip .tc-n{font-family:'Newsreader',serif;font-weight:600;font-size:14px;color:var(--ink);line-height:1.1;margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .tchip .tc-t{font-size:9.5px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);font-weight:800;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .tchip .tc-v{font-weight:800;font-size:14px;color:var(--ink);margin-top:3px}
+  .tchip.gold{border-top-color:var(--amber)} .tchip.gold .tc-v{color:var(--gold-deep)}
+  .tchip.good{border-top-color:var(--good)}  .tchip.good .tc-v{color:var(--good)}
+  .tchip.bad{border-top-color:var(--clay)}   .tchip.bad .tc-v{color:var(--clay)}
+  .tchip.fire{border-top-color:#f97316}      .tchip.fire .tc-v{color:#c2410c}
+  .tchip.ace{border-top-color:var(--amber);box-shadow:0 0 0 2px rgba(216,178,78,.35);animation:acepulse 1.4s ease-in-out infinite}
+  /* variante del perfil: ahí el texto grande es el TÍTULO del trofeo ("Líder de la temporada"),
+     que no cabe en una línea. Deja que envuelva en vez de cortarlo con puntos suspensivos. */
+  .tchip.wrapn{min-width:112px}
+  .tchip.wrapn .tc-n{white-space:normal;line-height:1.15}
+
   .carrilla{margin-top:18px}
   .carrilla .ctit{font-family:'Newsreader',serif;font-weight:600;font-size:19px;color:var(--fairway);margin-bottom:10px}
   .cbub{background:var(--paper-2);color:var(--ink);border-left:3px solid var(--amber);border-radius:0 10px 10px 0;padding:10px 13px;margin-bottom:8px;font-size:13.5px;line-height:1.45;animation:popin .3s ease}
@@ -399,7 +431,8 @@
     background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='11' height='11' viewBox='0 0 24 24' fill='none' stroke='%230a6a3a' stroke-width='2.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 10px center}
   .startsel button{width:auto;height:auto;padding:6px 13px;border-radius:999px;background:#fff;border:1.5px solid var(--line-3);font-weight:700;font-size:12.5px;color:var(--muted)}
   .startsel button.on{background:var(--fairway);color:#fff;border-color:var(--fairway)}
-  .feedbar{position:sticky;top:0;z-index:30;overflow:hidden;
+  /* sin position/z-index propios: vive dentro de #chrome y se mueve con él */
+  .feedbar{overflow:hidden;
     background:#fffdf6;border-bottom:1px solid #f0d9a8;padding:8px 0;white-space:nowrap}
   .feed-track{display:inline-flex;gap:8px;align-items:center;padding-left:12px;
     animation-name:ticker;animation-timing-function:linear;animation-iteration-count:infinite;will-change:transform}
@@ -521,7 +554,7 @@
   .lb-row:active{background:var(--paper-2)}
   /* ===== Look "papel + letra a mano" en los outputs en pantalla (El 19), igual que las imágenes compartibles ===== */
   .lb,.podium{background:#f6efda;border-color:#d4c39a}
-  .lb-sub{background:#efe6c9;color:#9a7d3a}
+  .lb-sub{background:#efe6c9;color:#7b642e}   /* 3.14→4.54 */
   .lb-row{border-bottom-color:#e3d6b0}
   .lb-row:active{background:#efe6c9}
   .lb .pos,.lb .nm,.lb .pesos,.lb .rayas,.pod-name,.pod-pesos,.pod-base{font-family:'Patrick Hand','Newsreader',cursive}
@@ -539,7 +572,7 @@
   .obcard{background:#f6efda;border:1px solid #d4c39a;border-radius:14px;padding:12px 14px;margin-bottom:12px;box-shadow:0 3px 12px rgba(0,0,0,.06)}
   .ob-hd{display:flex;gap:12px;align-items:center;margin-bottom:9px}
   .ob-t{font-family:'Newsreader',serif;font-style:italic;font-weight:600;font-size:19px;color:var(--fairway);line-height:1.1}
-  .ob-s{font-family:'Patrick Hand','Newsreader',cursive;font-size:14px;color:#8a7442;margin-top:2px}
+  .ob-s{font-family:'Patrick Hand','Newsreader',cursive;font-size:14px;color:#7e6a3c;margin-top:2px}   /* 3.92→4.55 */
   .ob-steps{display:flex;flex-direction:column;gap:6px}
   .ob-step{display:flex;align-items:center;gap:10px;width:100%;text-align:left;background:#fff;border:1px solid #e3d6b0;border-radius:10px;padding:9px 11px;font-family:'Patrick Hand','Newsreader',cursive;font-size:15px;color:var(--ink);cursor:pointer}
   .ob-step:active{background:#efe6c9}
@@ -610,7 +643,7 @@
   .toast{position:fixed;left:50%;bottom:calc(var(--navh) + 12px);transform:translateX(-50%) translateY(20px);background:var(--ink);color:#fff;padding:11px 18px;border-radius:999px;font-size:13px;font-weight:600;opacity:0;transition:.25s;z-index:60;pointer-events:none}
   .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
   /* Pull-to-refresh (para uso como web app instalada en el teléfono) */
-  #ptr{position:fixed;top:calc(env(safe-area-inset-top) + 6px);left:50%;transform:translateX(-50%) translateY(-46px);z-index:70;width:36px;height:36px;border-radius:50%;background:#fff;box-shadow:0 4px 14px rgba(10,40,24,.18);display:flex;align-items:center;justify-content:center;color:var(--fairway);font-size:18px;opacity:0;pointer-events:none;transition:opacity .15s}
+  #ptr{position:fixed;top:calc(var(--sat) + 6px);left:50%;transform:translateX(-50%) translateY(-46px);z-index:70;width:36px;height:36px;border-radius:50%;background:#fff;box-shadow:0 4px 14px rgba(10,40,24,.18);display:flex;align-items:center;justify-content:center;color:var(--fairway);font-size:18px;opacity:0;pointer-events:none;transition:opacity .15s}
   #ptr .ptr-ic{display:block;transition:transform .15s}
   #ptr.ready .ptr-ic{transform:rotate(180deg)}
   #ptr.go .ptr-ic{animation:ptrspin .7s linear infinite}
@@ -629,6 +662,8 @@
 </head>
 <body>
 
+<!-- Bloque superior completo en una sola capa pegajosa (ver #chrome en el CSS) -->
+<div id="chrome">
 <header>
   <div class="appbar">
     <button class="ab-user" id="abUser" onclick="App.userSpace()" aria-label="Tu espacio">👤</button>
@@ -644,7 +679,8 @@
 
 <div id="idbar" onclick="App.loginModal()" title="Cambiar usuario (modo prueba)" style="cursor:pointer;background:#fff;border-bottom:1px solid var(--line);padding:7px 16px;font-size:12.5px;color:var(--muted);display:flex;justify-content:space-between;align-items:center;gap:8px"></div>
 <div id="notifbar" style="display:none"></div>
-<div id="feedbar" class="feedbar" style="display:none;cursor:pointer" onclick="App.go('high')" title="Ver todos los trofeos del día"></div>
+<div id="feedbar" class="feedbar" style="display:none;cursor:pointer" onclick="App.go('liq')" title="Ver los trofeos del día"></div>
+</div><!-- /#chrome -->
 
 <main>
   <!-- LIQUIDACIÓN -->
@@ -667,7 +703,7 @@
   <section class="view" id="v-score">
     <div class="eyebrow">Tarjeta</div>
     <h2 class="vtitle">Captura</h2>
-    <p class="lead">Elige jugador y mete cada hoyo. Birdie, eagle y calaca se marcan solos; sandie, hole out y castigos los prendes tú.</p>
+    <p class="lead">Captura el hoyo para todo el grupo y avanza. Birdie, eagle y calaca se marcan solos; sandie, hole out y castigos los prendes tú.</p>
     <div id="scoreContent"></div>
   </section>
 
@@ -679,11 +715,11 @@
     <div id="ventContent"></div>
   </section>
 
-  <!-- DESTACADOS -->
+  <!-- JUGADORES (antes "Trofeos": los del día se ven en El 19, los de temporada en cada perfil) -->
   <section class="view" id="v-high">
-    <div class="eyebrow">Salón de la fama 🔥</div>
-    <h2 class="vtitle">Trofeos</h2>
-    <p class="lead">Lo mejor y lo peor del día y de la temporada. Rachas, récords y lo que se dice en el 19.</p>
+    <div class="eyebrow">Salón de la fama</div>
+    <h2 class="vtitle">Jugadores</h2>
+    <p class="lead">Toca a cualquiera para ver su perfil: sus trofeos, su vitrina y su balance del año.</p>
     <div id="highContent"></div>
   </section>
 
@@ -705,8 +741,8 @@
 <nav>
   <button data-v="day" onclick="App.go('day')"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M6.5 21V3.5"/><path d="M6.5 4.5h10l-2.3 3 2.3 3h-10"/></svg></span>Salidas</button>
   <button data-v="score" onclick="App.go('score')"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M15.2 4.4l4.4 4.4-9.4 9.4-4.7.9.9-4.7Z"/><path d="M13.4 6.2l4.4 4.4"/><path d="M6.4 14.4l3.2 3.2"/></svg></span>Captura</button>
-  <button data-v="high" onclick="App.go('high')"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M7 4h10v4.5a5 5 0 0 1-10 0Z"/><path d="M7 5.5H4.5a2 2 0 0 0 2.3 3.2"/><path d="M17 5.5h2.5a2 2 0 0 1-2.3 3.2"/><path d="M10 14h4l-.4 2.5h-3.2Z"/><path d="M8.5 20h7"/><path d="M12 16.5V20"/></svg></span>Trofeos</button>
   <button data-v="liq" class="active" onclick="App.go('liq')"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M7.5 8h7v10.5a1 1 0 0 1-1 1h-5a1 1 0 0 1-1-1Z"/><path d="M14.5 10h2.5a1.4 1.4 0 0 1 1.4 1.4v2.6a1.4 1.4 0 0 1-1.4 1.4h-2.5"/><path d="M9 8c0-1.6 1.2-2.6 3-2.6s3 1 3 2.6"/></svg></span>El 19</button>
+  <button data-v="high" onclick="App.go('high')"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.2"/><path d="M3.5 19.5c0-3 2.5-5 5.5-5s5.5 2 5.5 5"/><circle cx="17" cy="9.5" r="2.4"/><path d="M15.4 14.9c2.6-.5 5.1 1.2 5.1 4.6"/></svg></span>Jugadores</button>
   <button data-v="vent" onclick="App.go('vent')"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4.5v15"/><path d="M5.5 19.5h13"/><path d="M6 7.5l6-1.3 6 1.3"/><path d="M6 7.5l-2.5 5a2.5 2.5 0 0 0 5 0Z"/><path d="M18 7.5l-2.5 5a2.5 2.5 0 0 0 5 0Z"/></svg></span>Ventajas</button>
   <button data-v="cfg" onclick="App.go('cfg')"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 2.5v2.2M12 19.3v2.2M21.5 12h-2.2M4.7 12H2.5M18.7 5.3l-1.6 1.6M6.9 17.1l-1.6 1.6M18.7 18.7l-1.6-1.6M6.9 6.9 5.3 5.3"/></svg></span>Ajustes</button>
 </nav>
@@ -718,7 +754,7 @@
 
 <script>
 const App = (() => {
-  const APP_VERSION = '2026-07-10-92';   // ⬆️ SUBIR en cada deploy: la app se auto-recarga cuando detecta una versión distinta
+  const APP_VERSION = '2026-07-10-93';   // ⬆️ SUBIR en cada deploy: la app se auto-recarga cuando detecta una versión distinta
   const APP_URL = 'https://app.plagolf.com/';   // dominio canónico: los links de invitación y códigos SIEMPRE usan éste
   const KEY = 'rayas-campestre-v2';
   const uid = () => Math.random().toString(36).slice(2,9);
@@ -1511,6 +1547,7 @@ const App = (() => {
     try{ localStorage.setItem('cl_view', v); }catch(e){}   // recuerda la vista para no desorientar al recargar
     document.querySelectorAll('.view').forEach(s=>s.classList.toggle('active',s.id==='v-'+v));
     document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('active',b.dataset.v===v));
+    showChrome();   // al cambiar de vista siempre debes ver dónde estás
     render();
   }
   function updateBrand(){
@@ -1680,6 +1717,22 @@ const App = (() => {
       html+=`</div></div>`;
     }
 
+    // ---- Trofeos del día (tira compacta, justo debajo del podio) ----
+    // Se omite el 👑 "Líder del día": ya es el 1º del podio, aquí arriba.
+    if(hasScores){
+      const hl=dayHighlights(dayStats(d)).filter(t=>t.t!=='Líder del día');
+      if(hl.length){
+        html+=`<div class="tstrip-tit">Trofeos del día</div><div class="tstrip">`;
+        hl.forEach(t=>{ html+=`<div class="tchip ${t.c||''}">
+          <div class="tc-e">${t.e}</div>
+          <div class="tc-n">${t.n}</div>
+          <div class="tc-t">${t.t}</div>
+          <div class="tc-v">${t.v}</div>
+        </div>`; });
+        html+=`</div>`;
+      }
+    }
+
     // ---- Leaderboard ----
     html+=`<div class="lb">
       <div class="lb-head"><div class="c1">POS</div><div class="c2">JUGADOR</div><div class="c3">PESOS</div><div class="c4">RAYAS</div></div>
@@ -1728,6 +1781,12 @@ const App = (() => {
       html+=`</div>`;
     }
     html+=dayPhotoStrip(d);
+    // La carrilla y el exportador también vivían en la sección Trofeos; su sitio natural es aquí.
+    if(hasScores){
+      const lines=dayCarrilla(dayStats(d));
+      if(lines.length) html+='<div class="carrilla"><div class="ctit">🎙️ La mesa del 19</div>'+lines.map(l=>`<div class="cbub">${l}</div>`).join('')+'</div>';
+      html+='<div class="exprow"><button class="expbtn" onclick="App.exportHigh()">📸 Exportar trofeos</button></div>';
+    }
     box.innerHTML=html;
     loadDayStrip(d.id);
   }
@@ -2067,17 +2126,12 @@ const App = (() => {
     h+='<div class="exprow"><button class="expbtn" onclick="App.exportHigh()">📸 Exportar trofeos</button></div>';
     return h;
   }
+  // Antes esta vista eran 3 pestañas (Día · Jugadores · Temporada) y la gente no sabía a cuál
+  // meterse. Ahora es SOLO la lista de jugadores: los trofeos del día viven en El 19 (donde
+  // caes al terminar la jugada) y los de temporada en el perfil de cada quien.
   function renderHigh(){
     const box=document.getElementById('highContent'); if(!box) return;
-    const seg=`<div class="seg3">
-      <button class="${highTab==='hoy'?'on':''}" onclick="App.setHighTab('hoy')">Día</button>
-      <button class="${highTab==='jug'?'on':''}" onclick="App.setHighTab('jug')">Jugadores</button>
-      <button class="${highTab==='temp'?'on':''}" onclick="App.setHighTab('temp')">🏆 Temporada</button></div>`;
-    let body;
-    if(highTab==='temp') body=renderHighSeason();
-    else if(highTab==='jug') body=renderHighPlayers();
-    else body=renderHighDay();
-    box.innerHTML=seg+body;
+    box.innerHTML=renderHighPlayers();
   }
   function setHighTab(t){ highTab=t; renderHigh(); }
 
@@ -2201,6 +2255,17 @@ const App = (() => {
       const lvlCls=earned?(lv===3?' lv3':lv===2?' lv2':lv===1?' lv1':''):'';
       h+=`<div class="tbadge ${earned?(b.good?'tg':'tb'):'tlock'}${lvlCls}">${med?`<div class="tb-med">${med}</div>`:''}<div class="tb-e">${b.emoji}</div><div class="tb-n">${b.name}</div><div class="tb-v">${earned?'×'+b.val+(b.suffix||''):'—'}</div></div>`; });
     h+=`</div>`;
+    // Trofeos de temporada que ostenta ESTE jugador. Antes vivían en la pestaña "Temporada"
+    // de la sección Trofeos, pero ahí eran superlativos de todo el grupo; aquí se filtran a
+    // los que este jugador tiene hoy, que es lo que de verdad le interesa a él.
+    try{
+      const mine=seasonHighlights(seasonStats()).filter(t=>t.n===pname(pid));
+      if(mine.length){
+        h+=`<div class="prof-sect" style="margin-top:14px">🏆 Trofeos de la temporada</div><div class="tstrip">`;
+        mine.forEach(t=>{ h+=`<div class="tchip wrapn ${t.c||''}"><div class="tc-e">${t.e}</div><div class="tc-n">${t.t}</div><div class="tc-v">${t.v}</div></div>`; });
+        h+=`</div>`;
+      }
+    }catch(e){}
     h+=`<button class="btn ghost block" style="margin-top:14px" onclick="App.openH2H('${pid}')">⚔️ Balance contra cada jugador</button>`;
     h+=`<div class="exprow"><button class="expbtn" onclick="App.exportProfile('${pid}')">📸 Exportar perfil</button></div>`;
     h+=`<button class="btn block" style="margin-top:8px" onclick="App.closeModal()">Cerrar</button>`;
@@ -5049,12 +5114,60 @@ const App = (() => {
     window.addEventListener('touchend',end,{passive:true});
     window.addEventListener('touchcancel',()=>{ pulling=false; hide(); },{passive:true});
   }
+  // Auto-ocultar el bloque superior: al avanzar hacia abajo se va; al regresar hacia arriba,
+  // aunque sea poco, vuelve. Un solo elemento (#chrome) => un solo transform, nada que medir.
+  function initAutoHideChrome(){
+    if(window.__chromeInit) return; window.__chromeInit=true;
+    const el=document.getElementById('chrome'); if(!el) return;
+    const HIDE=10;   // px acumulados hacia ABAJO para esconder (mata el jitter del dedo)
+    const SHOW=6;    // px acumulados hacia ARRIBA para reaparecer ("aunque sea poco")
+    let lastY=Math.max(0, window.scrollY||0), acc=0, hidden=false, queued=false;
+    const modalOpen=()=>{ const m=document.getElementById('modalBg'); return !!(m&&m.classList.contains('show')); };
+    const set=v=>{ if(v===hidden) return; hidden=v; el.classList.toggle('chrome-off',v); };
+    function frame(){
+      queued=false;
+      const y=Math.max(0, window.scrollY||document.documentElement.scrollTop||0);   // iOS reporta negativo al rebotar
+      const dy=y-lastY; lastY=y;
+      // Nunca escondido: con modal abierto, ni mientras el bloque todavía cabe en pantalla.
+      // Lo segundo protege al pull-to-refresh, que solo se arma con scrollY<=0.
+      if(modalOpen() || y<=el.offsetHeight){ set(false); acc=0; return; }
+      if((dy>0&&acc<0)||(dy<0&&acc>0)) acc=0;   // cambió el sentido: reinicia el acumulador
+      acc+=dy;
+      if(acc>=HIDE){ set(true); acc=0; }
+      else if(acc<=-SHOW){ set(false); acc=0; }
+    }
+    // rAF con guardia: iOS emite hasta 60 scroll/s con inercia; se colapsan en un frame.
+    window.addEventListener('scroll',()=>{ if(!queued){ queued=true; requestAnimationFrame(frame); } },{passive:true});
+    window.addEventListener('orientationchange',()=>{ set(false); acc=0; lastY=Math.max(0,window.scrollY||0); },{passive:true});
+  }
+  function showChrome(){ const el=document.getElementById('chrome'); if(el) el.classList.remove('chrome-off'); }
   async function init(){ try{ if(document.fonts&&document.fonts.load){ document.fonts.load("600 40px Newsreader"); document.fonts.load("italic 600 40px Newsreader"); document.fonts.load("400 20px 'Patrick Hand'"); document.fonts.load("700 16px 'Hanken Grotesk'"); } }catch(e){} loadDevUser(); await load(); autoPickDay(); render();
     try{ const sv=localStorage.getItem('cl_view'); if(sv && ['liq','day','score','vent','high','cfg'].indexOf(sv)>=0 && sv!==curView) go(sv); }catch(e){}   // restaura la última vista (no desorientar al recargar)
-    initPullRefresh(); startAuth(); if(!_devUser) loginModal();
+    initPullRefresh(); initAutoHideChrome(); startAuth(); if(!_devUser) loginModal();
     checkForUpdate();   // ¿hay versión nueva? recarga sola
     document.addEventListener('visibilitychange', ()=>{ if(!document.hidden) checkForUpdate(); });   // y cada vez que vuelves a la app
+    maybeDemo();   // ?demo=1 en local: siembra días de prueba para ver la app llena
   }   // muestra la entrada al instante; si hay sesión de Google, se cierra sola al resolver
+
+  // Días de prueba con ?demo=1 — SOLO en localhost y SOLO sin sesión iniciada.
+  // Carga demo-seed.js, que siembra en memoria (nunca llama a save()). Al recargar sin el
+  // parámetro, desaparece. Triple candado para que esto no pueda pasar en app.plagolf.com:
+  // (1) el host debe ser local, (2) no debe haber usuario autenticado, (3) el archivo
+  // demo-seed.js no se despliega (está sin trackear en git).
+  function maybeDemo(){
+    try{
+      if(!/(^|\?|&)demo=1(&|$)/.test(location.search)) return;
+      const local=['localhost','127.0.0.1','[::1]',''].indexOf(location.hostname)>=0;
+      if(!local){ console.warn('demo: ignorado — solo funciona en local'); return; }
+      if(typeof firebase!=='undefined' && firebase.auth && firebase.auth().currentUser){
+        console.warn('demo: ignorado — hay sesión iniciada'); return;
+      }
+      const s=document.createElement('script');
+      s.src='demo-seed.js?_='+Date.now();
+      s.onerror=()=>console.warn('demo: falta demo-seed.js junto a index.html');
+      document.body.appendChild(s);
+    }catch(e){}
+  }
   // ============================================================
   //  COMPROBANTE DE LIQUIDACIÓN (PDF vía window.print) — todos contra todos + cuentas T
   //  Solo LEE del motor (computeDay/h2h); no toca el cálculo. La matriz es res.pm (rayas netas).
