@@ -573,6 +573,19 @@ async function main(){
     t('el que iba ganando (pa) no acumula saved',ss.A.pa.saved===0,ss.A.pa.saved);
     t('pb.washouts = 1',ss.A.pb.washouts===1,ss.A.pb.washouts);
     t('las jugadas SÍ cuentan (pa.birdies = 1)',ss.A.pa.birdies===1,ss.A.pa.birdies);
+    // careerStats debe seguir EXACTAMENTE la misma regla que seasonStats: si no se paga,
+    // no cuenta. Antes solo lo hacía seasonStats, y por eso el "balance del año" del perfil
+    // salía distinto del de Temporada (la diferencia era justo el día de clima).
+    const cs=T.careerStats();
+    t('clima · career: pa.pesos NO cuenta (0)',cs.C.pa.pesos===0,cs.C.pa.pesos);
+    t('clima · career: pb.pesos NO cuenta (0)',cs.C.pb.pesos===0,cs.C.pb.pesos);
+    t('clima · career: nadie gana ni pierde el viernes',cs.C.pa.won===0&&cs.C.pb.lost===0,cs.C.pa.won+'/'+cs.C.pb.lost);
+    t('clima · career: no hay líder del viernes',cs.C.pa.leaderDays===0,cs.C.pa.leaderDays);
+    t('clima · career: no hay farol',cs.C.pb.farolDays===0,cs.C.pb.farolDays);
+    t('clima · career: mejor/peor viernes sin registrar',cs.C.pa.bestDay===null&&cs.C.pb.worstDay===null,cs.C.pa.bestDay+'/'+cs.C.pb.worstDay);
+    t('clima · career: el día SÍ se cuenta como jugado',cs.C.pa.days===1,cs.C.pa.days);
+    t('clima · career: los logros SÍ cuentan (birdies)',cs.C.pa.birdies===1,cs.C.pa.birdies);
+    t('career y season coinciden en pesos (era el bug)',cs.C.pa.pesos===ss.A.pa.pesos&&cs.C.pb.pesos===ss.A.pb.pesos,cs.C.pa.pesos+'/'+ss.A.pa.pesos);
     const svEmo=T.SAVED_TROPHIES.map(x=>x[0]);   // emojis de los trofeos de "se salvó por el clima"
     const isSave=h=>svEmo.indexOf(h.e)>=0;
     const hl=T.dayHighlights(T.dayStats(d));
@@ -606,6 +619,13 @@ async function main(){
     reset({players:[P('pa','Ana'),P('pb','Beto')],days:[d2],currentDayId:d2.id});
     const ss2=T.seasonStats();
     t('control: sin clima, pb.pesos = −80 y saved 0',ss2.A.pb.pesos===-80&&ss2.A.pb.saved===0,ss2.A.pb.pesos+'/'+ss2.A.pb.saved);
+    // Control imprescindible: sin la marca de clima, career SÍ cuenta. Sin esto, las pruebas
+    // de arriba también pasarían con un motor roto que no contara nunca nada.
+    const cs2=T.careerStats();
+    t('control · career: sin clima pb.pesos = −80',cs2.C.pb.pesos===-80,cs2.C.pb.pesos);
+    t('control · career: sin clima pa gana el viernes',cs2.C.pa.won===1&&cs2.C.pb.lost===1,cs2.C.pa.won+'/'+cs2.C.pb.lost);
+    t('control · career: sin clima hay líder y farol',cs2.C.pa.leaderDays===1&&cs2.C.pb.farolDays===1,cs2.C.pa.leaderDays+'/'+cs2.C.pb.farolDays);
+    t('control · career: sin clima se registra mejor/peor viernes',cs2.C.pa.bestDay===80&&cs2.C.pb.worstDay===-80,cs2.C.pa.bestDay+'/'+cs2.C.pb.worstDay);
   }
 
   window.__RESULTS__.ready=true;

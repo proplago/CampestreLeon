@@ -756,7 +756,7 @@
 
 <script>
 const App = (() => {
-  const APP_VERSION = '2026-07-10-94';   // ⬆️ SUBIR en cada deploy: la app se auto-recarga cuando detecta una versión distinta
+  const APP_VERSION = '2026-07-10-95';   // ⬆️ SUBIR en cada deploy: la app se auto-recarga cuando detecta una versión distinta
   const APP_URL = 'https://app.plagolf.com/';   // dominio canónico: los links de invitación y códigos SIEMPRE usan éste
   const KEY = 'rayas-campestre-v2';
   const uid = () => Math.random().toString(36).slice(2,9);
@@ -1922,7 +1922,8 @@ const App = (() => {
   // ---- Balance head-to-head de la temporada ----
   function seasonH2H(pid){
     const bal={};
-    state.days.forEach(d=>{ const res=computeDay(d); if(!res||!res.pm) return;
+    state.days.forEach(d=>{ if(d.washout) return;   // 🌂 clima: no se pagó, no cuenta en el balance
+      const res=computeDay(d); if(!res||!res.pm) return;
       const row=res.pm[pid]||{};
       Object.keys(row).forEach(q=>{ bal[q]=(bal[q]||0)+row[q]; });
     });
@@ -2188,15 +2189,25 @@ const App = (() => {
       played.forEach(id=>{ let s2=0; const row=pm[id]||{}; Object.keys(row).forEach(o=>{ const op=player(o); if(op && !op.guest) s2+=row[o]; }); inet[id]=s2; });
       const internals=played.filter(id=>{ const p=player(id); return p && !p.guest; });
       const rankedInt=[...internals].sort((a,b)=>inet[b]-inet[a]); const leader=rankedInt[0], farol=rankedInt[rankedInt.length-1];
+      const wash=!!d.washout;   // 🌂 La Acapulqueña: apuestas canceladas, NADIE paga
       played.forEach(id=>{ const s=st.S[id], c=C[id]; if(!c)return; const ipesos=inet[id]*state.rayaValue;
-        c.pesos+=ipesos; c.days++; if(inet[id]>0)c.won++; else if(inet[id]<0)c.lost++;
+        c.days++;
+        // Los LOGROS sí ocurrieron aunque no se haya pagado: cuentan siempre.
         c.birdies+=s.birdies;c.eagles+=s.eagles;c.aces+=s.aces;c.holeouts+=s.holeouts;c.sandies+=s.sandies;c.aquas+=s.aquas;c.oyesWon+=s.oyesWon;c.calacas+=s.calacas;c.zopilotes+=s.zopilotes;c.castigos+=s.castigos;
         Object.keys(s.castById||{}).forEach(k=>c.castById[k]=(c.castById[k]||0)+s.castById[k]);
         c.bestHot=Math.max(c.bestHot,s.hotStreak); c.bestCold=Math.max(c.bestCold,s.coldStreak); c.bestBirdieStreak=Math.max(c.bestBirdieStreak,s.birdieStreak);
+        // Si no se paga, no cuenta: ni saldo, ni viernes ganado/perdido, ni mejor/peor viernes.
+        // seasonStats ya lo hacía así; careerStats no, y por eso el "balance del año" del
+        // perfil no cuadraba con Temporada (diferencia = lo del día de clima).
+        if(wash) return;
+        c.pesos+=ipesos; if(inet[id]>0)c.won++; else if(inet[id]<0)c.lost++;
         if(c.bestDay===null||ipesos>c.bestDay)c.bestDay=ipesos; if(c.worstDay===null||ipesos<c.worstDay)c.worstDay=ipesos;
       });
-      if(leader&&inet[leader]>0)C[leader].leaderDays++;
-      if(farol&&inet[farol]<0)C[farol].farolDays++;
+      // Líder y farol del viernes son posiciones de DINERO: en un día de clima no hay.
+      if(!wash){
+        if(leader&&inet[leader]>0)C[leader].leaderDays++;
+        if(farol&&inet[farol]<0)C[farol].farolDays++;
+      }
     });
     return {C, ids: ids.filter(id=>C[id].days>0)};
   }
@@ -2329,8 +2340,9 @@ const App = (() => {
       if(mf.length===9) skipped.push({name:nm,msg:'no jugó la 1ª vuelta'}); else if(mf.length) partial(' (1ª v.)',mf);
       if(ms.length===9) skipped.push({name:nm,msg:'no jugó la 2ª vuelta'}); else if(ms.length) partial(' (2ª v.)',ms);
     });
-    // oyes en par 3: TODOS los del grupo que jugaron el hoyo deben tener lugar asignado
-    (d.salidas||[]).forEach((grp,gi)=>{ const members=(grp||[]).filter(Boolean); if(members.length<2) return;
+    // oyes en par 3: TODOS los del grupo que jugaron el hoyo deben tener lugar asignado.
+    // Si la apuesta de oyes está apagada, no hay nada que exigir (ni se captura).
+    if(betOn(d,'oyes')) (d.salidas||[]).forEach((grp,gi)=>{ const members=(grp||[]).filter(Boolean); if(members.length<2) return;
       holesOf(d).forEach((h,i)=>{ if(h.par!==3) return;
         const playedMembers=members.filter(id=>ensureScore(d,id).gross[i]>0);
         if(!playedMembers.length) return;
@@ -3285,7 +3297,7 @@ const App = (() => {
     const _pulse=_hlPulse; _hlPulse=false;   // el pulso del encabezado suena una sola vez tras el salto
     html+=`<div class="holenav${_pulse?' pulse':''}">
       <button onclick="App.navHole(-1)" ${curHoleNav===0?'disabled':''}>‹</button>
-      <div class="hninfo"><div class="hnh">Hoyo ${h.n}${h.par===3?' · oyes':''}</div>
+      <div class="hninfo"><div class="hnh">Hoyo ${h.n}${h.par===3&&betOn(d,'oyes')?' · oyes':''}</div>
         <div class="hnp">Par ${h.par} · HCP ${h.si} · ${curHoleNav+1} de ${order.length}</div></div>
       <button onclick="App.navHole(1)" ${curHoleNav===last?'disabled':''}>›</button>
     </div>`;
@@ -3312,7 +3324,7 @@ const App = (() => {
             <span class="pval">${pv==null?'·':pv}</span>
             <button class="pmini" onclick="App.putt('${id}',${hi},1)">+</button>
           </div>
-          ${h.par===3?`<div class="hbh-oy"><span class="olab">🎯</span>
+          ${h.par===3&&betOn(d,'oyes')?`<div class="hbh-oy"><span class="olab">🎯</span>
             <select class="osel${ov===0?' pend':''}" onchange="App.setOyes('${id}',${hi},this.value)">
               <option value="0"${ov===0?' selected':''}>—</option>
               ${Array.from({length:gids.length},(_,k)=>k+1).map(n=>`<option value="${n}"${ov===n?' selected':''}>${n}°${n===1?' 📍':''}</option>`).join('')}
@@ -3398,7 +3410,9 @@ const App = (() => {
     // En par 3 el hoyo NO está completo hasta que el grupo tenga su lugar de oyes: antes
     // brincaba con solo los golpes y había que regresarse a meterlos. Si ese día no juegan
     // oyes, se avanza con la flecha.
-    if(holesOf(d)[hi].par===3 && !gids.every(id=>{ const sc=ensureScore(d,id); return ((sc.oyes||{})[hi]||0)>0; })) return false;
+    // ...salvo que la apuesta de oyes esté apagada para el grupo: entonces no hay nada que
+    // esperar (y la UI de oyes tampoco se muestra).
+    if(betOn(d,'oyes') && holesOf(d)[hi].par===3 && !gids.every(id=>{ const sc=ensureScore(d,id); return ((sc.oyes||{})[hi]||0)>0; })) return false;
     return true;
   }
   function maybeAutoAdvance(d,hi){
