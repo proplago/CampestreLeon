@@ -42,14 +42,28 @@
     --purple:#7a5bb0;        /* Grupo 2 */
     --good:#0a6a3a;          /* + dinero a favor */
     --shadow:0 1px 0 rgba(0,0,0,.02),0 10px 30px rgba(15,40,28,.07);
+    /* Safe-area detrás de una variable: Chromium no puede emular env(), así que sin esta
+       indirección el caso "PWA con notch" —donde vive este bug— no se puede probar. */
+    --sab:env(safe-area-inset-bottom);
+    /* Altura REAL de la nav: 1 borde + 7 + (4+22+3+~11+4) + 9 = 61px, +1 de holgura.
+       Fuente única de verdad para el colchón del contenido y para el toast. */
+    --navh:calc(62px + var(--sab));
   }
   *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;touch-action:manipulation}
-  html,body{margin:0;padding:0;touch-action:manipulation}
+  /* overscroll-behavior-y:none => sin rebote elástico en los extremos del documento.
+     ESE es el motivo de que la barra de abajo "se venga con toda la pantalla" al scrollear
+     hacia arriba en iOS: durante el rebote el viewport visual se desplaza respecto al de
+     layout, y todo lo position:fixed viaja con el segundo.
+     El pull-to-refresh propio (initPullRefresh) no se rompe: usa listeners táctiles y no
+     depende del rebote nativo. De paso apaga el PTR nativo de Android, que hoy se disparaba
+     en paralelo con el de la app. */
+  html,body{margin:0;padding:0;touch-action:manipulation;overscroll-behavior-y:none}
   body{
     font-family:'Hanken Grotesk',Inter,system-ui,sans-serif;
     color:var(--ink);
     background:var(--paper);
-    padding-bottom:84px;
+    /* Sin padding-bottom aquí: se SUMABA al de <main> (84 + 96 + safe-area = 180px) contra
+       una nav de 62px, dejando ~119px de blanco muerto que hacía ver la barra "despegada". */
     -webkit-text-size-adjust:100%;
   }
   h1,h2,h3{margin:0}
@@ -108,11 +122,13 @@
     position:fixed;left:0;right:0;bottom:0;z-index:40;
     background:#fff;border-top:1px solid var(--line);
     display:grid;grid-template-columns:repeat(6,1fr);
-    padding:7px 2px calc(env(safe-area-inset-bottom) + 9px);
-    /* iOS: fija la barra a su propia capa de GPU para que no se "despegue" a media pantalla durante el scroll con inercia */
-    transform:translateZ(0);-webkit-transform:translateZ(0);
-    backface-visibility:hidden;-webkit-backface-visibility:hidden;
-    will-change:transform;
+    padding:7px 2px calc(var(--sab) + 9px);
+    /* Se revirtió la promoción a capa GPU (translateZ/backface-visibility/will-change) del
+       intento anterior: WebKit decide qué capa sigue al viewport por position:fixed y por la
+       ausencia de ancestros transformados, NO por si está compositada — no servía de nada.
+       Y will-change permanente reserva memoria de capa toda la vida de la página y crea un
+       bloque contenedor que rompería cualquier position:fixed anidado aquí.
+       La causa real era el rebote elástico: ver overscroll-behavior arriba. */
   }
   nav button{
     color:var(--muted-2);font-size:9px;font-weight:600;letter-spacing:0;white-space:nowrap;
@@ -122,7 +138,8 @@
   nav button .ic svg{width:21px;height:21px}
   nav button.active{color:var(--fairway);font-weight:700}
 
-  main{padding:16px 16px calc(96px + env(safe-area-inset-bottom));max-width:760px;margin:0 auto}
+  /* 14px de respiro deliberado sobre la nav, en vez de ~119px de vacío accidental */
+  main{padding:16px 16px calc(var(--navh) + 14px);max-width:760px;margin:0 auto}
   .view{display:none}
   .view.active{display:block;animation:fade .25s ease}
   @keyframes fade{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
@@ -317,7 +334,7 @@
   .gtabs{display:flex;gap:8px;margin-bottom:12px}
   .gtabs button{flex:1;padding:9px;border-radius:999px;background:#fff;border:1.5px solid var(--line-3);font-weight:700;font-size:13px;color:var(--muted)}
   /* Salto automático de hoyo: aviso confirmando + pulso del encabezado */
-  .holejump{position:fixed;left:0;right:0;bottom:calc(env(safe-area-inset-bottom) + 78px);display:flex;justify-content:center;z-index:60;transition:opacity .3s;padding:0 16px}
+  .holejump{position:fixed;left:0;right:0;bottom:calc(var(--sab) + 78px);display:flex;justify-content:center;z-index:60;transition:opacity .3s;padding:0 16px}
   .holejump.out{opacity:0}
   .hj-card{background:#0a6a3a;color:#f6efda;border-radius:14px;padding:9px 18px;box-shadow:0 10px 28px rgba(10,60,35,.38);text-align:center;display:flex;flex-direction:column;align-items:center;gap:1px;cursor:pointer;max-width:86%;animation:hjin .24s ease}
   .hj-chk{font-size:19px;line-height:1}
@@ -583,12 +600,14 @@
 
   .modal-bg{position:fixed;inset:0;background:rgba(12,30,20,.5);z-index:50;display:none;align-items:flex-end;justify-content:center}
   .modal-bg.show{display:flex}
-  .modal{background:var(--paper);width:100%;max-width:520px;border-radius:20px 20px 0 0;padding:18px 18px calc(env(safe-area-inset-bottom) + 18px);max-height:88vh;overflow:auto;animation:up .25s ease}
+  /* overscroll-behavior:contain => el scroll dentro de la hoja no se encadena al documento de atrás */
+  .modal{background:var(--paper);width:100%;max-width:520px;border-radius:20px 20px 0 0;padding:18px 18px calc(var(--sab) + 18px);max-height:88vh;overflow:auto;overscroll-behavior:contain;animation:up .25s ease}
   @keyframes up{from{transform:translateY(100%)}to{transform:none}}
   .modal h3{font-family:'Newsreader',serif;font-weight:600;font-size:22px;color:var(--fairway);margin-bottom:10px}
   .ruleslist{margin:0 0 6px;padding-left:20px;font-size:13px;line-height:1.5;color:var(--ink)}
   .ruleslist li{margin-bottom:7px}
-  .toast{position:fixed;left:50%;bottom:96px;transform:translateX(-50%) translateY(20px);background:var(--ink);color:#fff;padding:11px 18px;border-radius:999px;font-size:13px;font-weight:600;opacity:0;transition:.25s;z-index:60;pointer-events:none}
+  /* bottom era 96px fijo, sin env(): en iPhone con notch el toast rozaba la nav o quedaba debajo */
+  .toast{position:fixed;left:50%;bottom:calc(var(--navh) + 12px);transform:translateX(-50%) translateY(20px);background:var(--ink);color:#fff;padding:11px 18px;border-radius:999px;font-size:13px;font-weight:600;opacity:0;transition:.25s;z-index:60;pointer-events:none}
   .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
   /* Pull-to-refresh (para uso como web app instalada en el teléfono) */
   #ptr{position:fixed;top:calc(env(safe-area-inset-top) + 6px);left:50%;transform:translateX(-50%) translateY(-46px);z-index:70;width:36px;height:36px;border-radius:50%;background:#fff;box-shadow:0 4px 14px rgba(10,40,24,.18);display:flex;align-items:center;justify-content:center;color:var(--fairway);font-size:18px;opacity:0;pointer-events:none;transition:opacity .15s}
@@ -699,7 +718,7 @@
 
 <script>
 const App = (() => {
-  const APP_VERSION = '2026-07-10-91';   // ⬆️ SUBIR en cada deploy: la app se auto-recarga cuando detecta una versión distinta
+  const APP_VERSION = '2026-07-10-92';   // ⬆️ SUBIR en cada deploy: la app se auto-recarga cuando detecta una versión distinta
   const APP_URL = 'https://app.plagolf.com/';   // dominio canónico: los links de invitación y códigos SIEMPRE usan éste
   const KEY = 'rayas-campestre-v2';
   const uid = () => Math.random().toString(36).slice(2,9);
